@@ -4,6 +4,7 @@ import { CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import ConfirmButton from '@/components/ui/ConfirmButton.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useExpenses } from '@/composables/useExpenses';
@@ -134,9 +135,12 @@ const rows = computed(() => expenses.value);
             >
               Edit
             </BaseButton>
-            <BaseButton variant="ghost" :disabled="busyId === row.id" @click="onDelete(row.id!)">
-              Delete
-            </BaseButton>
+            <ConfirmButton
+              label="Delete"
+              confirm-label="Really delete?"
+              :disabled="busyId === row.id"
+              @confirm="onDelete(row.id!)"
+            />
           </div>
         </template>
       </li>
