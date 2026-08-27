@@ -4,6 +4,10 @@ import { useSpaceStore } from "@/stores/space";
 import LoginView from "@/views/LoginView.vue";
 import SpaceView from "@/views/SpaceView.vue";
 import PocketHomeView from "@/views/pocket/PocketHomeView.vue";
+import CapView from "@/views/pocket/CapView.vue";
+import CategoriesView from "@/views/pocket/CategoriesView.vue";
+import AddExpenseView from "@/views/pocket/AddExpenseView.vue";
+import HistoryView from "@/views/pocket/HistoryView.vue";
 
 declare module "vue-router" {
   interface RouteMeta {
@@ -19,6 +23,25 @@ const router = createRouter({
     { path: "/login", name: "login", component: LoginView },
     { path: "/spaces", name: "spaces", component: SpaceView },
     { path: "/", name: "home", component: PocketHomeView, meta: { showHeader: true } },
+    { path: "/pocket/cap", name: "pocket-cap", component: CapView, meta: { showHeader: true } },
+    {
+      path: "/pocket/categories",
+      name: "pocket-categories",
+      component: CategoriesView,
+      meta: { showHeader: true },
+    },
+    {
+      path: "/pocket/add",
+      name: "pocket-add",
+      component: AddExpenseView,
+      meta: { showHeader: true },
+    },
+    {
+      path: "/pocket/history",
+      name: "pocket-history",
+      component: HistoryView,
+      meta: { showHeader: true },
+    },
   ],
 });
 
