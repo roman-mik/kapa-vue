@@ -2,12 +2,15 @@
 import { THEME_IDS, themes } from "@roman-mik/kapa-core/theme";
 import { useRouter } from "vue-router";
 import { useSessionStore } from "@/stores/session";
+import { useSpaceStore } from "@/stores/space";
 import { useThemeStore } from "@/stores/theme";
 
-// Temporary — proves task 8's theme switching and task 9's auth end to end.
-// Replaced by SettingsView (theme) and real Pocket screens (task 11).
+// Temporary — proves task 8's theme switching, task 9's auth, and task 10's
+// space selection end to end. Replaced by SettingsView (theme) and real
+// Pocket screens (task 11).
 const theme = useThemeStore();
 const session = useSessionStore();
+const space = useSpaceStore();
 const router = useRouter();
 
 async function onSignOut(): Promise<void> {
@@ -20,6 +23,10 @@ async function onSignOut(): Promise<void> {
   <main>
     <h1>kapa-vue</h1>
     <p>Signed in as {{ session.user?.email }}</p>
+    <p>
+      Space: {{ space.currentSpace?.name }}
+      <router-link to="/spaces">Switch</router-link>
+    </p>
     <p>Pick a theme to confirm it restyles instantly with no flash on reload.</p>
     <div class="switcher">
       <button

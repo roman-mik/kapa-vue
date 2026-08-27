@@ -12,7 +12,10 @@ app.use(createPinia());
 useThemeStore().init();
 
 // Awaited before the router starts navigating, so its first guard sees the
-// restored session (or its absence) instead of an in-flight unknown.
+// restored session (or its absence) instead of an in-flight unknown. The
+// space store is initialized lazily by the router guard itself (it needs
+// an authenticated caller, and must also re-run after a login navigation,
+// not just on startup).
 await useSessionStore().init();
 
 app.use(router);

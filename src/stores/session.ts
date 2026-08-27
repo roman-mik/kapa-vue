@@ -1,6 +1,7 @@
 import type { Session, User } from "@supabase/supabase-js";
 import { defineStore } from "pinia";
 import { supabase } from "@/lib/supabase";
+import { useSpaceStore } from "@/stores/space";
 
 export const useSessionStore = defineStore("session", {
   state: () => ({
@@ -32,6 +33,9 @@ export const useSessionStore = defineStore("session", {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       this.user = null;
+      // Clears the previous user's spaces so a different account signing
+      // in on the same device never briefly sees a stale space list.
+      useSpaceStore().reset();
     },
   },
 });
