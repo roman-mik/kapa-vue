@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   attributionLabel,
-  CURRENCY_EXPONENT,
   type Currency,
   dayLabel,
   zonedDateKey,
@@ -9,7 +8,6 @@ import {
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 import { computed, ref } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
 import ConfirmButton from '@/components/ui/ConfirmButton.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
@@ -20,15 +18,12 @@ import { useSessionStore } from '@/stores/session';
 import { useSpaceStore } from '@/stores/space';
 import { formatMoney } from '@/lib/money';
 
-const { expenses, loading, error, update, remove } = useExpenses();
+const { expenses, loading, error, remove } = useExpenses();
 const { members } = useSpaceMembers();
 const space = useSpaceStore();
 const toast = useToast();
 const session = useSessionStore();
 
-const editingId = ref<string | null>(null);
-const editAmount = ref('');
-const editNote = ref('');
 const busyId = ref<string | null>(null);
 const rowError = ref<string | null>(null);
 
@@ -45,42 +40,6 @@ function attribution(userId: string | null): string {
       formerMember: 'Former member',
     }
   );
-}
-
-function startEdit(
-  id: string,
-  amountMinor: number | null,
-  currency: string | null,
-  note: string | null
-): void {
-  editingId.value = id;
-  const exponent = CURRENCY_EXPONENT[(currency ?? 'RSD') as Currency];
-  editAmount.value = amountMinor !== null ? String(amountMinor / 10 ** exponent) : '';
-  editNote.value = note ?? '';
-}
-
-async function confirmEdit(id: string, currency: string | null): Promise<void> {
-  rowError.value = null;
-  const value = Number(editAmount.value);
-  if (!Number.isFinite(value) || value <= 0) {
-    rowError.value = 'Enter a valid amount.';
-    return;
-  }
-  const exponent = CURRENCY_EXPONENT[(currency ?? 'RSD') as Currency];
-  busyId.value = id;
-  try {
-    await update(id, {
-      amount_minor: Math.round(value * 10 ** exponent),
-      note: editNote.value.trim() || null,
-    });
-    editingId.value = null;
-    toast.success('Expense updated');
-  } catch (err) {
-    rowError.value = err instanceof Error ? err.message : "Couldn't save that expense.";
-    toast.error(rowError.value);
-  } finally {
-    busyId.value = null;
-  }
 }
 
 async function onDelete(id: string): Promise<void> {
@@ -178,42 +137,25 @@ const dayGroups = computed<DayGroup[]>(() => {
 
         <ul class="list">
           <li v-for="row in group.rows" :key="row.id ?? ''">
-            <template v-if="editingId === row.id">
-              <BaseInput v-model="editAmount" type="number" min="0" step="0.01" />
-              <BaseInput v-model="editNote" type="text" placeholder="Note" />
-              <BaseButton
-                variant="secondary"
+            <div class="main">
+              <span class="amount">{{
+                formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)
+              }}</span>
+              <span class="category">{{ row.category_name ?? 'Uncategorized' }}</span>
+              <span class="attribution">{{ attribution(row.user_id) }}</span>
+            </div>
+            <p v-if="row.note" class="note">{{ row.note }}</p>
+            <div class="actions">
+              <router-link :to="{ name: 'pocket-edit', params: { id: row.id } }">
+                <BaseButton variant="ghost">Edit</BaseButton>
+              </router-link>
+              <ConfirmButton
+                label="Delete"
+                confirm-label="Really delete?"
                 :disabled="busyId === row.id"
-                @click="confirmEdit(row.id!, row.currency)"
-              >
-                Save
-              </BaseButton>
-              <BaseButton variant="ghost" @click="editingId = null">Cancel</BaseButton>
-            </template>
-            <template v-else>
-              <div class="main">
-                <span class="amount">{{
-                  formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)
-                }}</span>
-                <span class="category">{{ row.category_name ?? 'Uncategorized' }}</span>
-                <span class="attribution">{{ attribution(row.user_id) }}</span>
-              </div>
-              <p v-if="row.note" class="note">{{ row.note }}</p>
-              <div class="actions">
-                <BaseButton
-                  variant="ghost"
-                  @click="startEdit(row.id!, row.amount_minor, row.currency, row.note)"
-                >
-                  Edit
-                </BaseButton>
-                <ConfirmButton
-                  label="Delete"
-                  confirm-label="Really delete?"
-                  :disabled="busyId === row.id"
-                  @confirm="onDelete(row.id!)"
-                />
-              </div>
-            </template>
+                @confirm="onDelete(row.id!)"
+              />
+            </div>
           </li>
         </ul>
       </section>
