@@ -27,7 +27,13 @@ export const useSpaceStore = defineStore("space", {
     // router guard below waits on `ready` before deciding whether a space
     // still needs picking.
     async init(): Promise<void> {
-      const [spaces, profile] = await Promise.all([listMySpaces(supabase), getProfile(supabase)]);
+      const session = useSessionStore();
+      if (!session.user) return;
+
+      const [spaces, profile] = await Promise.all([
+        listMySpaces(supabase),
+        getProfile(supabase, session.user.id),
+      ]);
       this.spaces = spaces;
 
       const lastActive = profile?.last_active_space_id ?? null;
