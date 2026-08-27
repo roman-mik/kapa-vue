@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseField from '@/components/ui/BaseField.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
 import { useSessionStore } from '@/stores/session';
 
 const session = useSessionStore();
@@ -30,19 +33,23 @@ async function onSubmit(): Promise<void> {
 <template>
   <main class="login">
     <h1>Sign in</h1>
-    <form @submit.prevent="onSubmit">
-      <label>
-        Email
-        <input v-model="email" type="email" autocomplete="username" required />
-      </label>
-      <label>
-        Password
-        <input v-model="password" type="password" autocomplete="current-password" required />
-      </label>
+    <form class="form" @submit.prevent="onSubmit">
+      <BaseField label="Email" v-slot="{ id }">
+        <BaseInput :id="id" v-model="email" type="email" autocomplete="username" required />
+      </BaseField>
+      <BaseField label="Password" v-slot="{ id }">
+        <BaseInput
+          :id="id"
+          v-model="password"
+          type="password"
+          autocomplete="current-password"
+          required
+        />
+      </BaseField>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
-      <button type="submit" :disabled="submitting">
+      <BaseButton type="submit" block :disabled="submitting">
         {{ submitting ? 'Signing in…' : 'Sign in' }}
-      </button>
+      </BaseButton>
     </form>
   </main>
 </template>
@@ -54,50 +61,18 @@ async function onSubmit(): Promise<void> {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  padding: var(--kapa-space-6);
 }
 
-form {
+.form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--kapa-space-4);
   width: min(320px, 100%);
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.875rem;
-  color: var(--kapa-ink-muted);
-}
-
-input {
-  font: inherit;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--kapa-radius-sm);
-  border: 1px solid var(--kapa-neutral-400);
-  background: var(--kapa-surface);
-  color: var(--kapa-ink);
 }
 
 .error {
   color: var(--kapa-negative);
   margin: 0;
-}
-
-button {
-  font: inherit;
-  padding: 0.5rem 1rem;
-  border-radius: var(--kapa-radius-sm);
-  border: none;
-  background: var(--kapa-accent);
-  color: var(--kapa-white);
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 </style>

@@ -2,6 +2,10 @@
 import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseField from '@/components/ui/BaseField.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useExpenses } from '@/composables/useExpenses';
 import { useSpaceStore } from '@/stores/space';
@@ -45,92 +49,54 @@ async function onSubmit(): Promise<void> {
 </script>
 
 <template>
-  <main class="add-expense">
+  <main class="page">
     <h1>Add expense</h1>
-    <form @submit.prevent="onSubmit">
-      <label>
-        Amount
-        <input
+    <form class="form" @submit.prevent="onSubmit">
+      <BaseField label="Amount" v-slot="{ id }">
+        <BaseInput
+          :id="id"
           v-model="amount"
           type="number"
           min="0"
           :step="exponent > 0 ? '0.01' : '1'"
           required
         />
-      </label>
-      <label>
-        Currency
-        <select v-model="currency">
+      </BaseField>
+
+      <BaseField label="Currency" v-slot="{ id }">
+        <BaseSelect :id="id" v-model="currency">
           <option v-for="c in CURRENCIES" :key="c" :value="c">{{ c }}</option>
-        </select>
-      </label>
-      <label>
-        Category
-        <select v-model="categoryId">
+        </BaseSelect>
+      </BaseField>
+
+      <BaseField label="Category" v-slot="{ id }">
+        <BaseSelect :id="id" v-model="categoryId">
           <option value="">Uncategorized</option>
           <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </select>
-      </label>
-      <label>
-        Note
-        <input v-model="note" type="text" />
-      </label>
+        </BaseSelect>
+      </BaseField>
+
+      <BaseField label="Note" v-slot="{ id }">
+        <BaseInput :id="id" v-model="note" type="text" />
+      </BaseField>
+
       <p v-if="error" role="alert" class="error">{{ error }}</p>
-      <button type="submit" :disabled="submitting">
+      <BaseButton type="submit" block :disabled="submitting">
         {{ submitting ? 'Adding…' : 'Add expense' }}
-      </button>
+      </BaseButton>
     </form>
   </main>
 </template>
 
 <style scoped>
-.add-expense {
-  max-width: 420px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
-form {
+.form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.875rem;
-  color: var(--kapa-ink-muted);
-}
-
-input,
-select {
-  font: inherit;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--kapa-radius-sm);
-  border: 1px solid var(--kapa-neutral-400);
-  background: var(--kapa-surface);
-  color: var(--kapa-ink);
+  gap: var(--kapa-space-4);
 }
 
 .error {
   color: var(--kapa-negative);
   margin: 0;
-}
-
-button {
-  font: inherit;
-  padding: 0.5rem 1rem;
-  border-radius: var(--kapa-radius-sm);
-  border: none;
-  background: var(--kapa-accent);
-  color: var(--kapa-white);
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 </style>

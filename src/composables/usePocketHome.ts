@@ -103,6 +103,11 @@ export function usePocketHome() {
   const summary = computed<PocketSummary | null>(() => {
     const currentSpace = space.currentSpace;
     if (!currentSpace) return null;
+    // Before the cap has loaded at least once, cap.cap.value is null the
+    // same way "no cap configured" is — without this guard, the home
+    // screen would flash a "no cap set" state on every load, even for
+    // spaces that do have one, until the real cap arrives.
+    if (cap.loading.value && cap.cap.value === null) return null;
 
     const timeZone = currentSpace.timezone;
     const spaceCurrency = currentSpace.currency as Currency;

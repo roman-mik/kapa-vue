@@ -1,8 +1,14 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseCard from '@/components/ui/BaseCard.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import ProgressBar from '@/components/ui/ProgressBar.vue';
+import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import StatBlock from '@/components/ui/StatBlock.vue';
 import { usePocketHome } from '@/composables/usePocketHome';
 import { useCategories } from '@/composables/useCategories';
 import { formatMoney } from '@/lib/money';
-import { computed } from 'vue';
 
 const { summary, loading, error } = usePocketHome();
 const { categories } = useCategories({ includeArchived: true });
@@ -13,57 +19,68 @@ function categoryName(categoryId: string | null): string {
 }
 
 const barPct = computed(() => summary.value?.spentPct ?? 0);
+
+const barState = computed<'healthy' | 'nudge' | 'over'>(() => {
+  const home = summary.value?.home;
+  if (!home || home.kind === 'no-cap') return 'healthy';
+  if (home.kind === 'over') return 'over';
+  return home.nudge ? 'nudge' : 'healthy';
+});
 </script>
 
 <template>
-  <main class="home">
-    <p v-if="loading && !summary">Loading…</p>
+  <main class="page home">
+    <template v-if="loading && !summary">
+      <SkeletonBlock height="160px" radius="md" />
+      <SkeletonBlock height="80px" radius="md" />
+    </template>
+
     <p v-else-if="error" role="alert" class="error">{{ error }}</p>
 
     <template v-else-if="summary">
-      <section v-if="summary.home.kind === 'no-cap'" class="card no-cap">
-        <h1>No cap set yet</h1>
-        <p>Set a monthly cap to start tracking your spending against it.</p>
-        <router-link class="cta" to="/pocket/cap">Set a cap</router-link>
-      </section>
-
-      <section v-else class="card">
-        <h1>{{ formatMoney(summary.spent, summary.currency) }} spent this month</h1>
-
-        <div
-          class="bar"
-          role="progressbar"
-          :aria-valuenow="barPct"
-          aria-valuemin="0"
-          aria-valuemax="100"
+      <BaseCard v-if="summary.home.kind === 'no-cap'">
+        <EmptyState
+          title="No cap set yet"
+          message="Set a monthly cap to start tracking your spending against it."
         >
-          <div
-            class="bar-fill"
-            :class="{ over: summary.home.kind === 'over' }"
-            :style="{ width: `${barPct}%` }"
-          />
-        </div>
+          <router-link to="/pocket/cap"><BaseButton>Set a cap</BaseButton></router-link>
+        </EmptyState>
+      </BaseCard>
 
-        <p v-if="summary.home.kind === 'over'" class="over-line">
+      <BaseCard v-else class="summary-card">
+        <StatBlock
+          :value="formatMoney(summary.spent, summary.currency)"
+          label="spent this month"
+          :tone="summary.home.kind === 'over' ? 'negative' : 'default'"
+        />
+
+        <ProgressBar :percent="barPct" :state="barState" />
+
+        <p v-if="summary.home.kind === 'over'" class="line negative">
           {{ formatMoney(summary.overspend, summary.currency) }} over your cap.
         </p>
-        <p v-else>{{ formatMoney(summary.remaining, summary.currency) }} left this month.</p>
+        <p v-else class="line">
+          {{ formatMoney(summary.remaining, summary.currency) }} left this month.
+        </p>
 
-        <p v-if="summary.home.kind === 'over' && summary.home.recovery.suggested" class="recovery">
+        <p
+          v-if="summary.home.kind === 'over' && summary.home.recovery.suggested"
+          class="line muted"
+        >
           To even out, consider next month's cap at
           {{ formatMoney(summary.home.recovery.cap, summary.currency) }}.
         </p>
 
-        <p v-if="summary.home.kind === 'in-budget' && summary.home.nudge" class="nudge">
+        <p v-if="summary.home.kind === 'in-budget' && summary.home.nudge" class="line negative">
           You're approaching your cap — {{ formatMoney(summary.safeDaily, summary.currency) }}/day
           left for the rest of the month.
         </p>
-        <p v-else-if="summary.home.kind === 'in-budget'">
+        <p v-else-if="summary.home.kind === 'in-budget'" class="line muted">
           Safe to spend {{ formatMoney(summary.safeDaily, summary.currency) }}/day for the rest of
           the month.
         </p>
 
-        <p v-if="summary.home.kind === 'in-budget' && summary.home.showPace" class="pace">
+        <p v-if="summary.home.kind === 'in-budget' && summary.home.showPace" class="line muted">
           <template v-if="summary.paceGap >= 0">
             {{ formatMoney(summary.paceGap, summary.currency) }} under an even pace.
           </template>
@@ -74,111 +91,66 @@ const barPct = computed(() => summary.value?.spentPct ?? 0);
 
         <p
           v-if="summary.home.kind === 'in-budget' && summary.home.showProjection"
-          class="projection"
+          class="line muted"
         >
           Projected to land at {{ formatMoney(summary.projection, summary.currency) }} by month end.
         </p>
-      </section>
+      </BaseCard>
 
-      <section v-if="summary.categoryBreakdown.length" class="card breakdown">
+      <BaseCard v-if="summary.categoryBreakdown.length" padding="sm">
         <h2>By category</h2>
-        <ul>
+        <ul class="breakdown">
           <li v-for="row in summary.categoryBreakdown" :key="row.categoryId ?? 'none'">
             <span>{{ categoryName(row.categoryId) }}</span>
             <span>{{ formatMoney(row.spent, summary.currency) }}</span>
           </li>
         </ul>
-      </section>
-
-      <router-link class="cta add" to="/pocket/add">Add expense</router-link>
+      </BaseCard>
     </template>
   </main>
 </template>
 
 <style scoped>
 .home {
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--kapa-space-4);
 }
 
-.card {
-  background: var(--kapa-surface);
-  border-radius: var(--kapa-radius-md);
-  padding: 1.5rem;
-  box-shadow: var(--kapa-shadow-sm);
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kapa-space-3);
 }
 
-h1 {
-  font-size: 1.25rem;
-  margin: 0 0 1rem;
+.line {
+  margin: 0;
+  color: var(--kapa-ink);
 }
 
-h2 {
-  font-size: 1rem;
-  margin: 0 0 0.75rem;
+.line.muted {
+  color: var(--kapa-ink-muted);
+  font-size: var(--kapa-text-caption-size);
 }
 
-.bar {
-  height: 10px;
-  border-radius: 999px;
-  background: var(--kapa-neutral-300);
-  overflow: hidden;
-  margin-bottom: 0.75rem;
-}
-
-.bar-fill {
-  height: 100%;
-  background: var(--kapa-accent);
-}
-
-.bar-fill.over {
-  background: var(--kapa-negative);
-}
-
-.over-line {
+.line.negative {
   color: var(--kapa-negative);
   font-weight: 600;
 }
 
-.nudge {
-  color: var(--kapa-negative);
-}
-
-.recovery,
-.pace,
-.projection {
-  color: var(--kapa-ink-muted);
-  font-size: 0.9rem;
-}
-
-.breakdown ul {
+.breakdown {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--kapa-space-2);
 }
 
 .breakdown li {
   display: flex;
   justify-content: space-between;
-  font-size: 0.9rem;
-}
-
-.cta {
-  display: block;
-  text-align: center;
-  padding: 0.6rem 1rem;
-  border-radius: var(--kapa-radius-sm);
-  background: var(--kapa-accent);
-  color: var(--kapa-white);
-  text-decoration: none;
-  font-weight: 600;
+  font-size: var(--kapa-text-caption-size);
 }
 
 .error {

@@ -2,6 +2,10 @@
 import { attributionLabel } from '@roman-mik/kapa-core/pocket';
 import { CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref } from 'vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
+import EmptyState from '@/components/ui/EmptyState.vue';
+import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useExpenses } from '@/composables/useExpenses';
 import { useSpaceMembers } from '@/composables/useSpaceMembers';
 import { useSessionStore } from '@/stores/session';
@@ -79,25 +83,31 @@ const rows = computed(() => expenses.value);
 </script>
 
 <template>
-  <main class="history">
+  <main class="page">
     <h1>History</h1>
-    <p v-if="loading && !rows.length">Loading…</p>
+
+    <template v-if="loading && !rows.length">
+      <SkeletonBlock height="64px" />
+      <SkeletonBlock height="64px" />
+      <SkeletonBlock height="64px" />
+    </template>
+
     <p v-else-if="error" role="alert" class="error">{{ error }}</p>
-    <p v-else-if="!rows.length">No expenses yet.</p>
+    <EmptyState v-else-if="!rows.length" title="No expenses yet" />
 
     <ul v-else class="list">
       <li v-for="row in rows" :key="row.id ?? ''">
         <template v-if="editingId === row.id">
-          <input v-model="editAmount" type="number" min="0" step="0.01" />
-          <input v-model="editNote" type="text" placeholder="Note" />
-          <button
-            type="button"
+          <BaseInput v-model="editAmount" type="number" min="0" step="0.01" />
+          <BaseInput v-model="editNote" type="text" placeholder="Note" />
+          <BaseButton
+            variant="secondary"
             :disabled="busyId === row.id"
             @click="confirmEdit(row.id!, row.currency)"
           >
             Save
-          </button>
-          <button type="button" @click="editingId = null">Cancel</button>
+          </BaseButton>
+          <BaseButton variant="ghost" @click="editingId = null">Cancel</BaseButton>
         </template>
         <template v-else>
           <div class="main">
@@ -109,15 +119,15 @@ const rows = computed(() => expenses.value);
           </div>
           <p v-if="row.note" class="note">{{ row.note }}</p>
           <div class="actions">
-            <button
-              type="button"
+            <BaseButton
+              variant="ghost"
               @click="startEdit(row.id!, row.amount_minor, row.currency, row.note)"
             >
               Edit
-            </button>
-            <button type="button" :disabled="busyId === row.id" @click="onDelete(row.id!)">
+            </BaseButton>
+            <BaseButton variant="ghost" :disabled="busyId === row.id" @click="onDelete(row.id!)">
               Delete
-            </button>
+            </BaseButton>
           </div>
         </template>
       </li>
@@ -127,23 +137,17 @@ const rows = computed(() => expenses.value);
 </template>
 
 <style scoped>
-.history {
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--kapa-space-3);
 }
 
 .list li {
-  padding: 0.75rem;
+  padding: var(--kapa-space-3);
   border-radius: var(--kapa-radius-sm);
   border: 1px solid var(--kapa-neutral-400);
   background: var(--kapa-surface);
@@ -152,7 +156,7 @@ const rows = computed(() => expenses.value);
 .main {
   display: flex;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: var(--kapa-space-2);
 }
 
 .amount {
@@ -161,42 +165,25 @@ const rows = computed(() => expenses.value);
 
 .category {
   color: var(--kapa-ink-muted);
-  font-size: 0.85rem;
+  font-size: var(--kapa-text-caption-size);
 }
 
 .attribution {
   margin-left: auto;
   color: var(--kapa-ink-subtle);
-  font-size: 0.8rem;
+  font-size: var(--kapa-text-caption-size);
 }
 
 .note {
-  margin: 0.25rem 0 0;
+  margin: var(--kapa-space-1) 0 0;
   color: var(--kapa-ink-muted);
-  font-size: 0.85rem;
+  font-size: var(--kapa-text-caption-size);
 }
 
 .actions {
   display: flex;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
-
-.actions button,
-.list input {
-  font: inherit;
-  font-size: 0.85rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: var(--kapa-radius-sm);
-  border: 1px solid var(--kapa-neutral-400);
-  background: transparent;
-  color: var(--kapa-ink);
-  cursor: pointer;
-}
-
-.list input {
-  cursor: text;
-  background: var(--kapa-bg);
+  gap: var(--kapa-space-2);
+  margin-top: var(--kapa-space-2);
 }
 
 .error {

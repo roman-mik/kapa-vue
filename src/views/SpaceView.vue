@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseField from '@/components/ui/BaseField.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
 import { useSpaceStore } from '@/stores/space';
 
 const space = useSpaceStore();
@@ -60,22 +63,21 @@ async function onLeave(spaceId: string): Promise<void> {
         >
           {{ s.name }}
         </button>
-        <button type="button" class="leave" :disabled="leavingId === s.id" @click="onLeave(s.id)">
+        <BaseButton variant="ghost" :disabled="leavingId === s.id" @click="onLeave(s.id)">
           Leave
-        </button>
+        </BaseButton>
       </li>
     </ul>
     <p v-else>You're not in any spaces yet — join one with an invite code below.</p>
 
     <form class="join" @submit.prevent="onJoin">
-      <label>
-        Invite code
-        <input v-model="inviteCode" type="text" required />
-      </label>
+      <BaseField label="Invite code" v-slot="{ id }">
+        <BaseInput :id="id" v-model="inviteCode" type="text" required />
+      </BaseField>
       <p v-if="joinError" role="alert" class="error">{{ joinError }}</p>
-      <button type="submit" :disabled="joining || !inviteCode.trim()">
+      <BaseButton type="submit" block :disabled="joining || !inviteCode.trim()">
         {{ joining ? 'Joining…' : 'Join space' }}
-      </button>
+      </BaseButton>
     </form>
   </main>
 </template>
@@ -86,8 +88,8 @@ async function onLeave(spaceId: string): Promise<void> {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
-  padding: 2rem;
+  gap: var(--kapa-space-5);
+  padding: var(--kapa-space-6);
 }
 
 .list {
@@ -96,19 +98,19 @@ async function onLeave(spaceId: string): Promise<void> {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--kapa-space-2);
   width: min(320px, 100%);
 }
 
 .list li {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--kapa-space-2);
 }
 
 .space {
   flex: 1;
   font: inherit;
-  padding: 0.5rem 1rem;
+  padding: var(--kapa-space-3) var(--kapa-space-4);
   border-radius: var(--kapa-radius-sm);
   border: 1px solid var(--kapa-neutral-400);
   background: var(--kapa-surface);
@@ -123,62 +125,15 @@ async function onLeave(spaceId: string): Promise<void> {
   background: var(--kapa-accent-100);
 }
 
-.leave {
-  font: inherit;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--kapa-radius-sm);
-  border: 1px solid var(--kapa-neutral-400);
-  background: transparent;
-  color: var(--kapa-ink-muted);
-  cursor: pointer;
-}
-
-.leave:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
 .join {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--kapa-space-4);
   width: min(320px, 100%);
-}
-
-.join label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.875rem;
-  color: var(--kapa-ink-muted);
-}
-
-.join input {
-  font: inherit;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--kapa-radius-sm);
-  border: 1px solid var(--kapa-neutral-400);
-  background: var(--kapa-surface);
-  color: var(--kapa-ink);
 }
 
 .error {
   color: var(--kapa-negative);
   margin: 0;
-}
-
-.join button {
-  font: inherit;
-  padding: 0.5rem 1rem;
-  border-radius: var(--kapa-radius-sm);
-  border: none;
-  background: var(--kapa-accent);
-  color: var(--kapa-white);
-  cursor: pointer;
-}
-
-.join button:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 </style>

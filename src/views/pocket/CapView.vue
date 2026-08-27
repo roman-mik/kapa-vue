@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseCheckbox from '@/components/ui/BaseCheckbox.vue';
+import BaseField from '@/components/ui/BaseField.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
+import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useCap } from '@/composables/useCap';
 import { useSpaceStore } from '@/stores/space';
 
@@ -51,89 +56,51 @@ async function onSubmit(): Promise<void> {
 </script>
 
 <template>
-  <main class="cap">
+  <main class="page">
     <h1>Monthly cap</h1>
-    <p v-if="loading && !cap">Loading…</p>
+
+    <template v-if="loading && !cap">
+      <SkeletonBlock height="42px" />
+      <SkeletonBlock height="42px" />
+    </template>
+
     <p v-else-if="error" role="alert" class="error">{{ error }}</p>
 
-    <form v-else @submit.prevent="onSubmit">
-      <label>
-        Cap ({{ currency }})
-        <input
+    <form v-else class="form" @submit.prevent="onSubmit">
+      <BaseField :label="`Cap (${currency})`" v-slot="{ id }">
+        <BaseInput
+          :id="id"
           v-model="capAmount"
           type="number"
           min="0"
           :step="exponent > 0 ? '0.01' : '1'"
           required
         />
-      </label>
-      <label class="checkbox">
-        <input v-model="nudgeEnabled" type="checkbox" />
-        Warn me as I approach the cap
-      </label>
-      <label v-if="nudgeEnabled">
-        Warn at (% of cap)
-        <input v-model.number="nudgePct" type="number" min="1" max="100" required />
-      </label>
+      </BaseField>
+
+      <BaseCheckbox v-model="nudgeEnabled" label="Warn me as I approach the cap" />
+
+      <BaseField v-if="nudgeEnabled" label="Warn at (% of cap)" v-slot="{ id }">
+        <BaseInput :id="id" v-model.number="nudgePct" type="number" min="1" max="100" required />
+      </BaseField>
+
       <p v-if="saveError" role="alert" class="error">{{ saveError }}</p>
-      <button type="submit" :disabled="saving">{{ saving ? 'Saving…' : 'Save' }}</button>
+      <BaseButton type="submit" block :disabled="saving">{{
+        saving ? 'Saving…' : 'Save'
+      }}</BaseButton>
     </form>
   </main>
 </template>
 
 <style scoped>
-.cap {
-  max-width: 420px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
-form {
+.form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-}
-
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.875rem;
-  color: var(--kapa-ink-muted);
-}
-
-label.checkbox {
-  flex-direction: row;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-input[type='number'] {
-  font: inherit;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--kapa-radius-sm);
-  border: 1px solid var(--kapa-neutral-400);
-  background: var(--kapa-surface);
-  color: var(--kapa-ink);
+  gap: var(--kapa-space-4);
 }
 
 .error {
   color: var(--kapa-negative);
   margin: 0;
-}
-
-button {
-  font: inherit;
-  padding: 0.5rem 1rem;
-  border-radius: var(--kapa-radius-sm);
-  border: none;
-  background: var(--kapa-accent);
-  color: var(--kapa-white);
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 </style>

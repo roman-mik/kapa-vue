@@ -1,5 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseField from '@/components/ui/BaseField.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
+import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useCategories } from '@/composables/useCategories';
 
 const { categories, loading, error, add, rename, archive, restore } = useCategories({
@@ -65,9 +69,15 @@ async function onRestore(id: string): Promise<void> {
 </script>
 
 <template>
-  <main class="categories">
+  <main class="page">
     <h1>Categories</h1>
-    <p v-if="loading && !categories.length">Loading…</p>
+
+    <template v-if="loading && !categories.length">
+      <SkeletonBlock height="48px" />
+      <SkeletonBlock height="48px" />
+      <SkeletonBlock height="48px" />
+    </template>
+
     <p v-else-if="error" role="alert" class="error">{{ error }}</p>
 
     <template v-else>
@@ -78,76 +88,73 @@ async function onRestore(id: string): Promise<void> {
           :class="{ archived: category.archived }"
         >
           <template v-if="renamingId === category.id">
-            <input v-model="renameValue" type="text" @keyup.enter="confirmRename(category.id)" />
-            <button type="button" @click="confirmRename(category.id)">Save</button>
-            <button type="button" @click="renamingId = null">Cancel</button>
+            <BaseInput
+              v-model="renameValue"
+              type="text"
+              @keyup.enter="confirmRename(category.id)"
+            />
+            <BaseButton variant="secondary" @click="confirmRename(category.id)">Save</BaseButton>
+            <BaseButton variant="ghost" @click="renamingId = null">Cancel</BaseButton>
           </template>
           <template v-else>
             <span class="name">{{ category.name }}</span>
             <span v-if="category.archived" class="badge">Archived</span>
             <template v-if="!category.archived">
-              <button
-                type="button"
+              <BaseButton
+                variant="ghost"
                 :disabled="busyId === category.id"
                 @click="startRename(category.id, category.name)"
               >
                 Rename
-              </button>
-              <button
-                type="button"
+              </BaseButton>
+              <BaseButton
+                variant="ghost"
                 :disabled="busyId === category.id"
                 @click="onArchive(category.id)"
               >
                 Archive
-              </button>
+              </BaseButton>
             </template>
-            <button
+            <BaseButton
               v-else
-              type="button"
+              variant="ghost"
               :disabled="busyId === category.id"
               @click="onRestore(category.id)"
             >
               Restore
-            </button>
+            </BaseButton>
           </template>
         </li>
       </ul>
 
       <form class="add" @submit.prevent="onAdd">
-        <label>
-          New category
-          <input v-model="newName" type="text" required />
-        </label>
+        <BaseField label="New category" v-slot="{ id }">
+          <BaseInput :id="id" v-model="newName" type="text" required />
+        </BaseField>
         <p v-if="addError" role="alert" class="error">{{ addError }}</p>
-        <button type="submit" :disabled="adding || !newName.trim()">
+        <BaseButton type="submit" block :disabled="adding || !newName.trim()">
           {{ adding ? 'Adding…' : 'Add category' }}
-        </button>
+        </BaseButton>
       </form>
     </template>
   </main>
 </template>
 
 <style scoped>
-.categories {
-  max-width: 420px;
-  margin: 0 auto;
-  padding: 2rem 1rem;
-}
-
 .list {
   list-style: none;
-  margin: 0 0 1.5rem;
+  margin: 0 0 var(--kapa-space-5);
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--kapa-space-2);
 }
 
 .list li {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  gap: var(--kapa-space-2);
+  padding: var(--kapa-space-2) var(--kapa-space-3);
   border-radius: var(--kapa-radius-sm);
   border: 1px solid var(--kapa-neutral-400);
   background: var(--kapa-surface);
@@ -162,67 +169,14 @@ async function onRestore(id: string): Promise<void> {
 }
 
 .badge {
-  font-size: 0.75rem;
+  font-size: var(--kapa-text-caption-size);
   color: var(--kapa-ink-muted);
-}
-
-.list button {
-  font: inherit;
-  font-size: 0.85rem;
-  padding: 0.3rem 0.6rem;
-  border-radius: var(--kapa-radius-sm);
-  border: 1px solid var(--kapa-neutral-400);
-  background: transparent;
-  color: var(--kapa-ink);
-  cursor: pointer;
-}
-
-.list input[type='text'] {
-  flex: 1;
-  font: inherit;
-  padding: 0.3rem 0.5rem;
-  border-radius: var(--kapa-radius-sm);
-  border: 1px solid var(--kapa-neutral-400);
-  background: var(--kapa-bg);
-  color: var(--kapa-ink);
 }
 
 .add {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-}
-
-.add label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.875rem;
-  color: var(--kapa-ink-muted);
-}
-
-.add input {
-  font: inherit;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--kapa-radius-sm);
-  border: 1px solid var(--kapa-neutral-400);
-  background: var(--kapa-surface);
-  color: var(--kapa-ink);
-}
-
-.add button {
-  font: inherit;
-  padding: 0.5rem 1rem;
-  border-radius: var(--kapa-radius-sm);
-  border: none;
-  background: var(--kapa-accent);
-  color: var(--kapa-white);
-  cursor: pointer;
-}
-
-.add button:disabled {
-  opacity: 0.6;
-  cursor: default;
+  gap: var(--kapa-space-3);
 }
 
 .error {
