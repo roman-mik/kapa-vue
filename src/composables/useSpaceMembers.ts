@@ -1,8 +1,8 @@
-import type { SpaceMember } from "@roman-mik/kapa-core/core";
-import { listSpaceMembers } from "@roman-mik/kapa-core/core";
-import { ref, watch } from "vue";
-import { supabase } from "@/lib/supabase";
-import { useSpaceStore } from "@/stores/space";
+import type { SpaceMember } from '@roman-mik/kapa-core/core';
+import { listSpaceMembers } from '@roman-mik/kapa-core/core';
+import { ref, watch } from 'vue';
+import { supabase } from '@/lib/supabase';
+import { useSpaceStore } from '@/stores/space';
 
 // Feeds pocket/attribution.ts's attributionLabel on the history screen —
 // resolves "who added this expense" for the current space's members.

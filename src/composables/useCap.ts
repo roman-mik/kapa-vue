@@ -1,8 +1,8 @@
-import type { Cap } from "@roman-mik/kapa-core/pocket/queries";
-import { getCap, upsertCap } from "@roman-mik/kapa-core/pocket/queries";
-import { ref, watch } from "vue";
-import { supabase } from "@/lib/supabase";
-import { useSpaceStore } from "@/stores/space";
+import type { Cap } from '@roman-mik/kapa-core/pocket/queries';
+import { getCap, upsertCap } from '@roman-mik/kapa-core/pocket/queries';
+import { ref, watch } from 'vue';
+import { supabase } from '@/lib/supabase';
+import { useSpaceStore } from '@/stores/space';
 
 export interface SetCapInput {
   monthlyCapMinor: number;

@@ -1,16 +1,16 @@
-import type { Space } from "@roman-mik/kapa-core/core";
+import type { Space } from '@roman-mik/kapa-core/core';
 import {
   getProfile,
   joinSpace,
   leaveSpace,
   listMySpaces,
   updateLastActiveSpace,
-} from "@roman-mik/kapa-core/core";
-import { defineStore } from "pinia";
-import { supabase } from "@/lib/supabase";
-import { useSessionStore } from "@/stores/session";
+} from '@roman-mik/kapa-core/core';
+import { defineStore } from 'pinia';
+import { supabase } from '@/lib/supabase';
+import { useSessionStore } from '@/stores/session';
 
-export const useSpaceStore = defineStore("space", {
+export const useSpaceStore = defineStore('space', {
   state: () => ({
     spaces: [] as Space[],
     currentSpaceId: null as string | null,

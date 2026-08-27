@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useCategories } from "@/composables/useCategories";
+import { ref } from 'vue';
+import { useCategories } from '@/composables/useCategories';
 
 const { categories, loading, error, add, rename, archive, restore } = useCategories({
   includeArchived: true,
 });
 
-const newName = ref("");
+const newName = ref('');
 const adding = ref(false);
 const addError = ref<string | null>(null);
 const renamingId = ref<string | null>(null);
-const renameValue = ref("");
+const renameValue = ref('');
 const busyId = ref<string | null>(null);
 
 async function onAdd(): Promise<void> {
@@ -20,7 +20,7 @@ async function onAdd(): Promise<void> {
   adding.value = true;
   try {
     await add(name);
-    newName.value = "";
+    newName.value = '';
   } catch (err) {
     addError.value = err instanceof Error ? err.message : "Couldn't add that category.";
   } finally {
@@ -120,7 +120,7 @@ async function onRestore(id: string): Promise<void> {
         </label>
         <p v-if="addError" role="alert" class="error">{{ addError }}</p>
         <button type="submit" :disabled="adding || !newName.trim()">
-          {{ adding ? "Adding…" : "Add category" }}
+          {{ adding ? 'Adding…' : 'Add category' }}
         </button>
       </form>
     </template>
@@ -177,7 +177,7 @@ async function onRestore(id: string): Promise<void> {
   cursor: pointer;
 }
 
-.list input[type="text"] {
+.list input[type='text'] {
   flex: 1;
   font: inherit;
   padding: 0.3rem 0.5rem;

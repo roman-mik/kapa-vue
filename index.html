@@ -11,9 +11,9 @@
       // flash of the default theme on reload. src/stores/theme.ts's init()
       // reads the same key to sync Pinia state to what's already applied.
       (function () {
-        var stored = localStorage.getItem("kapa-theme");
-        var theme = stored === "sand" || stored === "moss" ? stored : "sand";
-        document.documentElement.setAttribute("data-theme", theme);
+        var stored = localStorage.getItem('kapa-theme');
+        var theme = stored === 'sand' || stored === 'moss' ? stored : 'sand';
+        document.documentElement.setAttribute('data-theme', theme);
       })();
     </script>
   </head>

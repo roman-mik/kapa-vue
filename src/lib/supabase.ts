@@ -1,6 +1,6 @@
-import type { Database } from "@roman-mik/kapa-core/types";
-import { createClient } from "@supabase/supabase-js";
-import { supabaseEnv } from "@/lib/env";
+import type { Database } from '@roman-mik/kapa-core/types';
+import { createClient } from '@supabase/supabase-js';
+import { supabaseEnv } from '@/lib/env';
 
 const { url, key } = supabaseEnv();
 

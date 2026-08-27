@@ -1,15 +1,15 @@
-import { createRouter, createWebHistory } from "vue-router";
-import { useSessionStore } from "@/stores/session";
-import { useSpaceStore } from "@/stores/space";
-import LoginView from "@/views/LoginView.vue";
-import SpaceView from "@/views/SpaceView.vue";
-import PocketHomeView from "@/views/pocket/PocketHomeView.vue";
-import CapView from "@/views/pocket/CapView.vue";
-import CategoriesView from "@/views/pocket/CategoriesView.vue";
-import AddExpenseView from "@/views/pocket/AddExpenseView.vue";
-import HistoryView from "@/views/pocket/HistoryView.vue";
+import { createRouter, createWebHistory } from 'vue-router';
+import { useSessionStore } from '@/stores/session';
+import { useSpaceStore } from '@/stores/space';
+import LoginView from '@/views/LoginView.vue';
+import SpaceView from '@/views/SpaceView.vue';
+import PocketHomeView from '@/views/pocket/PocketHomeView.vue';
+import CapView from '@/views/pocket/CapView.vue';
+import CategoriesView from '@/views/pocket/CategoriesView.vue';
+import AddExpenseView from '@/views/pocket/AddExpenseView.vue';
+import HistoryView from '@/views/pocket/HistoryView.vue';
 
-declare module "vue-router" {
+declare module 'vue-router' {
   interface RouteMeta {
     // Whether App.vue renders the space/theme/sign-out header — off for
     // /login and /spaces, on for every Pocket screen.
@@ -20,25 +20,25 @@ declare module "vue-router" {
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: "/login", name: "login", component: LoginView },
-    { path: "/spaces", name: "spaces", component: SpaceView },
-    { path: "/", name: "home", component: PocketHomeView, meta: { showHeader: true } },
-    { path: "/pocket/cap", name: "pocket-cap", component: CapView, meta: { showHeader: true } },
+    { path: '/login', name: 'login', component: LoginView },
+    { path: '/spaces', name: 'spaces', component: SpaceView },
+    { path: '/', name: 'home', component: PocketHomeView, meta: { showHeader: true } },
+    { path: '/pocket/cap', name: 'pocket-cap', component: CapView, meta: { showHeader: true } },
     {
-      path: "/pocket/categories",
-      name: "pocket-categories",
+      path: '/pocket/categories',
+      name: 'pocket-categories',
       component: CategoriesView,
       meta: { showHeader: true },
     },
     {
-      path: "/pocket/add",
-      name: "pocket-add",
+      path: '/pocket/add',
+      name: 'pocket-add',
       component: AddExpenseView,
       meta: { showHeader: true },
     },
     {
-      path: "/pocket/history",
-      name: "pocket-history",
+      path: '/pocket/history',
+      name: 'pocket-history',
       component: HistoryView,
       meta: { showHeader: true },
     },
@@ -54,11 +54,11 @@ router.beforeEach(async (to) => {
   const session = useSessionStore();
   const authenticated = session.user !== null;
 
-  if (to.name !== "login" && !authenticated) {
-    return { name: "login", query: { redirect: to.fullPath } };
+  if (to.name !== 'login' && !authenticated) {
+    return { name: 'login', query: { redirect: to.fullPath } };
   }
-  if (to.name === "login" && authenticated) {
-    return { name: "home" };
+  if (to.name === 'login' && authenticated) {
+    return { name: 'home' };
   }
 
   // Every Pocket query is space-scoped, so a space must be selected before
@@ -68,8 +68,8 @@ router.beforeEach(async (to) => {
   if (authenticated) {
     const space = useSpaceStore();
     if (!space.ready) await space.init();
-    if (to.name !== "spaces" && !space.currentSpaceId) {
-      return { name: "spaces", query: { redirect: to.fullPath } };
+    if (to.name !== 'spaces' && !space.currentSpaceId) {
+      return { name: 'spaces', query: { redirect: to.fullPath } };
     }
   }
 });

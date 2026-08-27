@@ -1,11 +1,11 @@
-import { writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import vue from "@vitejs/plugin-vue";
-import { RADIUS, SHADOW, THEME_IDS, themes, toCssVars } from "@roman-mik/kapa-core/theme";
-import { defineConfig, lazyPlugins, loadEnv, type Plugin } from "vite-plus";
-import { parseSupabaseEnv } from "./src/lib/env-schema.js";
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import vue from '@vitejs/plugin-vue';
+import { RADIUS, SHADOW, THEME_IDS, themes, toCssVars } from '@roman-mik/kapa-core/theme';
+import { defineConfig, lazyPlugins, loadEnv, type Plugin } from 'vite-plus';
+import { parseSupabaseEnv } from './src/lib/env-schema.js';
 
-const themeVarsPath = fileURLToPath(new URL("./src/styles/theme-vars.css", import.meta.url));
+const themeVarsPath = fileURLToPath(new URL('./src/styles/theme-vars.css', import.meta.url));
 
 // kapa-core ships theme data, not CSS. This turns it into the `--kapa-*`
 // custom properties main.css and every component's scoped styles read,
@@ -15,21 +15,21 @@ function generateThemeCss(): string {
   const structureVars = [
     ...Object.entries(RADIUS).map(([key, value]) => `  --kapa-radius-${key}: ${value}px;`),
     ...Object.entries(SHADOW).map(([key, value]) => `  --kapa-shadow-${key}: ${value};`),
-  ].join("\n");
+  ].join('\n');
 
   const themeBlocks = THEME_IDS.map((id) => {
     const declarations = Object.entries(toCssVars(themes[id]))
       .map(([property, value]) => `  ${property}: ${value};`)
-      .join("\n");
+      .join('\n');
     return `[data-theme="${id}"] {\n${declarations}\n}`;
-  }).join("\n\n");
+  }).join('\n\n');
 
   return `/* Generated from @roman-mik/kapa-core/theme — do not edit by hand. */\n:root {\n${structureVars}\n}\n\n${themeBlocks}\n`;
 }
 
 function kapaThemeCss(): Plugin {
   return {
-    name: "kapa-theme-css",
+    name: 'kapa-theme-css',
     buildStart() {
       writeFileSync(themeVarsPath, generateThemeCss());
     },
@@ -41,22 +41,36 @@ export default defineConfig(({ mode }) => {
   // Validated here, not just in src/lib/env.ts's browser-side call, so a
   // missing/invalid var fails `vp build`/`vp dev` immediately instead of
   // surfacing as a runtime error on the first page load.
-  parseSupabaseEnv(loadEnv(mode, process.cwd(), "VITE_"));
+  parseSupabaseEnv(loadEnv(mode, process.cwd(), 'VITE_'));
 
   return {
     staged: {
-      "*": "vp check --fix",
+      '*': 'vp check --fix',
     },
-    fmt: {},
+    // Closest match to tracker's .prettierrc (semi: true, trailingComma:
+    // "es5", tabWidth: 2) — those three are already Oxfmt's defaults, only
+    // singleQuote needs setting explicitly.
+    fmt: { singleQuote: true, trailingComma: 'es5' },
     lint: {
-      jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
-      rules: { "vite-plus/prefer-vite-plus-imports": "error" },
+      jsPlugins: [{ name: 'vite-plus', specifier: 'vite-plus/oxlint-plugin' }],
+      rules: {
+        'vite-plus/prefer-vite-plus-imports': 'error',
+        'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      },
       options: { typeAware: true, typeCheck: true },
     },
     resolve: {
       alias: {
-        "@": fileURLToPath(new URL("./src", import.meta.url)),
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
       },
+    },
+    test: {
+      environment: 'jsdom',
+      include: ['src/**/*.{test,spec}.ts'],
+      // No component/composable specs exist yet (flagged as a gap, not this
+      // task's scope) — without this, `vp test` exits non-zero on an empty
+      // suite and CI never goes green.
+      passWithNoTests: true,
     },
     plugins: lazyPlugins(() => [vue(), kapaThemeCss()]),
   };

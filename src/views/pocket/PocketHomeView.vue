@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { usePocketHome } from "@/composables/usePocketHome";
-import { useCategories } from "@/composables/useCategories";
-import { formatMoney } from "@/lib/money";
-import { computed } from "vue";
+import { usePocketHome } from '@/composables/usePocketHome';
+import { useCategories } from '@/composables/useCategories';
+import { formatMoney } from '@/lib/money';
+import { computed } from 'vue';
 
 const { summary, loading, error } = usePocketHome();
 const { categories } = useCategories({ includeArchived: true });
 
 function categoryName(categoryId: string | null): string {
-  if (categoryId === null) return "Uncategorized";
-  return categories.value.find((c) => c.id === categoryId)?.name ?? "Uncategorized";
+  if (categoryId === null) return 'Uncategorized';
+  return categories.value.find((c) => c.id === categoryId)?.name ?? 'Uncategorized';
 }
 
 const barPct = computed(() => summary.value?.spentPct ?? 0);

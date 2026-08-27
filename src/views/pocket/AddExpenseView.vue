@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from "@roman-mik/kapa-core/pocket";
-import { computed, ref } from "vue";
-import { useRouter } from "vue-router";
-import { useCategories } from "@/composables/useCategories";
-import { useExpenses } from "@/composables/useExpenses";
-import { useSpaceStore } from "@/stores/space";
+import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
+import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { useCategories } from '@/composables/useCategories';
+import { useExpenses } from '@/composables/useExpenses';
+import { useSpaceStore } from '@/stores/space';
 
 const space = useSpaceStore();
 const { categories } = useCategories();
 const { add } = useExpenses();
 const router = useRouter();
 
-const amount = ref("");
-const currency = ref<Currency>((space.currentSpace?.currency ?? "RSD") as Currency);
-const categoryId = ref<string>("");
-const note = ref("");
+const amount = ref('');
+const currency = ref<Currency>((space.currentSpace?.currency ?? 'RSD') as Currency);
+const categoryId = ref<string>('');
+const note = ref('');
 const submitting = ref(false);
 const error = ref<string | null>(null);
 
@@ -24,7 +24,7 @@ async function onSubmit(): Promise<void> {
   error.value = null;
   const value = Number(amount.value);
   if (!Number.isFinite(value) || value <= 0) {
-    error.value = "Enter a valid amount.";
+    error.value = 'Enter a valid amount.';
     return;
   }
   submitting.value = true;
@@ -35,7 +35,7 @@ async function onSubmit(): Promise<void> {
       categoryId: categoryId.value || null,
       note: note.value.trim() || null,
     });
-    await router.push({ name: "home" });
+    await router.push({ name: 'home' });
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Couldn't add that expense.";
   } finally {
@@ -77,7 +77,7 @@ async function onSubmit(): Promise<void> {
       </label>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
       <button type="submit" :disabled="submitting">
-        {{ submitting ? "Adding…" : "Add expense" }}
+        {{ submitting ? 'Adding…' : 'Add expense' }}
       </button>
     </form>
   </main>

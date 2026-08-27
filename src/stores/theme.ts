@@ -1,8 +1,8 @@
-import type { ThemeId } from "@roman-mik/kapa-core/theme";
-import { defineStore } from "pinia";
-import { applyTheme, DEFAULT_THEME, readStoredTheme, storeTheme } from "@/lib/theme";
+import type { ThemeId } from '@roman-mik/kapa-core/theme';
+import { defineStore } from 'pinia';
+import { applyTheme, DEFAULT_THEME, readStoredTheme, storeTheme } from '@/lib/theme';
 
-export const useThemeStore = defineStore("theme", {
+export const useThemeStore = defineStore('theme', {
   state: () => ({
     id: DEFAULT_THEME as ThemeId,
   }),

@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useSessionStore } from "@/stores/session";
+import { ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useSessionStore } from '@/stores/session';
 
 const session = useSessionStore();
 const router = useRouter();
 const route = useRoute();
 
-const email = ref("");
-const password = ref("");
+const email = ref('');
+const password = ref('');
 const error = ref<string | null>(null);
 const submitting = ref(false);
 
@@ -17,10 +17,10 @@ async function onSubmit(): Promise<void> {
   submitting.value = true;
   try {
     await session.signInWithPassword(email.value, password.value);
-    const redirect = typeof route.query.redirect === "string" ? route.query.redirect : "/";
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/';
     await router.replace(redirect);
   } catch (err) {
-    error.value = err instanceof Error ? err.message : "Sign in failed.";
+    error.value = err instanceof Error ? err.message : 'Sign in failed.';
   } finally {
     submitting.value = false;
   }
@@ -41,7 +41,7 @@ async function onSubmit(): Promise<void> {
       </label>
       <p v-if="error" role="alert" class="error">{{ error }}</p>
       <button type="submit" :disabled="submitting">
-        {{ submitting ? "Signing in…" : "Sign in" }}
+        {{ submitting ? 'Signing in…' : 'Sign in' }}
       </button>
     </form>
   </main>

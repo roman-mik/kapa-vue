@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # vite.config.ts validates these at config-load time (env-schema.ts), so
+    # every `vp`/`pnpm` command below needs them, not just the build step.
+    # CI never deploys this build (Vercel builds separately with the real
+    # values) — placeholders only need to satisfy the schema.
+    env:
+      VITE_SUPABASE_URL: https://placeholder.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: placeholder-ci-key
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Vite+
+        run: |
+          curl -fsSL https://vite.plus | bash
+          echo "$HOME/.local/share/vite-plus/bin" >> "$GITHUB_PATH"
+
+      # @roman-mik/kapa-core is private; the project .npmrc only maps the
+      # scope to the registry (see README), so the token has to land in a
+      # user-level .npmrc for pnpm to pick it up, same as local dev.
+      - name: Configure npm auth for GitHub Packages
+        run: echo "//npm.pkg.github.com/:_authToken=${NPM_TOKEN}" >> ~/.npmrc
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - run: vp install
+
+      - name: Remove vp's auto-written devEngines pin
+        # `vp install` writes package.json#devEngines.packageManager pinning
+        # the pnpm version vp itself manages. The build step below calls
+        # plain `pnpm` (not `vp`), which hard-fails on that pin under a
+        # different pnpm with EBADDEVENGINES. `npm pkg delete` itself
+        # enforces devEngines, so edit the file directly.
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            delete pkg.devEngines;
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          "
+
+      - run: vp check
+      - run: vp test
+      - run: pnpm run build

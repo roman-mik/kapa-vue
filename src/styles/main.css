@@ -1,10 +1,10 @@
-@import "./theme-vars.css";
+@import './theme-vars.css';
 
 :root {
   color-scheme: light;
   font:
     16px/1.5 system-ui,
-    "Segoe UI",
+    'Segoe UI',
     Roboto,
     sans-serif;
 }

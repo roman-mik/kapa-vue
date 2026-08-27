@@ -1,4 +1,4 @@
-import type { FxRate, PocketHomeView } from "@roman-mik/kapa-core/pocket";
+import type { FxRate, PocketHomeView } from '@roman-mik/kapa-core/pocket';
 import {
   categoryBreakdown,
   completedDays,
@@ -19,14 +19,14 @@ import {
   spentPct,
   spentTotal,
   zonedDateKey,
-} from "@roman-mik/kapa-core/pocket";
-import { listExpensesInRange } from "@roman-mik/kapa-core/pocket/queries";
-import { listFxRates } from "@roman-mik/kapa-core/core";
-import { computed, ref, watch } from "vue";
-import { supabase } from "@/lib/supabase";
-import { useCap } from "@/composables/useCap";
-import { useSpaceStore } from "@/stores/space";
-import type { ExpenseView } from "@roman-mik/kapa-core/pocket/queries";
+} from '@roman-mik/kapa-core/pocket';
+import { listExpensesInRange } from '@roman-mik/kapa-core/pocket/queries';
+import { listFxRates } from '@roman-mik/kapa-core/core';
+import { computed, ref, watch } from 'vue';
+import { supabase } from '@/lib/supabase';
+import { useCap } from '@/composables/useCap';
+import { useSpaceStore } from '@/stores/space';
+import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 
 export interface PocketSummary {
   month: string;
@@ -46,7 +46,7 @@ function toExpenseAmount(row: ExpenseView): ExpenseAmount {
   return {
     categoryId: row.category_id,
     amountMinor: row.amount_minor ?? 0,
-    currency: (row.currency ?? "RSD") as Currency,
+    currency: (row.currency ?? 'RSD') as Currency,
     spentAt: row.spent_at ?? new Date().toISOString(),
   };
 }

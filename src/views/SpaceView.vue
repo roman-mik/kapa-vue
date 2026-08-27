@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useSpaceStore } from "@/stores/space";
+import { ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { useSpaceStore } from '@/stores/space';
 
 const space = useSpaceStore();
 const router = useRouter();
 const route = useRoute();
 
-const inviteCode = ref("");
+const inviteCode = ref('');
 const joining = ref(false);
 const joinError = ref<string | null>(null);
 const leavingId = ref<string | null>(null);
 
 async function goToRedirect(): Promise<void> {
-  const redirect = typeof route.query.redirect === "string" ? route.query.redirect : "/";
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/';
   await router.replace(redirect);
 }
 
@@ -27,7 +27,7 @@ async function onJoin(): Promise<void> {
   joining.value = true;
   try {
     await space.join(inviteCode.value.trim());
-    inviteCode.value = "";
+    inviteCode.value = '';
     if (space.currentSpaceId) await goToRedirect();
   } catch (err) {
     joinError.value = err instanceof Error ? err.message : "Couldn't join that space.";
@@ -74,7 +74,7 @@ async function onLeave(spaceId: string): Promise<void> {
       </label>
       <p v-if="joinError" role="alert" class="error">{{ joinError }}</p>
       <button type="submit" :disabled="joining || !inviteCode.trim()">
-        {{ joining ? "Joining…" : "Join space" }}
+        {{ joining ? 'Joining…' : 'Join space' }}
       </button>
     </form>
   </main>
@@ -117,7 +117,7 @@ async function onLeave(spaceId: string): Promise<void> {
   text-align: left;
 }
 
-.space[aria-pressed="true"] {
+.space[aria-pressed='true'] {
   border-color: var(--kapa-accent);
   color: var(--kapa-accent-700);
   background: var(--kapa-accent-100);

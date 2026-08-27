@@ -1,14 +1,14 @@
-import type { Category } from "@roman-mik/kapa-core/core";
+import type { Category } from '@roman-mik/kapa-core/core';
 import {
   addCategory,
   archiveCategory,
   listCategories,
   renameCategory,
   restoreCategory,
-} from "@roman-mik/kapa-core/core";
-import { ref, watch } from "vue";
-import { supabase } from "@/lib/supabase";
-import { useSpaceStore } from "@/stores/space";
+} from '@roman-mik/kapa-core/core';
+import { ref, watch } from 'vue';
+import { supabase } from '@/lib/supabase';
+import { useSpaceStore } from '@/stores/space';
 
 // No arithmetic — CRUD over core.categories via kapa-core's query layer only.
 export function useCategories(options: { includeArchived?: boolean } = {}) {

@@ -1,9 +1,9 @@
-import type { Session, User } from "@supabase/supabase-js";
-import { defineStore } from "pinia";
-import { supabase } from "@/lib/supabase";
-import { useSpaceStore } from "@/stores/space";
+import type { Session, User } from '@supabase/supabase-js';
+import { defineStore } from 'pinia';
+import { supabase } from '@/lib/supabase';
+import { useSpaceStore } from '@/stores/space';
 
-export const useSessionStore = defineStore("session", {
+export const useSessionStore = defineStore('session', {
   state: () => ({
     user: null as User | null,
     // Undetermined until the first onAuthStateChange fires (or getSession()

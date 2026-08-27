@@ -1,34 +1,34 @@
 <script setup lang="ts">
-import { attributionLabel } from "@roman-mik/kapa-core/pocket";
-import { CURRENCY_EXPONENT, type Currency } from "@roman-mik/kapa-core/pocket";
-import { computed, ref } from "vue";
-import { useExpenses } from "@/composables/useExpenses";
-import { useSpaceMembers } from "@/composables/useSpaceMembers";
-import { useSessionStore } from "@/stores/session";
-import { formatMoney } from "@/lib/money";
+import { attributionLabel } from '@roman-mik/kapa-core/pocket';
+import { CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
+import { computed, ref } from 'vue';
+import { useExpenses } from '@/composables/useExpenses';
+import { useSpaceMembers } from '@/composables/useSpaceMembers';
+import { useSessionStore } from '@/stores/session';
+import { formatMoney } from '@/lib/money';
 
 const { expenses, loading, error, update, remove } = useExpenses();
 const { members } = useSpaceMembers();
 const session = useSessionStore();
 
 const editingId = ref<string | null>(null);
-const editAmount = ref("");
-const editNote = ref("");
+const editAmount = ref('');
+const editNote = ref('');
 const busyId = ref<string | null>(null);
 const rowError = ref<string | null>(null);
 
 function attribution(userId: string | null): string {
-  const currentUserId = session.user?.id ?? "";
+  const currentUserId = session.user?.id ?? '';
   const member = members.value.find((m) => m.userId === userId);
   return attributionLabel(
     userId,
     currentUserId,
     member ? { displayName: member.displayName } : undefined,
     {
-      you: "You",
-      spaceMember: "Space member",
-      formerMember: "Former member",
-    },
+      you: 'You',
+      spaceMember: 'Space member',
+      formerMember: 'Former member',
+    }
   );
 }
 
@@ -36,22 +36,22 @@ function startEdit(
   id: string,
   amountMinor: number | null,
   currency: string | null,
-  note: string | null,
+  note: string | null
 ): void {
   editingId.value = id;
-  const exponent = CURRENCY_EXPONENT[(currency ?? "RSD") as Currency];
-  editAmount.value = amountMinor !== null ? String(amountMinor / 10 ** exponent) : "";
-  editNote.value = note ?? "";
+  const exponent = CURRENCY_EXPONENT[(currency ?? 'RSD') as Currency];
+  editAmount.value = amountMinor !== null ? String(amountMinor / 10 ** exponent) : '';
+  editNote.value = note ?? '';
 }
 
 async function confirmEdit(id: string, currency: string | null): Promise<void> {
   rowError.value = null;
   const value = Number(editAmount.value);
   if (!Number.isFinite(value) || value <= 0) {
-    rowError.value = "Enter a valid amount.";
+    rowError.value = 'Enter a valid amount.';
     return;
   }
-  const exponent = CURRENCY_EXPONENT[(currency ?? "RSD") as Currency];
+  const exponent = CURRENCY_EXPONENT[(currency ?? 'RSD') as Currency];
   busyId.value = id;
   try {
     await update(id, {
@@ -102,9 +102,9 @@ const rows = computed(() => expenses.value);
         <template v-else>
           <div class="main">
             <span class="amount">{{
-              formatMoney(row.amount_minor ?? 0, (row.currency ?? "RSD") as Currency)
+              formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)
             }}</span>
-            <span class="category">{{ row.category_name ?? "Uncategorized" }}</span>
+            <span class="category">{{ row.category_name ?? 'Uncategorized' }}</span>
             <span class="attribution">{{ attribution(row.user_id) }}</span>
           </div>
           <p v-if="row.note" class="note">{{ row.note }}</p>

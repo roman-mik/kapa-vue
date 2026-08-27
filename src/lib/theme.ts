@@ -1,10 +1,10 @@
-import { THEME_IDS, type ThemeId } from "@roman-mik/kapa-core/theme";
+import { THEME_IDS, type ThemeId } from '@roman-mik/kapa-core/theme';
 
-const STORAGE_KEY = "kapa-theme";
-export const DEFAULT_THEME: ThemeId = "sand";
+const STORAGE_KEY = 'kapa-theme';
+export const DEFAULT_THEME: ThemeId = 'sand';
 
 export function isThemeId(value: unknown): value is ThemeId {
-  return typeof value === "string" && (THEME_IDS as readonly string[]).includes(value);
+  return typeof value === 'string' && (THEME_IDS as readonly string[]).includes(value);
 }
 
 export function readStoredTheme(): ThemeId {
@@ -19,5 +19,5 @@ export function storeTheme(id: ThemeId): void {
 // Matches the attribute index.html's pre-paint inline script already sets,
 // so this is idempotent when called again once Vue mounts.
 export function applyTheme(id: ThemeId): void {
-  document.documentElement.setAttribute("data-theme", id);
+  document.documentElement.setAttribute('data-theme', id);
 }

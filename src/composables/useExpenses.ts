@@ -1,14 +1,14 @@
-import type { ExpenseUpdate, ExpenseView } from "@roman-mik/kapa-core/pocket/queries";
+import type { ExpenseUpdate, ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 import {
   addExpense,
   deleteExpense,
   listExpenses,
   updateExpense,
-} from "@roman-mik/kapa-core/pocket/queries";
-import { ref, watch } from "vue";
-import { supabase } from "@/lib/supabase";
-import { useSessionStore } from "@/stores/session";
-import { useSpaceStore } from "@/stores/space";
+} from '@roman-mik/kapa-core/pocket/queries';
+import { ref, watch } from 'vue';
+import { supabase } from '@/lib/supabase';
+import { useSessionStore } from '@/stores/session';
+import { useSpaceStore } from '@/stores/space';
 
 export interface NewExpense {
   amountMinor: number;

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 const envSchema = z.object({
   VITE_SUPABASE_URL: z.url(),
@@ -18,8 +18,8 @@ export function parseSupabaseEnv(raw: Record<string, string | undefined>): Supab
   const result = envSchema.safeParse(raw);
   if (!result.success) {
     const message = result.error.issues
-      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-      .join("; ");
+      .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
+      .join('; ');
     throw new Error(`Invalid Supabase environment variables — ${message}`);
   }
   return { url: result.data.VITE_SUPABASE_URL, key: result.data.VITE_SUPABASE_PUBLISHABLE_KEY };

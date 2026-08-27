@@ -1,10 +1,10 @@
-import { createPinia } from "pinia";
-import { createApp } from "vue";
-import App from "./App.vue";
-import router from "./router";
-import { useSessionStore } from "./stores/session";
-import { useThemeStore } from "./stores/theme";
-import "./styles/main.css";
+import { createPinia } from 'pinia';
+import { createApp } from 'vue';
+import App from './App.vue';
+import router from './router';
+import { useSessionStore } from './stores/session';
+import { useThemeStore } from './stores/theme';
+import './styles/main.css';
 
 const app = createApp(App);
 app.use(createPinia());
@@ -19,4 +19,4 @@ useThemeStore().init();
 await useSessionStore().init();
 
 app.use(router);
-app.mount("#app");
+app.mount('#app');

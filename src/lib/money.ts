@@ -1,4 +1,4 @@
-import { CURRENCY_EXPONENT, type Currency } from "@roman-mik/kapa-core/pocket";
+import { CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
 
 // The exponent (decimal places) comes from kapa-core so it can never drift
 // from the DB's currency check constraint. The Intl.NumberFormat call itself
@@ -8,7 +8,7 @@ export function formatMoney(amountMinor: number, currency: Currency): string {
   const exponent = CURRENCY_EXPONENT[currency];
   const amount = amountMinor / 10 ** exponent;
   return new Intl.NumberFormat(undefined, {
-    style: "currency",
+    style: 'currency',
     currency,
     minimumFractionDigits: exponent,
     maximumFractionDigits: exponent,

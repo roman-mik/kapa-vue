@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { THEME_IDS, themes } from "@roman-mik/kapa-core/theme";
-import { useRouter } from "vue-router";
-import { useSessionStore } from "@/stores/session";
-import { useSpaceStore } from "@/stores/space";
-import { useThemeStore } from "@/stores/theme";
+import { THEME_IDS, themes } from '@roman-mik/kapa-core/theme';
+import { useRouter } from 'vue-router';
+import { useSessionStore } from '@/stores/session';
+import { useSpaceStore } from '@/stores/space';
+import { useThemeStore } from '@/stores/theme';
 
 const theme = useThemeStore();
 const session = useSessionStore();
@@ -12,7 +12,7 @@ const router = useRouter();
 
 async function onSignOut(): Promise<void> {
   await session.signOut();
-  await router.replace({ name: "login" });
+  await router.replace({ name: 'login' });
 }
 </script>
 
@@ -104,7 +104,7 @@ async function onSignOut(): Promise<void> {
   cursor: pointer;
 }
 
-.theme-switcher button[aria-pressed="true"] {
+.theme-switcher button[aria-pressed='true'] {
   border-color: var(--kapa-accent);
   color: var(--kapa-accent-700);
   background: var(--kapa-accent-100);

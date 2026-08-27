@@ -1,0 +1,6 @@
+{
+  "installCommand": "echo \"//npm.pkg.github.com/:_authToken=$NPM_TOKEN\" >> ~/.npmrc && pnpm install",
+  "buildCommand": "pnpm run build",
+  "outputDirectory": "dist",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}

@@ -1,4 +1,4 @@
-import { parseSupabaseEnv, type SupabaseEnv } from "@/lib/env-schema";
+import { parseSupabaseEnv, type SupabaseEnv } from '@/lib/env-schema';
 
 export type { SupabaseEnv };
 
