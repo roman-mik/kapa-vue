@@ -42,6 +42,8 @@ export interface PocketSummary {
   categoryBreakdown: { categoryId: string | null; spent: number }[];
   dailyTotals: { dateKey: string; amountMinor: number }[];
   dailyCapReference: number;
+  todayExpenses: ExpenseView[];
+  daysUntilReset: number;
   home: PocketHomeView;
 }
 
@@ -124,6 +126,11 @@ export function usePocketHome() {
     const spentResult = spentTotal(amounts, timeZone, spaceCurrency, rates.value);
     const spent = spentResult.value;
 
+    const todayKey = zonedDateKey(new Date(), timeZone);
+    const todayExpenses = expenses.value.filter(
+      (e) => e.spent_at !== null && zonedDateKey(new Date(e.spent_at), timeZone) === todayKey
+    );
+
     const capMinor = cap.cap.value?.monthly_cap_minor ?? 0;
     const remainingValue = remaining(capMinor, spent);
     const evenPaceValue = evenPace(capMinor, completed, D);
@@ -153,6 +160,8 @@ export function usePocketHome() {
       categoryBreakdown: categoryBreakdown(amounts, timeZone, spaceCurrency, rates.value).value,
       dailyTotals: dailyTotals(amounts, month, timeZone, spaceCurrency, rates.value).value,
       dailyCapReference: Math.floor(capMinor / D),
+      todayExpenses,
+      daysUntilReset: dl,
       home,
     };
   });

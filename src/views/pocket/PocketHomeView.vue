@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Currency } from '@roman-mik/kapa-core/pocket';
 import { computed } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
@@ -96,6 +97,29 @@ const barState = computed<'healthy' | 'nudge' | 'over'>(() => {
         >
           Projected to land at {{ formatMoney(summary.projection, summary.currency) }} by month end.
         </p>
+
+        <p class="line muted">
+          {{
+            summary.daysUntilReset === 0
+              ? 'Resets tomorrow.'
+              : summary.daysUntilReset === 1
+                ? '1 day until reset.'
+                : `${summary.daysUntilReset} days until reset.`
+          }}
+        </p>
+      </BaseCard>
+
+      <BaseCard padding="sm">
+        <h2>Today</h2>
+        <EmptyState v-if="!summary.todayExpenses.length" title="No expenses yet today" />
+        <ul v-else class="today-list">
+          <li v-for="row in summary.todayExpenses" :key="row.id ?? ''">
+            <span class="category">{{ categoryName(row.category_id) }}</span>
+            <span class="amount">{{
+              formatMoney(row.amount_minor ?? 0, (row.currency ?? summary.currency) as Currency)
+            }}</span>
+          </li>
+        </ul>
       </BaseCard>
 
       <BaseCard v-if="summary.home.kind !== 'no-cap'" padding="sm">
@@ -161,6 +185,26 @@ const barState = computed<'healthy' | 'nudge' | 'over'>(() => {
   display: flex;
   justify-content: space-between;
   font-size: var(--kapa-text-caption-size);
+}
+
+.today-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kapa-space-2);
+}
+
+.today-list li {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--kapa-text-caption-size);
+}
+
+.today-list .amount {
+  font-weight: 600;
+  color: var(--kapa-ink);
 }
 
 .error {
