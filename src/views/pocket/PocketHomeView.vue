@@ -6,6 +6,7 @@ import EmptyState from '@/components/ui/EmptyState.vue';
 import ProgressBar from '@/components/ui/ProgressBar.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatBlock from '@/components/ui/StatBlock.vue';
+import DailySpendChart from '@/components/pocket/DailySpendChart.vue';
 import { usePocketHome } from '@/composables/usePocketHome';
 import { useCategories } from '@/composables/useCategories';
 import { formatMoney } from '@/lib/money';
@@ -95,6 +96,15 @@ const barState = computed<'healthy' | 'nudge' | 'over'>(() => {
         >
           Projected to land at {{ formatMoney(summary.projection, summary.currency) }} by month end.
         </p>
+      </BaseCard>
+
+      <BaseCard v-if="summary.home.kind !== 'no-cap'" padding="sm">
+        <h2>Daily spending</h2>
+        <DailySpendChart
+          :days="summary.dailyTotals"
+          :reference-line="summary.dailyCapReference"
+          :currency="summary.currency"
+        />
       </BaseCard>
 
       <BaseCard v-if="summary.categoryBreakdown.length" padding="sm">

@@ -3,6 +3,7 @@ import {
   categoryBreakdown,
   completedDays,
   type Currency,
+  dailyTotals,
   daysInMonth,
   daysLeft,
   elapsedDays,
@@ -39,6 +40,8 @@ export interface PocketSummary {
   spentPct: number;
   overspend: number;
   categoryBreakdown: { categoryId: string | null; spent: number }[];
+  dailyTotals: { dateKey: string; amountMinor: number }[];
+  dailyCapReference: number;
   home: PocketHomeView;
 }
 
@@ -148,6 +151,8 @@ export function usePocketHome() {
       spentPct: spentPctValue,
       overspend: overspendValue,
       categoryBreakdown: categoryBreakdown(amounts, timeZone, spaceCurrency, rates.value).value,
+      dailyTotals: dailyTotals(amounts, month, timeZone, spaceCurrency, rates.value).value,
+      dailyCapReference: Math.floor(capMinor / D),
       home,
     };
   });
