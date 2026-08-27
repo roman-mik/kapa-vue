@@ -1,8 +1,9 @@
+import { currentMonth, monthWindow } from '@roman-mik/kapa-core/pocket';
 import type { ExpenseUpdate, ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 import {
   addExpense,
   deleteExpense,
-  listExpenses,
+  listExpensesInRange,
   updateExpense,
 } from '@roman-mik/kapa-core/pocket/queries';
 import { ref, watch } from 'vue';
@@ -18,10 +19,11 @@ export interface NewExpense {
   spentAt?: string;
 }
 
-// Full expense history for the current space — no arithmetic, this is CRUD
-// only via kapa-core's query layer. usePocketHome fetches its own
-// month-scoped slice for deriving figures; this composable is for the
-// history screen's full list.
+// The current-month expense list for the current space — no arithmetic,
+// this is CRUD only via kapa-core's query layer. usePocketHome fetches its
+// own month-scoped slice for deriving figures; this composable is for the
+// history screen's list, scoped the same way rather than pulling the
+// space's entire unpaginated history.
 export function useExpenses() {
   const space = useSpaceStore();
   const session = useSessionStore();
@@ -30,15 +32,17 @@ export function useExpenses() {
   const error = ref<string | null>(null);
 
   async function refresh(): Promise<void> {
-    const spaceId = space.currentSpaceId;
-    if (!spaceId) {
+    const currentSpace = space.currentSpace;
+    if (!currentSpace) {
       expenses.value = [];
       return;
     }
     loading.value = true;
     error.value = null;
     try {
-      expenses.value = await listExpenses(supabase, spaceId);
+      const month = currentMonth(new Date(), currentSpace.timezone);
+      const { startUtc, endUtc } = monthWindow(month, currentSpace.timezone);
+      expenses.value = await listExpensesInRange(supabase, currentSpace.id, startUtc, endUtc);
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Couldn't load expenses.";
     } finally {
