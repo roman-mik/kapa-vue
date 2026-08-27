@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import ConfirmButton from '@/components/ui/ConfirmButton.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useToast } from '@/composables/useToast';
@@ -120,13 +121,12 @@ async function onRestore(id: string): Promise<void> {
               >
                 Rename
               </BaseButton>
-              <BaseButton
-                variant="ghost"
+              <ConfirmButton
+                label="Archive"
+                confirm-label="Really archive?"
                 :disabled="busyId === category.id"
-                @click="onArchive(category.id)"
-              >
-                Archive
-              </BaseButton>
+                @confirm="onArchive(category.id)"
+              />
             </template>
             <BaseButton
               v-else
