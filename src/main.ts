@@ -20,3 +20,12 @@ await useSessionStore().init();
 
 app.use(router);
 app.mount('#app');
+
+// Registered after mount, not blocking startup — a failed registration
+// (unsupported browser, non-secure context in some dev setups) shouldn't
+// affect the app; it only forfeits the install prompt.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
