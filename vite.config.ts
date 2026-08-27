@@ -92,10 +92,6 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: 'jsdom',
       include: ['src/**/*.{test,spec}.ts'],
-      // No component/composable specs exist yet (flagged as a gap, not this
-      // task's scope) — without this, `vp test` exits non-zero on an empty
-      // suite and CI never goes green.
-      passWithNoTests: true,
     },
     plugins: lazyPlugins(() => [vue(), kapaThemeCss()]),
   };
