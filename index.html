@@ -5,6 +5,17 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>kapa-vue</title>
+    <script>
+      // Runs before any CSS paints, so the correct theme's `--kapa-*` vars
+      // are already selected by the time main.css resolves them — avoids a
+      // flash of the default theme on reload. src/stores/theme.ts's init()
+      // reads the same key to sync Pinia state to what's already applied.
+      (function () {
+        var stored = localStorage.getItem("kapa-theme");
+        var theme = stored === "sand" || stored === "moss" ? stored : "sand";
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -1,0 +1,41 @@
+@import "./theme-vars.css";
+
+:root {
+  color-scheme: light;
+  font:
+    16px/1.5 system-ui,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  color: var(--kapa-ink);
+  background: var(--kapa-bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--kapa-ink);
+  font-weight: 600;
+  margin: 0 0 0.5em;
+}
+
+p {
+  margin: 0 0 1em;
+  color: var(--kapa-ink-muted);
+}
+
+#app {
+  min-height: 100svh;
+}

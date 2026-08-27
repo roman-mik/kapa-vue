@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Generated from @roman-mik/kapa-core/theme by vite.config.ts's kapa-theme-css plugin
+src/styles/theme-vars.css
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

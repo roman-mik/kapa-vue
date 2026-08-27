@@ -1,5 +1,12 @@
+import { createPinia } from "pinia";
 import { createApp } from "vue";
-import "./style.css";
 import App from "./App.vue";
+import { useThemeStore } from "./stores/theme";
+import "./styles/main.css";
 
-createApp(App).mount("#app");
+const app = createApp(App);
+app.use(createPinia());
+
+useThemeStore().init();
+
+app.mount("#app");
