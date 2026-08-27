@@ -11,8 +11,12 @@
       // flash of the default theme on reload. src/stores/theme.ts's init()
       // reads the same key to sync Pinia state to what's already applied.
       (function () {
+        // The KAPA_THEME_IDS placeholder below is substituted by the
+        // kapa-theme-css Vite plugin (vite.config.ts) from kapa-core's own
+        // THEME_IDS, so a new theme added there doesn't need an edit here.
+        var ids = %KAPA_THEME_IDS%;
         var stored = localStorage.getItem('kapa-theme');
-        var theme = stored === 'sand' || stored === 'moss' ? stored : 'sand';
+        var theme = ids.indexOf(stored) !== -1 ? stored : ids[0];
         document.documentElement.setAttribute('data-theme', theme);
       })();
     </script>

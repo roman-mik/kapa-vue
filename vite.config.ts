@@ -1,7 +1,16 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import vue from '@vitejs/plugin-vue';
-import { RADIUS, SHADOW, THEME_IDS, themes, toCssVars } from '@roman-mik/kapa-core/theme';
+import {
+  MOTION,
+  RADIUS,
+  SHADOW,
+  SPACE,
+  THEME_IDS,
+  TYPE,
+  themes,
+  toCssVars,
+} from '@roman-mik/kapa-core/theme';
 import { defineConfig, lazyPlugins, loadEnv, type Plugin } from 'vite-plus';
 import { parseSupabaseEnv } from './src/lib/env-schema.js';
 
@@ -15,6 +24,16 @@ function generateThemeCss(): string {
   const structureVars = [
     ...Object.entries(RADIUS).map(([key, value]) => `  --kapa-radius-${key}: ${value}px;`),
     ...Object.entries(SHADOW).map(([key, value]) => `  --kapa-shadow-${key}: ${value};`),
+    ...Object.entries(SPACE).map(([key, value]) => `  --kapa-space-${key}: ${value}px;`),
+    ...Object.entries(TYPE).flatMap(([role, { size, lineHeight, weight }]) => [
+      `  --kapa-text-${role}-size: ${size}px;`,
+      `  --kapa-text-${role}-line: ${lineHeight}px;`,
+      `  --kapa-text-${role}-weight: ${weight};`,
+    ]),
+    `  --kapa-motion-fast: ${MOTION.fast}ms;`,
+    `  --kapa-motion-base: ${MOTION.base}ms;`,
+    `  --kapa-motion-slow: ${MOTION.slow}ms;`,
+    `  --kapa-motion-ease: ${MOTION.ease};`,
   ].join('\n');
 
   const themeBlocks = THEME_IDS.map((id) => {
@@ -32,6 +51,12 @@ function kapaThemeCss(): Plugin {
     name: 'kapa-theme-css',
     buildStart() {
       writeFileSync(themeVarsPath, generateThemeCss());
+    },
+    // Substitutes the pre-paint theme-detection script's %KAPA_THEME_IDS%
+    // placeholder (index.html) with kapa-core's own THEME_IDS, so adding a
+    // theme there never requires an index.html edit here.
+    transformIndexHtml(html) {
+      return html.replaceAll('%KAPA_THEME_IDS%', JSON.stringify(THEME_IDS));
     },
   };
 }

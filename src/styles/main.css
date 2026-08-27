@@ -2,11 +2,9 @@
 
 :root {
   color-scheme: light;
-  font:
-    16px/1.5 system-ui,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-size: var(--kapa-text-body-size);
+  line-height: calc(var(--kapa-text-body-line) / var(--kapa-text-body-size));
 }
 
 * {
@@ -27,15 +25,49 @@ h1,
 h2,
 h3 {
   color: var(--kapa-ink);
-  font-weight: 600;
-  margin: 0 0 0.5em;
+  margin: 0 0 var(--kapa-space-3);
+}
+
+h1 {
+  font-size: var(--kapa-text-display-size);
+  line-height: calc(var(--kapa-text-display-line) / var(--kapa-text-display-size));
+  font-weight: var(--kapa-text-display-weight);
+}
+
+h2 {
+  font-size: var(--kapa-text-title-size);
+  line-height: calc(var(--kapa-text-title-line) / var(--kapa-text-title-size));
+  font-weight: var(--kapa-text-title-weight);
 }
 
 p {
-  margin: 0 0 1em;
+  margin: 0 0 var(--kapa-space-4);
   color: var(--kapa-ink-muted);
+}
+
+small,
+.caption {
+  font-size: var(--kapa-text-caption-size);
+  line-height: calc(var(--kapa-text-caption-line) / var(--kapa-text-caption-size));
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
 }
 
 #app {
   min-height: 100svh;
+}
+
+/* Shared page container — replaces the 480/420/320px max-width each view
+ * used to set independently. `pb` leaves room for the bottom tab bar
+ * (src/components/layout/BottomTabBar.vue, task A4) so content never sits
+ * underneath it. */
+.page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: var(--kapa-space-6) var(--kapa-space-4) calc(var(--kapa-space-7) * 2);
 }
