@@ -2,7 +2,8 @@ import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import vue from "@vitejs/plugin-vue";
 import { RADIUS, SHADOW, THEME_IDS, themes, toCssVars } from "@roman-mik/kapa-core/theme";
-import { defineConfig, lazyPlugins, type Plugin } from "vite-plus";
+import { defineConfig, lazyPlugins, loadEnv, type Plugin } from "vite-plus";
+import { parseSupabaseEnv } from "./src/lib/env-schema.js";
 
 const themeVarsPath = fileURLToPath(new URL("./src/styles/theme-vars.css", import.meta.url));
 
@@ -36,20 +37,27 @@ function kapaThemeCss(): Plugin {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
-  staged: {
-    "*": "vp check --fix",
-  },
-  fmt: {},
-  lint: {
-    jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
-    rules: { "vite-plus/prefer-vite-plus-imports": "error" },
-    options: { typeAware: true, typeCheck: true },
-  },
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
+export default defineConfig(({ mode }) => {
+  // Validated here, not just in src/lib/env.ts's browser-side call, so a
+  // missing/invalid var fails `vp build`/`vp dev` immediately instead of
+  // surfacing as a runtime error on the first page load.
+  parseSupabaseEnv(loadEnv(mode, process.cwd(), "VITE_"));
+
+  return {
+    staged: {
+      "*": "vp check --fix",
     },
-  },
-  plugins: lazyPlugins(() => [vue(), kapaThemeCss()]),
+    fmt: {},
+    lint: {
+      jsPlugins: [{ name: "vite-plus", specifier: "vite-plus/oxlint-plugin" }],
+      rules: { "vite-plus/prefer-vite-plus-imports": "error" },
+      options: { typeAware: true, typeCheck: true },
+    },
+    resolve: {
+      alias: {
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
+      },
+    },
+    plugins: lazyPlugins(() => [vue(), kapaThemeCss()]),
+  };
 });

@@ -1,6 +1,8 @@
 import { createPinia } from "pinia";
 import { createApp } from "vue";
 import App from "./App.vue";
+import router from "./router";
+import { useSessionStore } from "./stores/session";
 import { useThemeStore } from "./stores/theme";
 import "./styles/main.css";
 
@@ -9,4 +11,9 @@ app.use(createPinia());
 
 useThemeStore().init();
 
+// Awaited before the router starts navigating, so its first guard sees the
+// restored session (or its absence) instead of an in-flight unknown.
+await useSessionStore().init();
+
+app.use(router);
 app.mount("#app");
