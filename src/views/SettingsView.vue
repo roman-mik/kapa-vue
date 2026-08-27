@@ -11,12 +11,14 @@ import { useSessionStore } from '@/stores/session';
 import { useSpaceStore } from '@/stores/space';
 import { useThemeStore } from '@/stores/theme';
 import { useToast } from '@/composables/useToast';
+import { useInstallPrompt } from '@/composables/useInstallPrompt';
 
 const theme = useThemeStore();
 const space = useSpaceStore();
 const session = useSessionStore();
 const router = useRouter();
 const toast = useToast();
+const { canInstall, installed, promptInstall } = useInstallPrompt();
 
 const exporting = ref(false);
 
@@ -70,6 +72,11 @@ async function onExport(): Promise<void> {
           {{ themes[id].name }}
         </button>
       </div>
+    </BaseCard>
+
+    <BaseCard v-if="canInstall && !installed" padding="sm" class="section">
+      <h2>App</h2>
+      <BaseButton variant="secondary" block @click="promptInstall">Install app</BaseButton>
     </BaseCard>
 
     <BaseCard padding="sm" class="section">
