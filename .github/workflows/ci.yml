@@ -51,4 +51,6 @@ jobs:
 
       - run: vp check
       - run: vp test
-      - run: pnpm run build
+      # `pnpm` itself isn't on PATH after `vp install` (only vp/vpr are) — vpr
+      # runs the package.json "build" script (vue-tsc -b && vp build) directly.
+      - run: vpr build
