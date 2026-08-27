@@ -1,17 +1,25 @@
 <script setup lang="ts">
-import { CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
+import {
+  CURRENCY_EXPONENT,
+  type Currency,
+  remaining,
+  safeDaily,
+} from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseCheckbox from '@/components/ui/BaseCheckbox.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
-import { useCap } from '@/composables/useCap';
+import { usePocketHome } from '@/composables/usePocketHome';
 import { useToast } from '@/composables/useToast';
+import { formatMoney } from '@/lib/money';
 import { useSpaceStore } from '@/stores/space';
 
 const space = useSpaceStore();
-const { cap, loading, error, setCap } = useCap();
+const { cap: capApi, summary, loading, error } = usePocketHome();
+const cap = capApi.cap;
 const toast = useToast();
 
 const currency = computed<Currency>(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
@@ -35,6 +43,20 @@ watch(
   { immediate: true }
 );
 
+// Live preview of what the *proposed* (not-yet-saved) cap amount implies,
+// so the consequence panel updates as the user types — before Save, not
+// after. Independent of the actually-saved cap; spentThisMonth doesn't
+// change with the proposal.
+const consequence = computed(() => {
+  const amount = Number(capAmount.value);
+  if (!Number.isFinite(amount) || amount < 0 || !summary.value) return null;
+  const proposedCapMinor = Math.round(amount * 10 ** exponent.value);
+  const spent = summary.value.spent;
+  const remainingValue = remaining(proposedCapMinor, spent);
+  const daily = safeDaily(remainingValue, summary.value.daysUntilReset);
+  return { alreadySpent: spent, safeDaily: daily, safeWeekly: daily * 7 };
+});
+
 async function onSubmit(): Promise<void> {
   saveError.value = null;
   const amount = Number(capAmount.value);
@@ -44,7 +66,7 @@ async function onSubmit(): Promise<void> {
   }
   saving.value = true;
   try {
-    await setCap({
+    await capApi.setCap({
       monthlyCapMinor: Math.round(amount * 10 ** exponent.value),
       nudgeEnabled: nudgeEnabled.value,
       nudgePct: nudgePct.value,
@@ -82,6 +104,27 @@ async function onSubmit(): Promise<void> {
         />
       </BaseField>
 
+      <BaseCard v-if="consequence" padding="sm">
+        <ul class="consequence">
+          <li>
+            <span>Already spent this month</span>
+            <span>{{ formatMoney(consequence.alreadySpent, currency) }}</span>
+          </li>
+          <li>
+            <span>Safe to spend per day</span>
+            <span :class="{ negative: consequence.safeDaily < 0 }">{{
+              formatMoney(consequence.safeDaily, currency)
+            }}</span>
+          </li>
+          <li>
+            <span>Safe to spend per week</span>
+            <span :class="{ negative: consequence.safeWeekly < 0 }">{{
+              formatMoney(consequence.safeWeekly, currency)
+            }}</span>
+          </li>
+        </ul>
+      </BaseCard>
+
       <BaseCheckbox v-model="nudgeEnabled" label="Warn me as I approach the cap" />
 
       <BaseField v-if="nudgeEnabled" label="Warn at (% of cap)" v-slot="{ id }">
@@ -106,5 +149,25 @@ async function onSubmit(): Promise<void> {
 .error {
   color: var(--kapa-negative);
   margin: 0;
+}
+
+.consequence {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kapa-space-2);
+  font-size: var(--kapa-text-caption-size);
+}
+
+.consequence li {
+  display: flex;
+  justify-content: space-between;
+}
+
+.consequence .negative {
+  color: var(--kapa-negative);
+  font-weight: 600;
 }
 </style>
