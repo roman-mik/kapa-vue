@@ -7,6 +7,7 @@ import ConfirmButton from '@/components/ui/ConfirmButton.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useToast } from '@/composables/useToast';
+import { categoryNameSchema, firstIssueMessage } from '@/lib/validation';
 
 const { categories, loading, error, add, rename, archive, restore } = useCategories({
   includeArchived: true,
@@ -18,15 +19,19 @@ const adding = ref(false);
 const addError = ref<string | null>(null);
 const renamingId = ref<string | null>(null);
 const renameValue = ref('');
+const renameError = ref<string | null>(null);
 const busyId = ref<string | null>(null);
 
 async function onAdd(): Promise<void> {
   addError.value = null;
-  const name = newName.value.trim();
-  if (!name) return;
+  const parsed = categoryNameSchema.safeParse(newName.value);
+  if (!parsed.success) {
+    addError.value = firstIssueMessage(parsed) ?? 'Enter a name.';
+    return;
+  }
   adding.value = true;
   try {
-    await add(name);
+    await add(parsed.data);
     newName.value = '';
     toast.success('Category added');
   } catch (err) {
@@ -40,15 +45,20 @@ async function onAdd(): Promise<void> {
 function startRename(id: string, currentName: string): void {
   renamingId.value = id;
   renameValue.value = currentName;
+  renameError.value = null;
 }
 
 async function confirmRename(id: string): Promise<void> {
-  const name = renameValue.value.trim();
+  renameError.value = null;
+  const parsed = categoryNameSchema.safeParse(renameValue.value);
+  if (!parsed.success) {
+    renameError.value = firstIssueMessage(parsed) ?? 'Enter a name.';
+    return;
+  }
   renamingId.value = null;
-  if (!name) return;
   busyId.value = id;
   try {
-    await rename(id, name);
+    await rename(id, parsed.data);
     toast.success('Category renamed');
   } catch (err) {
     toast.error(err instanceof Error ? err.message : "Couldn't rename that category.");
@@ -102,11 +112,15 @@ async function onRestore(id: string): Promise<void> {
           :class="{ archived: category.archived }"
         >
           <template v-if="renamingId === category.id">
-            <BaseInput
-              v-model="renameValue"
-              type="text"
-              @keyup.enter="confirmRename(category.id)"
-            />
+            <div class="rename">
+              <BaseInput
+                v-model="renameValue"
+                type="text"
+                maxlength="60"
+                @keyup.enter="confirmRename(category.id)"
+              />
+              <p v-if="renameError" role="alert" class="error">{{ renameError }}</p>
+            </div>
             <BaseButton variant="secondary" @click="confirmRename(category.id)">Save</BaseButton>
             <BaseButton variant="ghost" @click="renamingId = null">Cancel</BaseButton>
           </template>
@@ -142,7 +156,7 @@ async function onRestore(id: string): Promise<void> {
 
       <form class="add" @submit.prevent="onAdd">
         <BaseField label="New category" v-slot="{ id }">
-          <BaseInput :id="id" v-model="newName" type="text" required />
+          <BaseInput :id="id" v-model="newName" type="text" maxlength="60" required />
         </BaseField>
         <p v-if="addError" role="alert" class="error">{{ addError }}</p>
         <BaseButton type="submit" block :disabled="adding || !newName.trim()">
@@ -179,6 +193,18 @@ async function onRestore(id: string): Promise<void> {
 
 .name {
   flex: 1;
+}
+
+.rename {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kapa-space-1);
+}
+
+.rename .error {
+  margin: 0;
+  font-size: var(--kapa-text-caption-size);
 }
 
 .badge {
