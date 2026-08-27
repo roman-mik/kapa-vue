@@ -109,6 +109,18 @@ const barState = computed<'healthy' | 'nudge' | 'over'>(() => {
         </p>
       </BaseCard>
 
+      <BaseCard v-if="summary.unconverted.length" padding="sm">
+        <p class="line negative">
+          {{
+            summary.unconverted
+              .map((bucket) => formatMoney(bucket.amountMinor, bucket.currency))
+              .join(' + ')
+          }}
+          couldn't be converted to {{ summary.currency }} and
+          {{ summary.unconverted.length === 1 ? "isn't" : "aren't" }} included above.
+        </p>
+      </BaseCard>
+
       <BaseCard padding="sm">
         <h2>Today</h2>
         <EmptyState v-if="!summary.todayExpenses.length" title="No expenses yet today" />
