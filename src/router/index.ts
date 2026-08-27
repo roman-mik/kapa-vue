@@ -1,16 +1,24 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useSessionStore } from "@/stores/session";
 import { useSpaceStore } from "@/stores/space";
-import HomeView from "@/views/HomeView.vue";
 import LoginView from "@/views/LoginView.vue";
 import SpaceView from "@/views/SpaceView.vue";
+import PocketHomeView from "@/views/pocket/PocketHomeView.vue";
+
+declare module "vue-router" {
+  interface RouteMeta {
+    // Whether App.vue renders the space/theme/sign-out header — off for
+    // /login and /spaces, on for every Pocket screen.
+    showHeader?: boolean;
+  }
+}
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/login", name: "login", component: LoginView },
     { path: "/spaces", name: "spaces", component: SpaceView },
-    { path: "/", name: "home", component: HomeView },
+    { path: "/", name: "home", component: PocketHomeView, meta: { showHeader: true } },
   ],
 });
 
