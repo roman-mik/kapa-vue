@@ -6,9 +6,11 @@ import {
   listMySpaces,
   updateLastActiveSpace,
 } from '@roman-mik/kapa-core/core';
+import { isThemeId } from '@/lib/theme';
 import { defineStore } from 'pinia';
 import { supabase } from '@/lib/supabase';
 import { useSessionStore } from '@/stores/session';
+import { useThemeStore } from '@/stores/theme';
 
 export const useSpaceStore = defineStore('space', {
   state: () => ({
@@ -35,6 +37,10 @@ export const useSpaceStore = defineStore('space', {
         getProfile(supabase, session.user.id),
       ]);
       this.spaces = spaces;
+
+      if (profile && isThemeId(profile.theme)) {
+        useThemeStore().applyRemote(profile.theme);
+      }
 
       const lastActive = profile?.last_active_space_id ?? null;
       if (lastActive && spaces.some((space) => space.id === lastActive)) {

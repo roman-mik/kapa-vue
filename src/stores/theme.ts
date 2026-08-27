@@ -1,6 +1,9 @@
+import { updateTheme } from '@roman-mik/kapa-core/core';
 import type { ThemeId } from '@roman-mik/kapa-core/theme';
 import { defineStore } from 'pinia';
 import { applyTheme, DEFAULT_THEME, readStoredTheme, storeTheme } from '@/lib/theme';
+import { supabase } from '@/lib/supabase';
+import { useSessionStore } from '@/stores/session';
 
 export const useThemeStore = defineStore('theme', {
   state: () => ({
@@ -14,9 +17,21 @@ export const useThemeStore = defineStore('theme', {
       this.id = readStoredTheme();
     },
     // User-driven switch: updates the DOM attribute, persists to
-    // localStorage, and once task 9/10 wire up the session, also gets
-    // called to reconcile against core.profiles.theme after auth resolves.
-    setTheme(id: ThemeId): void {
+    // localStorage, and — when signed in — to core.profiles.theme, so the
+    // choice follows the user to their next device.
+    async setTheme(id: ThemeId): Promise<void> {
+      this.id = id;
+      applyTheme(id);
+      storeTheme(id);
+      const session = useSessionStore();
+      if (session.user) {
+        await updateTheme(supabase, session.user.id, id);
+      }
+    },
+    // Called from space.init() once the profile is known, to reconcile a
+    // theme chosen on a different device. Applies locally only — this is a
+    // read of the already-persisted choice, not a new one to write back.
+    applyRemote(id: ThemeId): void {
       this.id = id;
       applyTheme(id);
       storeTheme(id);
