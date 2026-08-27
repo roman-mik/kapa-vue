@@ -45,6 +45,14 @@ p {
   color: var(--kapa-ink-muted);
 }
 
+a {
+  color: var(--kapa-accent-700);
+}
+
+a:not(.btn) {
+  text-decoration-color: var(--kapa-accent-300);
+}
+
 small,
 .caption {
   font-size: var(--kapa-text-caption-size);

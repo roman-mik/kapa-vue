@@ -3,10 +3,13 @@ import { useSessionStore } from '@/stores/session';
 import { useSpaceStore } from '@/stores/space';
 import LoginView from '@/views/LoginView.vue';
 import SpaceView from '@/views/SpaceView.vue';
+import SettingsView from '@/views/SettingsView.vue';
+import NotFoundView from '@/views/NotFoundView.vue';
 import PocketHomeView from '@/views/pocket/PocketHomeView.vue';
 import CapView from '@/views/pocket/CapView.vue';
 import CategoriesView from '@/views/pocket/CategoriesView.vue';
 import AddExpenseView from '@/views/pocket/AddExpenseView.vue';
+import EditExpenseView from '@/views/pocket/EditExpenseView.vue';
 import HistoryView from '@/views/pocket/HistoryView.vue';
 
 declare module 'vue-router' {
@@ -42,6 +45,19 @@ const router = createRouter({
       component: HistoryView,
       meta: { showHeader: true },
     },
+    {
+      path: '/pocket/edit/:id',
+      name: 'pocket-edit',
+      component: EditExpenseView,
+      meta: { showHeader: true },
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: SettingsView,
+      meta: { showHeader: true },
+    },
+    { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundView },
   ],
 });
 
