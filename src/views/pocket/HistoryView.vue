@@ -11,7 +11,9 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import ConfirmButton from '@/components/ui/ConfirmButton.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import { useCategories } from '@/composables/useCategories';
 import { useExpenses } from '@/composables/useExpenses';
+import { usePocketHome } from '@/composables/usePocketHome';
 import { useSpaceMembers } from '@/composables/useSpaceMembers';
 import { useToast } from '@/composables/useToast';
 import { useSessionStore } from '@/stores/session';
@@ -20,12 +22,40 @@ import { formatMoney } from '@/lib/money';
 
 const { expenses, loading, error, remove } = useExpenses();
 const { members } = useSpaceMembers();
+const { categories } = useCategories();
+const { summary, refresh: refreshSummary } = usePocketHome();
 const space = useSpaceStore();
 const toast = useToast();
 const session = useSessionStore();
 
 const busyId = ref<string | null>(null);
 const rowError = ref<string | null>(null);
+
+// 'all' shows everything; '' is the uncategorized bucket; anything else is a
+// category id. The month breakdown bar below is intentionally unaffected by
+// this filter — it always reflects the whole month, per the plan.
+const categoryFilter = ref<string>('all');
+
+function categoryName(categoryId: string | null): string {
+  if (categoryId === null) return 'Uncategorized';
+  return categories.value.find((c) => c.id === categoryId)?.name ?? 'Uncategorized';
+}
+
+const breakdown = computed(() => {
+  const rowsIn = summary.value?.categoryBreakdown ?? [];
+  const total = rowsIn.reduce((sum, r) => sum + r.spent, 0);
+  if (total <= 0) return [];
+  return rowsIn
+    .filter((r) => r.spent > 0)
+    .map((r, i) => ({
+      categoryId: r.categoryId,
+      name: categoryName(r.categoryId),
+      spent: r.spent,
+      pct: (r.spent / total) * 100,
+      swatch: `var(--kapa-swatch-${(i % 8) + 1})`,
+    }))
+    .sort((a, b) => b.spent - a.spent);
+});
 
 function attribution(userId: string | null): string {
   const currentUserId = session.user?.id ?? '';
@@ -47,6 +77,7 @@ async function onDelete(id: string): Promise<void> {
   rowError.value = null;
   try {
     await remove(id);
+    await refreshSummary();
     toast.success('Expense deleted');
   } catch (err) {
     rowError.value = err instanceof Error ? err.message : "Couldn't delete that expense.";
@@ -56,7 +87,13 @@ async function onDelete(id: string): Promise<void> {
   }
 }
 
-const rows = computed(() => expenses.value);
+const rows = computed(() => {
+  if (categoryFilter.value === 'all') return expenses.value;
+  const wantsUncategorized = categoryFilter.value === '';
+  return expenses.value.filter((e) =>
+    wantsUncategorized ? e.category_id === null : e.category_id === categoryFilter.value
+  );
+});
 
 interface DayGroup {
   dateKey: string;
@@ -117,6 +154,54 @@ const dayGroups = computed<DayGroup[]>(() => {
   <main class="page">
     <h1>History</h1>
 
+    <div v-if="breakdown.length" class="breakdown">
+      <div
+        class="breakdown-bar"
+        role="img"
+        :aria-label="`Month breakdown: ${breakdown.map((b) => `${b.name} ${formatMoney(b.spent, summary!.currency)}`).join(', ')}`"
+      >
+        <span
+          v-for="b in breakdown"
+          :key="b.categoryId ?? 'uncategorized'"
+          class="breakdown-segment"
+          :style="{ width: `${b.pct}%`, background: b.swatch }"
+        />
+      </div>
+      <ul class="breakdown-legend">
+        <li v-for="b in breakdown" :key="b.categoryId ?? 'uncategorized'">
+          <span class="dot" :style="{ background: b.swatch }" />
+          <span class="name">{{ b.name }}</span>
+          <span class="amount">{{ formatMoney(b.spent, summary!.currency) }}</span>
+        </li>
+      </ul>
+    </div>
+
+    <div class="chips" role="radiogroup" aria-label="Filter by category">
+      <BaseButton
+        type="button"
+        :variant="categoryFilter === 'all' ? 'primary' : 'secondary'"
+        @click="categoryFilter = 'all'"
+      >
+        All
+      </BaseButton>
+      <BaseButton
+        type="button"
+        :variant="categoryFilter === '' ? 'primary' : 'secondary'"
+        @click="categoryFilter = ''"
+      >
+        Uncategorized
+      </BaseButton>
+      <BaseButton
+        v-for="c in categories"
+        :key="c.id"
+        type="button"
+        :variant="categoryFilter === c.id ? 'primary' : 'secondary'"
+        @click="categoryFilter = c.id"
+      >
+        {{ c.name }}
+      </BaseButton>
+    </div>
+
     <template v-if="loading && !rows.length">
       <SkeletonBlock height="64px" />
       <SkeletonBlock height="64px" />
@@ -165,6 +250,58 @@ const dayGroups = computed<DayGroup[]>(() => {
 </template>
 
 <style scoped>
+.breakdown {
+  margin-bottom: var(--kapa-space-4);
+}
+
+.breakdown-bar {
+  display: flex;
+  width: 100%;
+  height: var(--kapa-space-2);
+  border-radius: var(--kapa-radius-sm);
+  overflow: hidden;
+  background: var(--kapa-neutral-200);
+}
+
+.breakdown-segment {
+  height: 100%;
+}
+
+.breakdown-legend {
+  list-style: none;
+  margin: var(--kapa-space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kapa-space-1) var(--kapa-space-3);
+}
+
+.breakdown-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--kapa-space-1);
+  font-size: var(--kapa-text-caption-size);
+  color: var(--kapa-ink-muted);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.amount {
+  color: var(--kapa-ink-subtle);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kapa-space-2);
+  margin-bottom: var(--kapa-space-4);
+}
+
 .day-group + .day-group {
   margin-top: var(--kapa-space-5);
 }
