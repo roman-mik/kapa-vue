@@ -169,6 +169,7 @@ export function usePocketHome() {
   return {
     cap,
     summary,
+    rates,
     loading: computed(() => loading.value || cap.loading.value),
     error,
     refresh: async () => {
