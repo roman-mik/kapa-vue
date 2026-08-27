@@ -15,6 +15,7 @@ import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { usePocketHome } from '@/composables/usePocketHome';
 import { useToast } from '@/composables/useToast';
 import { formatMoney } from '@/lib/money';
+import { firstIssueMessage, nonNegativeAmountSchema, nudgePctSchema } from '@/lib/validation';
 import { useSpaceStore } from '@/stores/space';
 
 const space = useSpaceStore();
@@ -59,15 +60,22 @@ const consequence = computed(() => {
 
 async function onSubmit(): Promise<void> {
   saveError.value = null;
-  const amount = Number(capAmount.value);
-  if (!Number.isFinite(amount) || amount < 0) {
-    saveError.value = 'Enter a valid amount.';
+  const parsedAmount = nonNegativeAmountSchema.safeParse(capAmount.value);
+  if (!parsedAmount.success) {
+    saveError.value = firstIssueMessage(parsedAmount) ?? 'Enter a valid amount.';
     return;
+  }
+  if (nudgeEnabled.value) {
+    const parsedPct = nudgePctSchema.safeParse(nudgePct.value);
+    if (!parsedPct.success) {
+      saveError.value = firstIssueMessage(parsedPct) ?? 'Enter a value between 1 and 100.';
+      return;
+    }
   }
   saving.value = true;
   try {
     await capApi.setCap({
-      monthlyCapMinor: Math.round(amount * 10 ** exponent.value),
+      monthlyCapMinor: Math.round(parsedAmount.data * 10 ** exponent.value),
       nudgeEnabled: nudgeEnabled.value,
       nudgePct: nudgePct.value,
     });

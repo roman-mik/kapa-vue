@@ -21,6 +21,7 @@ import { usePocketHome } from '@/composables/usePocketHome';
 import { useToast } from '@/composables/useToast';
 import { formatMoney } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
+import { firstIssueMessage, positiveAmountSchema } from '@/lib/validation';
 import { useSpaceStore } from '@/stores/space';
 
 const route = useRoute();
@@ -109,15 +110,15 @@ const leftAfterThis = computed<number | null>(() => {
 
 async function onSubmit(): Promise<void> {
   submitError.value = null;
-  const value = Number(amount.value);
-  if (!Number.isFinite(value) || value <= 0) {
-    submitError.value = 'Enter a valid amount.';
+  const parsed = positiveAmountSchema.safeParse(amount.value);
+  if (!parsed.success) {
+    submitError.value = firstIssueMessage(parsed) ?? 'Enter a valid amount.';
     return;
   }
   submitting.value = true;
   try {
     await update(expenseId.value, {
-      amount_minor: Math.round(value * 10 ** exponent.value),
+      amount_minor: Math.round(parsed.data * 10 ** exponent.value),
       currency: currency.value,
       category_id: categoryId.value || null,
       note: note.value.trim() || null,
