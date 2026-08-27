@@ -7,10 +7,12 @@ import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useCap } from '@/composables/useCap';
+import { useToast } from '@/composables/useToast';
 import { useSpaceStore } from '@/stores/space';
 
 const space = useSpaceStore();
 const { cap, loading, error, setCap } = useCap();
+const toast = useToast();
 
 const currency = computed<Currency>(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
 const exponent = computed(() => CURRENCY_EXPONENT[currency.value]);
@@ -47,8 +49,10 @@ async function onSubmit(): Promise<void> {
       nudgeEnabled: nudgeEnabled.value,
       nudgePct: nudgePct.value,
     });
+    toast.success('Cap saved');
   } catch (err) {
     saveError.value = err instanceof Error ? err.message : "Couldn't save the cap.";
+    toast.error(saveError.value);
   } finally {
     saving.value = false;
   }

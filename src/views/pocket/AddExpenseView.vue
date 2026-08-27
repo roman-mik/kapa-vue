@@ -8,11 +8,13 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useExpenses } from '@/composables/useExpenses';
+import { useToast } from '@/composables/useToast';
 import { useSpaceStore } from '@/stores/space';
 
 const space = useSpaceStore();
 const { categories } = useCategories();
 const { add } = useExpenses();
+const toast = useToast();
 const router = useRouter();
 
 const amount = ref('');
@@ -39,9 +41,11 @@ async function onSubmit(): Promise<void> {
       categoryId: categoryId.value || null,
       note: note.value.trim() || null,
     });
+    toast.success('Expense added');
     await router.push({ name: 'home' });
   } catch (err) {
     error.value = err instanceof Error ? err.message : "Couldn't add that expense.";
+    toast.error(error.value);
   } finally {
     submitting.value = false;
   }

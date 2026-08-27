@@ -8,11 +8,13 @@ import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useExpenses } from '@/composables/useExpenses';
 import { useSpaceMembers } from '@/composables/useSpaceMembers';
+import { useToast } from '@/composables/useToast';
 import { useSessionStore } from '@/stores/session';
 import { formatMoney } from '@/lib/money';
 
 const { expenses, loading, error, update, remove } = useExpenses();
 const { members } = useSpaceMembers();
+const toast = useToast();
 const session = useSessionStore();
 
 const editingId = ref<string | null>(null);
@@ -63,8 +65,10 @@ async function confirmEdit(id: string, currency: string | null): Promise<void> {
       note: editNote.value.trim() || null,
     });
     editingId.value = null;
+    toast.success('Expense updated');
   } catch (err) {
     rowError.value = err instanceof Error ? err.message : "Couldn't save that expense.";
+    toast.error(rowError.value);
   } finally {
     busyId.value = null;
   }
@@ -72,8 +76,13 @@ async function confirmEdit(id: string, currency: string | null): Promise<void> {
 
 async function onDelete(id: string): Promise<void> {
   busyId.value = id;
+  rowError.value = null;
   try {
     await remove(id);
+    toast.success('Expense deleted');
+  } catch (err) {
+    rowError.value = err instanceof Error ? err.message : "Couldn't delete that expense.";
+    toast.error(rowError.value);
   } finally {
     busyId.value = null;
   }

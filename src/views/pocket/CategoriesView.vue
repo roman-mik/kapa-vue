@@ -5,10 +5,12 @@ import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useCategories } from '@/composables/useCategories';
+import { useToast } from '@/composables/useToast';
 
 const { categories, loading, error, add, rename, archive, restore } = useCategories({
   includeArchived: true,
 });
+const toast = useToast();
 
 const newName = ref('');
 const adding = ref(false);
@@ -25,8 +27,10 @@ async function onAdd(): Promise<void> {
   try {
     await add(name);
     newName.value = '';
+    toast.success('Category added');
   } catch (err) {
     addError.value = err instanceof Error ? err.message : "Couldn't add that category.";
+    toast.error(addError.value);
   } finally {
     adding.value = false;
   }
@@ -44,6 +48,9 @@ async function confirmRename(id: string): Promise<void> {
   busyId.value = id;
   try {
     await rename(id, name);
+    toast.success('Category renamed');
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Couldn't rename that category.");
   } finally {
     busyId.value = null;
   }
@@ -53,6 +60,9 @@ async function onArchive(id: string): Promise<void> {
   busyId.value = id;
   try {
     await archive(id);
+    toast.success('Category archived');
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Couldn't archive that category.");
   } finally {
     busyId.value = null;
   }
@@ -62,6 +72,9 @@ async function onRestore(id: string): Promise<void> {
   busyId.value = id;
   try {
     await restore(id);
+    toast.success('Category restored');
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Couldn't restore that category.");
   } finally {
     busyId.value = null;
   }
