@@ -10,6 +10,8 @@
     "prepare": "vp config"
   },
   "dependencies": {
+    "@roman-mik/kapa-core": "0.6.0",
+    "@supabase/supabase-js": "^2.112.4",
     "vue": "^3.5.41"
   },
   "devDependencies": {

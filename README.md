@@ -1,5 +1,34 @@
-# Vue 3 + TypeScript + Vite
+# kapa-vue
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Vue 3 client for [Kapa](https://github.com/roman-mik/kapa-core) — a family of personal-finance
+apps (**Pocket**, a monthly spending cap tracker, and **Horizon**, cash-flow forecasting). All
+business logic, queries, and theming live in `@roman-mik/kapa-core`; this repo is the Vite +
+Vue 3 SPA that renders them.
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+## Prerequisite: `NPM_TOKEN`
+
+`@roman-mik/kapa-core` is a **private** package published to GitHub Packages, even though this
+repo is public. `pnpm install` will fail with `401 Unauthorized` unless you have:
+
+1. A **classic** GitHub PAT with `read:packages` scope (fine-grained tokens don't work for
+   GitHub Packages).
+2. That token exported as `NPM_TOKEN`, referenced from your **user-level** `~/.npmrc`
+   (pnpm refuses to expand env vars in a project-level `.npmrc`, since that file is committed):
+
+   ```
+   //npm.pkg.github.com/:_authToken=${NPM_TOKEN}
+   ```
+
+3. `NPM_TOKEN` set in your shell (`export NPM_TOKEN=...`) before running `pnpm install`, and as
+   a repo/env secret in CI and Vercel.
+
+The project's own `.npmrc` only maps the `@roman-mik` scope to the registry — it intentionally
+does not carry the auth token.
+
+## Development
+
+```
+pnpm install
+pnpm dev
+pnpm build
+```
