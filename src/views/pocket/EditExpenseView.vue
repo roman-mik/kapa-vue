@@ -45,7 +45,7 @@ const note = ref('');
 const submitting = ref(false);
 const submitError = ref<string | null>(null);
 
-onMounted(async () => {
+async function load(): Promise<void> {
   loading.value = true;
   try {
     const expense = await getExpense(supabase, expenseId.value);
@@ -64,7 +64,9 @@ onMounted(async () => {
   } finally {
     loading.value = false;
   }
-});
+}
+
+onMounted(load);
 
 const exponent = computed(() => CURRENCY_EXPONENT[currency.value]);
 
@@ -117,12 +119,27 @@ async function onSubmit(): Promise<void> {
   }
   submitting.value = true;
   try {
-    await update(expenseId.value, {
-      amount_minor: Math.round(parsed.data * 10 ** exponent.value),
-      currency: currency.value,
-      category_id: categoryId.value || null,
-      note: note.value.trim() || null,
-    });
+    // The write is scoped to the `updated_at` this screen loaded — if another
+    // member saved first, kapa-core refuses the clobber and we reload the
+    // latest version (discarding this form's values) so the user reviews the
+    // other change before saving again.
+    const outcome = await update(
+      expenseId.value,
+      {
+        amount_minor: Math.round(parsed.data * 10 ** exponent.value),
+        currency: currency.value,
+        category_id: categoryId.value || null,
+        note: note.value.trim() || null,
+      },
+      original.value?.updated_at ?? ''
+    );
+    if (!outcome.ok) {
+      submitError.value =
+        'This expense changed elsewhere while you were editing. Review the latest version and try again.';
+      toast.error(submitError.value);
+      await load();
+      return;
+    }
     toast.success('Expense updated');
     await router.push({ name: 'pocket-history' });
   } catch (err) {
