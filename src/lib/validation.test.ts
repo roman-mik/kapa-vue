@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vite-plus/test';
 import {
   categoryNameSchema,
+  displayNameSchema,
   firstIssueMessage,
   nonNegativeAmountSchema,
   nudgePctSchema,
@@ -26,6 +27,33 @@ describe('categoryNameSchema', () => {
   it('accepts exactly 60 characters', () => {
     const sixty = 'a'.repeat(60);
     expect(categoryNameSchema.parse(sixty)).toBe(sixty);
+  });
+});
+
+describe('displayNameSchema', () => {
+  it('trims and accepts a normal name', () => {
+    expect(displayNameSchema.parse('  John Doe  ')).toBe('John Doe');
+  });
+
+  it('rejects a name over 60 characters', () => {
+    const tooLong = 'a'.repeat(61);
+    expect(firstIssueMessage(displayNameSchema.safeParse(tooLong))).toBe(
+      'Display names are limited to 60 characters.'
+    );
+  });
+
+  it('accepts exactly 60 characters', () => {
+    const sixty = 'a'.repeat(60);
+    expect(displayNameSchema.parse(sixty)).toBe(sixty);
+  });
+
+  it('maps empty/whitespace input to null', () => {
+    expect(displayNameSchema.parse('')).toBe(null);
+    expect(displayNameSchema.parse('   ')).toBe(null);
+  });
+
+  it('accepts null', () => {
+    expect(displayNameSchema.parse(null)).toBe(null);
   });
 });
 
