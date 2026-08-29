@@ -9,7 +9,12 @@ const tabs = [
 
 <template>
   <div class="shell">
-    <router-link :to="{ name: 'pocket-add' }" class="fab" aria-label="Add expense">
+    <router-link
+      v-if="$route.name !== 'pocket-add'"
+      :to="{ name: 'pocket-add' }"
+      class="fab"
+      aria-label="Add expense"
+    >
       <svg
         viewBox="0 0 24 24"
         fill="none"
