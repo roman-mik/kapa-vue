@@ -2,8 +2,8 @@ import { updateTheme } from '@roman-mik/kapa-core/core';
 import type { ThemeId } from '@roman-mik/kapa-core/theme';
 import { defineStore } from 'pinia';
 import { applyTheme, DEFAULT_THEME, readStoredTheme, storeTheme } from '@/lib/theme';
+import { useToast } from '@/composables/useToast';
 import { supabase } from '@/lib/supabase';
-import { useSessionStore } from '@/stores/session';
 
 export const useThemeStore = defineStore('theme', {
   state: () => ({
@@ -18,19 +18,29 @@ export const useThemeStore = defineStore('theme', {
     },
     // User-driven switch: updates the DOM attribute, persists to
     // localStorage, and — when signed in — to core.profiles.theme, so the
-    // choice follows the user to their next device.
-    async setTheme(id: ThemeId): Promise<void> {
+    // choice follows the user to their next device. Persistence failure is
+    // reported (the local choice stands) rather than swallowed, so the
+    // cross-device guarantee doesn't fail silently.
+    //
+    // `userId` is passed in by the caller rather than read from the session
+    // store here, so this store stays free of a static import back into
+    // session/space (which would close an import cycle: theme -> session ->
+    // space -> theme). Providing undefined skips the server write.
+    async setTheme(id: ThemeId, userId?: string): Promise<void> {
       this.id = id;
       applyTheme(id);
       storeTheme(id);
-      const session = useSessionStore();
-      if (session.user) {
-        await updateTheme(supabase, session.user.id, id);
+      if (!userId) return;
+      try {
+        await updateTheme(supabase, userId, id);
+      } catch {
+        useToast().error("Couldn't save your theme to your profile.");
       }
     },
     // Called from space.init() once the profile is known, to reconcile a
-    // theme chosen on a different device. Applies locally only — this is a
-    // read of the already-persisted choice, not a new one to write back.
+    // theme chosen on a different device. Caches the remote choice locally
+    // for the pre-paint script — this is a read of the already-persisted
+    // choice, not a new one to write back to the server.
     applyRemote(id: ThemeId): void {
       this.id = id;
       applyTheme(id);

@@ -32,14 +32,22 @@ async function onExport(): Promise<void> {
   if (!spaceId) return;
   exporting.value = true;
   try {
+    // Intentionally all-time (tracker's /api/export does the same), matching
+    // the "kapa-<date>.csv" full-history download. listExpenses is
+    // unpaginated, which is fine at this space's scale; revisit with a
+    // date-range filter + pagination if a space ever grows large.
     const rows = await listExpenses(supabase, spaceId);
     const csv = expensesToCsv(rows);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     const link = document.createElement('a');
     link.href = url;
     link.download = `kapa-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    // Defer revoking so the browser snapshots the blob before it can be
+    // dropped — an immediate revoke can cancel the download in some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   } catch (err) {
     toast.error(err instanceof Error ? err.message : "Couldn't export.");
   } finally {
@@ -67,7 +75,7 @@ async function onExport(): Promise<void> {
           type="button"
           class="theme-btn"
           :aria-pressed="theme.id === id"
-          @click="theme.setTheme(id)"
+          @click="theme.setTheme(id, session.user?.id)"
         >
           {{ themes[id].name }}
         </button>

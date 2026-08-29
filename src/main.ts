@@ -5,6 +5,10 @@ import router from './router';
 import { useSessionStore } from './stores/session';
 import { useThemeStore } from './stores/theme';
 import './styles/main.css';
+// Side-effect import: registers the beforeinstallprompt/appinstalled
+// listeners at startup, so the one-shot beforeinstallprompt event is captured
+// even though the only component that reads it (Settings) is a lazy chunk.
+import './composables/useInstallPrompt';
 
 const app = createApp(App);
 app.use(createPinia());

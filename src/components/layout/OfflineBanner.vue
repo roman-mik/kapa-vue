@@ -13,7 +13,8 @@ const { isOnline } = useOnlineStatus();
 <style scoped>
 .offline-banner {
   margin: 0;
-  padding: var(--kapa-space-2) var(--kapa-space-4);
+  padding: calc(var(--kapa-space-2) + env(safe-area-inset-top, 0px)) var(--kapa-space-4)
+    var(--kapa-space-2);
   background: var(--kapa-negative);
   color: var(--kapa-white);
   font-size: var(--kapa-text-caption-size);

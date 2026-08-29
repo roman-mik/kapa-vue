@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vite-plus/test';
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 import { expensesToCsv } from './csv';
 
+const BOM = '\uFEFF';
+
 function row(overrides: Partial<ExpenseView> = {}): ExpenseView {
   return {
     id: 'e1',
@@ -20,11 +22,11 @@ function row(overrides: Partial<ExpenseView> = {}): ExpenseView {
 }
 
 describe('expensesToCsv', () => {
-  it('writes a header and one row per expense, amounts in minor units', () => {
+  it('writes a header and one row per expense, amounts in minor units, prefixed with a UTF-8 BOM', () => {
     const csv = expensesToCsv([row({ category_name: 'Groceries', amount_minor: 1550 })]);
 
     expect(csv).toBe(
-      'date,category,amount_minor,currency,note\n2026-08-15T00:00:00Z,Groceries,1550,RSD,'
+      BOM + 'date,category,amount_minor,currency,note\n2026-08-15T00:00:00Z,Groceries,1550,RSD,'
     );
   });
 
@@ -40,7 +42,19 @@ describe('expensesToCsv', () => {
     expect(csv).toContain('"lunch, ""the good one"""');
   });
 
-  it('returns just the header for an empty list', () => {
-    expect(expensesToCsv([])).toBe('date,category,amount_minor,currency,note');
+  it('guards against spreadsheet formula injection in leading =, +, -, and @', () => {
+    expect(expensesToCsv([row({ note: '=2+5*3' })])).toContain(",'=2+5*3");
+    expect(expensesToCsv([row({ note: '@SUM(A1:A2)' })])).toContain(",'@SUM(A1:A2)");
+    expect(expensesToCsv([row({ note: '+123' })])).toContain(",'+123");
+    expect(expensesToCsv([row({ note: '-123' })])).toContain(",'-123");
+  });
+
+  it('leaves ordinary text and amounts untouched (no spurious quote guard)', () => {
+    expect(expensesToCsv([row({ note: 'fitting room 12' })])).toContain(',fitting room 12');
+    expect(expensesToCsv([row({ category_name: 'Coffee' })])).toContain(',Coffee,');
+  });
+
+  it('returns just the header (plus BOM) for an empty list', () => {
+    expect(expensesToCsv([])).toBe(BOM + 'date,category,amount_minor,currency,note');
   });
 });
