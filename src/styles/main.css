@@ -2,7 +2,9 @@
 
 :root {
   color-scheme: light;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-body: 'Figtree', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-heading: 'Caprasimo', Georgia, 'Times New Roman', serif;
+  font-family: var(--font-body);
   font-size: var(--kapa-text-body-size);
   line-height: calc(var(--kapa-text-body-line) / var(--kapa-text-body-size));
 }
@@ -26,18 +28,19 @@ h2,
 h3 {
   color: var(--kapa-ink);
   margin: 0 0 var(--kapa-space-3);
+  font-family: var(--font-heading);
+  font-weight: 400;
+  letter-spacing: -0.015em;
 }
 
 h1 {
   font-size: var(--kapa-text-display-size);
   line-height: calc(var(--kapa-text-display-line) / var(--kapa-text-display-size));
-  font-weight: var(--kapa-text-display-weight);
 }
 
 h2 {
   font-size: var(--kapa-text-title-size);
   line-height: calc(var(--kapa-text-title-line) / var(--kapa-text-title-size));
-  font-weight: var(--kapa-text-title-weight);
 }
 
 p {
