@@ -5,7 +5,9 @@ import {
   listCategories,
   renameCategory,
   restoreCategory,
+  setCategoryColor,
 } from '@roman-mik/kapa-core/core';
+import type { SwatchSlot } from '@roman-mik/kapa-core/theme';
 import { ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
@@ -58,5 +60,12 @@ export function useCategories(options: { includeArchived?: boolean } = {}) {
     await refresh();
   }
 
-  return { categories, loading, error, refresh, add, rename, archive, restore };
+  // Slot validity is enforced by the SwatchSlot type plus the DB check
+  // constraint; null clears the assignment.
+  async function setColor(categoryId: string, color: SwatchSlot | null): Promise<void> {
+    await setCategoryColor(supabase, categoryId, color);
+    await refresh();
+  }
+
+  return { categories, loading, error, refresh, add, rename, archive, restore, setColor };
 }

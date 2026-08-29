@@ -17,8 +17,10 @@ import { useExpenses } from '@/composables/useExpenses';
 import { usePocketHome } from '@/composables/usePocketHome';
 import { useToast } from '@/composables/useToast';
 import { formatMoney } from '@/lib/money';
+import { swatchCssVar } from '@/lib/swatch';
 import { firstIssueMessage, positiveAmountSchema } from '@/lib/validation';
 import { useSpaceStore } from '@/stores/space';
+import type { SwatchSlot } from '@roman-mik/kapa-core/theme';
 
 const space = useSpaceStore();
 const { categories } = useCategories();
@@ -160,7 +162,14 @@ async function onSubmit(): Promise<void> {
           :variant="categoryId === c.id ? 'primary' : 'secondary'"
           @click="categoryId = c.id"
         >
-          {{ c.name }}
+          <span class="chip-inner">
+            <span
+              class="chip-dot"
+              :style="c.color ? { background: swatchCssVar(c.color as SwatchSlot) } : undefined"
+              :class="{ 'chip-dot--empty': !c.color }"
+            />
+            {{ c.name }}
+          </span>
         </BaseButton>
       </div>
 
@@ -221,6 +230,23 @@ async function onSubmit(): Promise<void> {
   display: flex;
   flex-wrap: wrap;
   gap: var(--kapa-space-2);
+}
+
+.chip-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kapa-space-1);
+}
+
+.chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.chip-dot--empty {
+  border: 1px dashed currentColor;
 }
 
 .hint {

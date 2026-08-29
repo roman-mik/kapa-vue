@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { SWATCH_SLOTS, type SwatchSlot } from '@roman-mik/kapa-core/theme';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -8,8 +9,9 @@ import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useToast } from '@/composables/useToast';
 import { categoryNameSchema, firstIssueMessage } from '@/lib/validation';
+import { swatchCssVar } from '@/lib/swatch';
 
-const { categories, loading, error, add, rename, archive, restore } = useCategories({
+const { categories, loading, error, add, rename, archive, restore, setColor } = useCategories({
   includeArchived: true,
 });
 const toast = useToast();
@@ -20,6 +22,7 @@ const addError = ref<string | null>(null);
 const renamingId = ref<string | null>(null);
 const renameValue = ref('');
 const renameError = ref<string | null>(null);
+const pickingColorId = ref<string | null>(null);
 const busyId = ref<string | null>(null);
 
 async function onAdd(): Promise<void> {
@@ -79,6 +82,23 @@ async function onArchive(id: string): Promise<void> {
   }
 }
 
+function toggleColorPicker(id: string): void {
+  pickingColorId.value = pickingColorId.value === id ? null : id;
+}
+
+async function onPickColor(id: string, slot: SwatchSlot | null): Promise<void> {
+  pickingColorId.value = null;
+  busyId.value = id;
+  try {
+    await setColor(id, slot);
+    toast.success(slot ? 'Colour updated' : 'Colour cleared');
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Couldn't update that colour.");
+  } finally {
+    busyId.value = null;
+  }
+}
+
 async function onRestore(id: string): Promise<void> {
   busyId.value = id;
   try {
@@ -125,6 +145,21 @@ async function onRestore(id: string): Promise<void> {
             <BaseButton variant="ghost" @click="renamingId = null">Cancel</BaseButton>
           </template>
           <template v-else>
+            <button
+              type="button"
+              class="swatch-dot"
+              :class="{ 'swatch-dot--empty': !category.color }"
+              :style="
+                category.color
+                  ? { background: swatchCssVar(category.color as SwatchSlot) }
+                  : undefined
+              "
+              :aria-label="
+                category.color ? `Change colour (current: ${category.color})` : 'Choose a colour'
+              "
+              :disabled="busyId === category.id"
+              @click="toggleColorPicker(category.id)"
+            />
             <span class="name">{{ category.name }}</span>
             <span v-if="category.archived" class="badge">Archived</span>
             <template v-if="!category.archived">
@@ -151,6 +186,24 @@ async function onRestore(id: string): Promise<void> {
               Restore
             </BaseButton>
           </template>
+          <div
+            v-if="pickingColorId === category.id"
+            class="swatch-row"
+            role="radiogroup"
+            :aria-label="`Colour for ${category.name}`"
+          >
+            <button
+              v-for="slot in SWATCH_SLOTS"
+              :key="slot"
+              type="button"
+              class="swatch-dot swatch-choice"
+              :style="{ background: swatchCssVar(slot) }"
+              :aria-pressed="category.color === slot"
+              :aria-label="slot"
+              @click="onPickColor(category.id, slot)"
+            />
+            <BaseButton variant="ghost" @click="onPickColor(category.id, null)">None</BaseButton>
+          </div>
         </li>
       </ul>
 
@@ -179,12 +232,40 @@ async function onRestore(id: string): Promise<void> {
 
 .list li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--kapa-space-2);
   padding: var(--kapa-space-2) var(--kapa-space-3);
   border-radius: var(--kapa-radius-sm);
   border: 1px solid var(--kapa-neutral-400);
   background: var(--kapa-surface);
+}
+
+.swatch-dot {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--kapa-neutral-400);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.swatch-dot--empty {
+  background: transparent;
+  border-style: dashed;
+}
+
+.swatch-row {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--kapa-space-2);
+}
+
+.swatch-choice[aria-pressed='true'] {
+  outline: 2px solid var(--kapa-accent-600);
+  outline-offset: 1px;
 }
 
 .list li.archived {

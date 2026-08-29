@@ -19,6 +19,8 @@ import { useToast } from '@/composables/useToast';
 import { useSessionStore } from '@/stores/session';
 import { useSpaceStore } from '@/stores/space';
 import { formatMoney } from '@/lib/money';
+import { swatchCssVar } from '@/lib/swatch';
+import type { SwatchSlot } from '@roman-mik/kapa-core/theme';
 
 const { expenses, loading, error, remove } = useExpenses();
 const { members } = useSpaceMembers();
@@ -54,6 +56,16 @@ function categoryName(categoryId: string | null): string {
   return categories.value.find((c) => c.id === categoryId)?.name ?? 'Uncategorized';
 }
 
+// A category's own swatch slot when it has one; uncategorized (or a category
+// without a colour) falls back to the position-based slot so the bar stays
+// readable. Slots are theme-agnostic names rendered through the generated
+// `--kapa-swatch-*` vars.
+function categorySwatch(categoryId: string | null, position: number): string {
+  const color = categories.value.find((c) => c.id === categoryId)?.color ?? null;
+  if (color) return swatchCssVar(color as SwatchSlot);
+  return `var(--kapa-swatch-${(position % 8) + 1})`;
+}
+
 const breakdown = computed(() => {
   const rowsIn = summary.value?.categoryBreakdown ?? [];
   const total = rowsIn.reduce((sum, r) => sum + r.spent, 0);
@@ -65,7 +77,7 @@ const breakdown = computed(() => {
       name: categoryName(r.categoryId),
       spent: r.spent,
       pct: (r.spent / total) * 100,
-      swatch: `var(--kapa-swatch-${(i % 8) + 1})`,
+      swatch: categorySwatch(r.categoryId, i),
     }))
     .sort((a, b) => b.spent - a.spent);
 });
@@ -243,7 +255,14 @@ const dayGroups = computed<DayGroup[]>(() => {
         :variant="categoryFilter === c.id ? 'primary' : 'secondary'"
         @click="categoryFilter = c.id"
       >
-        {{ c.name }}
+        <span class="chip-inner">
+          <span
+            class="dot chip-dot"
+            :style="c.color ? { background: swatchCssVar(c.color as SwatchSlot) } : undefined"
+            :class="{ 'chip-dot--empty': !c.color }"
+          />
+          {{ c.name }}
+        </span>
       </BaseButton>
     </div>
 
@@ -343,6 +362,16 @@ const dayGroups = computed<DayGroup[]>(() => {
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.chip-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kapa-space-1);
+}
+
+.chip-dot--empty {
+  border: 1px dashed currentColor;
 }
 
 .amount {
