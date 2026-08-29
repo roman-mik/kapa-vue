@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref } from 'vue';
+import { computed, ref } from 'vue';
 
 // Chrome/Android-only: fires once, and only if the manifest + service
 // worker already satisfy the browser's own installability checks. Safari
@@ -10,8 +10,11 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
-// Module-level: the event can only be captured once per page load,
-// whichever component mounts first — every consumer shares it.
+// Module-level: the event is captured once per page load, so every consumer
+// shares it. The listeners are registered at module load (not on first
+// consumer mount) because `beforeinstallprompt` fires exactly once, usually
+// early in the session — if the only consumer lived in a lazy route chunk,
+// mounting it after the event fired would lose the install prompt forever.
 const deferredPrompt = ref<BeforeInstallPromptEvent | null>(null);
 const installed = ref(false);
 
@@ -25,29 +28,20 @@ function onAppInstalled(): void {
   installed.value = true;
 }
 
-let listenerCount = 0;
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
+  window.addEventListener('appinstalled', onAppInstalled);
+}
 
 export function useInstallPrompt() {
-  if (listenerCount === 0) {
-    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-    window.addEventListener('appinstalled', onAppInstalled);
-  }
-  listenerCount++;
-
-  onScopeDispose(() => {
-    listenerCount--;
-    if (listenerCount === 0) {
-      window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt);
-      window.removeEventListener('appinstalled', onAppInstalled);
-    }
-  });
-
   async function promptInstall(): Promise<void> {
     const event = deferredPrompt.value;
+    // Clear synchronously so a rapid second call can't invoke prompt() on the
+    // same captured event (the browser rejects the second prompt()).
+    deferredPrompt.value = null;
     if (!event) return;
     await event.prompt();
     await event.userChoice;
-    deferredPrompt.value = null;
   }
 
   return {
