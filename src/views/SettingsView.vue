@@ -36,8 +36,12 @@ async function onExport(): Promise<void> {
     const link = document.createElement('a');
     link.href = url;
     link.download = `kapa-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
+    // Defer revoking so the browser snapshots the blob before it can be
+    // dropped — an immediate revoke can cancel the download in some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   } catch (err) {
     toast.error(err instanceof Error ? err.message : "Couldn't export.");
   } finally {
