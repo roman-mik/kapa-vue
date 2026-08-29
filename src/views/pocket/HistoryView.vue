@@ -12,6 +12,7 @@ import ConfirmButton from '@/components/ui/ConfirmButton.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useCategories } from '@/composables/useCategories';
+import { useConvertedExpenses } from '@/composables/useConvertedExpenses';
 import { useExpenses } from '@/composables/useExpenses';
 import { usePocketHome } from '@/composables/usePocketHome';
 import { useSpaceMembers } from '@/composables/useSpaceMembers';
@@ -23,6 +24,7 @@ import { swatchCssVar } from '@/lib/swatch';
 import type { SwatchSlot } from '@roman-mik/kapa-core/theme';
 
 const { expenses, loading, error, remove } = useExpenses();
+const { spaceCurrency, isForeign, convertedMinor, unconvertible } = useConvertedExpenses(expenses);
 const { members } = useSpaceMembers();
 const { categories } = useCategories({ includeArchived: true });
 const { summary, refresh: refreshSummary } = usePocketHome();
@@ -174,8 +176,21 @@ const dayGroups = computed<DayGroup[]>(() => {
     .sort(([a], [b]) => (a < b ? 1 : -1))
     .map(([dateKey, dayRows]) => {
       const label = dayLabel(dateKey, now, timeZone);
-      const currencies = new Set(dayRows.map((r) => (r.currency ?? 'RSD') as Currency));
-      const singleCurrency = currencies.size === 1 ? [...currencies][0] : null;
+      // The day total is always reported in the space currency: same-currency
+      // rows count as-is, foreign rows convert through the fx module. A day
+      // with an unconvertible row gets no total rather than a partial one —
+      // the row itself carries the "no fx rate" marker explaining why.
+      let total = 0;
+      let convertible = true;
+      for (const row of dayRows) {
+        if (!isForeign(row)) {
+          total += row.amount_minor ?? 0;
+          continue;
+        }
+        const converted = convertedMinor(row);
+        if (converted === null) convertible = false;
+        else total += converted;
+      }
       return {
         dateKey,
         heading:
@@ -185,8 +200,8 @@ const dayGroups = computed<DayGroup[]>(() => {
               ? 'Yesterday'
               : formatDateHeading(dateKey),
         rows: dayRows,
-        currency: singleCurrency,
-        total: singleCurrency ? dayRows.reduce((sum, r) => sum + (r.amount_minor ?? 0), 0) : null,
+        currency: spaceCurrency.value,
+        total: convertible ? total : null,
       };
     });
 });
@@ -293,6 +308,16 @@ const dayGroups = computed<DayGroup[]>(() => {
               <span class="amount">{{
                 formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)
               }}</span>
+              <span v-if="convertedMinor(row) !== null" class="converted">
+                ≈ {{ formatMoney(convertedMinor(row)!, spaceCurrency) }}
+              </span>
+              <span
+                v-else-if="isForeign(row)"
+                class="unconvertible"
+                title="No fx rate for this pair"
+              >
+                no fx rate
+              </span>
               <span class="category">{{ row.category_name ?? 'Uncategorized' }}</span>
               <span class="attribution">{{ attribution(row.user_id) }}</span>
             </div>
@@ -313,6 +338,15 @@ const dayGroups = computed<DayGroup[]>(() => {
       </section>
     </template>
     <p v-if="rowError" role="alert" class="error">{{ rowError }}</p>
+    <p v-if="unconvertible.length" role="status" class="error unconverted-note">
+      {{
+        unconvertible
+          .map((row) => formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency))
+          .join(' + ')
+      }}
+      couldn't be converted to {{ spaceCurrency }} because no fx rate covers
+      {{ unconvertible.length === 1 ? 'it' : 'them' }}.
+    </p>
   </main>
 </template>
 
@@ -435,6 +469,20 @@ const dayGroups = computed<DayGroup[]>(() => {
 
 .amount {
   font-weight: 600;
+}
+
+.converted {
+  color: var(--kapa-ink-muted);
+  font-size: var(--kapa-text-caption-size);
+}
+
+.unconvertible {
+  color: var(--kapa-negative);
+  font-size: var(--kapa-text-caption-size);
+}
+
+.unconverted-note {
+  margin-top: var(--kapa-space-3);
 }
 
 .category {
