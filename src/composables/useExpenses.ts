@@ -1,5 +1,9 @@
 import { currentMonth, monthWindow } from '@roman-mik/kapa-core/pocket';
-import type { ExpenseUpdate, ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
+import type {
+  ExpenseUpdate,
+  ExpenseView,
+  MutationOutcome,
+} from '@roman-mik/kapa-core/pocket/queries';
 import {
   addExpense,
   deleteExpense,
@@ -67,14 +71,24 @@ export function useExpenses() {
     await refresh();
   }
 
-  async function update(expenseId: string, patch: ExpenseUpdate): Promise<void> {
-    await updateExpense(supabase, expenseId, patch);
+  // `expectedUpdatedAt` is the row's `updated_at` as this client last read
+  // it — kapa-core scopes the write to it and reports a conflict instead of
+  // clobbering another member's change. Conflicts don't throw: the list is
+  // refreshed either way and the outcome is returned for the view to surface.
+  async function update(
+    expenseId: string,
+    patch: ExpenseUpdate,
+    expectedUpdatedAt: string
+  ): Promise<MutationOutcome> {
+    const outcome = await updateExpense(supabase, expenseId, patch, expectedUpdatedAt);
     await refresh();
+    return outcome;
   }
 
-  async function remove(expenseId: string): Promise<void> {
-    await deleteExpense(supabase, expenseId);
+  async function remove(expenseId: string, expectedUpdatedAt: string): Promise<MutationOutcome> {
+    const outcome = await deleteExpense(supabase, expenseId, expectedUpdatedAt);
     await refresh();
+    return outcome;
   }
 
   return { expenses, loading, error, refresh, add, update, remove };

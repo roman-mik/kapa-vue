@@ -86,10 +86,20 @@ function attribution(userId: string | null): string {
 }
 
 async function onDelete(id: string): Promise<void> {
+  // Delete is scoped to the row's `updated_at` as this list last read it; a
+  // conflict means another member changed or removed it first. useExpenses
+  // already refreshed the list either way — only the message differs.
+  const expectedUpdatedAt = expenses.value.find((e) => e.id === id)?.updated_at ?? '';
   busyId.value = id;
   rowError.value = null;
   try {
-    await remove(id);
+    const outcome = await remove(id, expectedUpdatedAt);
+    if (!outcome.ok) {
+      rowError.value =
+        'This expense was already changed or deleted elsewhere. The list is refreshed.';
+      toast.error(rowError.value);
+      return;
+    }
     toast.success('Expense deleted');
   } catch (err) {
     rowError.value = err instanceof Error ? err.message : "Couldn't delete that expense.";
