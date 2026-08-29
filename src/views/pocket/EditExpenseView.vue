@@ -3,6 +3,7 @@ import {
   convertToCurrency,
   CURRENCIES,
   CURRENCY_EXPONENT,
+  dateKeyStartUtc,
   type Currency,
   remainingAfter,
   zonedDateKey,
@@ -21,7 +22,7 @@ import { usePocketHome } from '@/composables/usePocketHome';
 import { useToast } from '@/composables/useToast';
 import { formatMoney } from '@/lib/money';
 import { supabase } from '@/lib/supabase';
-import { firstIssueMessage, positiveAmountSchema } from '@/lib/validation';
+import { expenseDateSchema, firstIssueMessage, positiveAmountSchema } from '@/lib/validation';
 import { useSpaceStore } from '@/stores/space';
 
 const route = useRoute();
@@ -32,7 +33,13 @@ const { update } = useExpenses();
 const { summary, rates } = usePocketHome();
 const toast = useToast();
 
+const timeZone = space.currentSpace?.timezone ?? 'UTC';
 const expenseId = computed(() => route.params.id as string);
+
+// Editing is capped at today: rates are fetched `onOrBefore` today, so the
+// "left after this" conversion is always covered. Also drives the native
+// date input's `max` so the picker can't open future months.
+const todayKey = computed(() => zonedDateKey(new Date(), timeZone));
 
 const original = ref<ExpenseView | null>(null);
 const loading = ref(true);
@@ -42,6 +49,7 @@ const amount = ref('');
 const currency = ref<Currency>('RSD');
 const categoryId = ref<string>('');
 const note = ref('');
+const spentAtKey = ref('');
 const submitting = ref(false);
 const submitError = ref<string | null>(null);
 
@@ -59,6 +67,9 @@ async function load(): Promise<void> {
     currency.value = (expense.currency ?? 'RSD') as Currency;
     categoryId.value = expense.category_id ?? '';
     note.value = expense.note ?? '';
+    spentAtKey.value = expense.spent_at
+      ? zonedDateKey(new Date(expense.spent_at), timeZone)
+      : zonedDateKey(new Date(), timeZone);
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : "Couldn't load this expense.";
   } finally {
@@ -97,12 +108,15 @@ const leftAfterThis = computed<number | null>(() => {
   );
   if (originalContribution === undefined) return null;
 
-  const todayKey = zonedDateKey(new Date(), space.currentSpace?.timezone ?? 'UTC');
+  // The proposed amount converts as of the newly selected date (not today),
+  // so a backdate or forward-date is previewed at the right rate. The picker
+  // defaults to today and is capped at today, so `spentAtKey` always parses
+  // and — with rates fetched `onOrBefore` today — always has a covering rate.
   const newContribution = convertToCurrency(
     proposedAmountMinor,
     currency.value,
     home.currency,
-    todayKey,
+    spentAtKey.value || todayKey.value,
     rates.value
   );
   if (newContribution === undefined) return null;
@@ -115,6 +129,11 @@ async function onSubmit(): Promise<void> {
   const parsed = positiveAmountSchema.safeParse(amount.value);
   if (!parsed.success) {
     submitError.value = firstIssueMessage(parsed) ?? 'Enter a valid amount.';
+    return;
+  }
+  const parsedDate = expenseDateSchema.safeParse(spentAtKey.value);
+  if (!parsedDate.success) {
+    submitError.value = firstIssueMessage(parsedDate) ?? 'Pick a valid date.';
     return;
   }
   submitting.value = true;
@@ -130,6 +149,7 @@ async function onSubmit(): Promise<void> {
         currency: currency.value,
         category_id: categoryId.value || null,
         note: note.value.trim() || null,
+        spent_at: dateKeyStartUtc(spentAtKey.value, timeZone).toISOString(),
       },
       original.value?.updated_at ?? ''
     );
@@ -172,6 +192,10 @@ async function onSubmit(): Promise<void> {
           :step="exponent > 0 ? '0.01' : '1'"
           required
         />
+      </BaseField>
+
+      <BaseField label="Date" v-slot="{ id }">
+        <BaseInput :id="id" v-model="spentAtKey" type="date" :max="todayKey" />
       </BaseField>
 
       <BaseField label="Currency" v-slot="{ id }">

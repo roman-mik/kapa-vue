@@ -33,6 +33,8 @@ export const nudgePctSchema = z.coerce
   .min(1, 'Enter a value between 1 and 100.')
   .max(100, 'Enter a value between 1 and 100.');
 
+export const expenseDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Pick a valid date.');
+
 /** The first schema-authored message for a failed parse, for a form's single error line. */
 export function firstIssueMessage(result: z.ZodSafeParseResult<unknown>): string | undefined {
   return result.success ? undefined : result.error.issues[0]?.message;
