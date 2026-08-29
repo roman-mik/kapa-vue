@@ -4,6 +4,7 @@ import {
   joinSpace,
   leaveSpace,
   listMySpaces,
+  renameSpace,
   updateDisplayName,
   updateLastActiveSpace,
 } from '@roman-mik/kapa-core/core';
@@ -73,6 +74,16 @@ export const useSpaceStore = defineStore('space', {
       // the store holding the backend's value and the form's save button stays
       // enabled instead of showing a stale name as "saved".
       this.displayName = name;
+    },
+    async renameCurrentSpace(name: string): Promise<void> {
+      const spaceId = this.currentSpaceId;
+      if (!spaceId) return;
+
+      await renameSpace(supabase, spaceId, name);
+      // Reflect the change only after a successful write (as in setDisplayName),
+      // so a failure leaves the store holding the backend's value. The replaced
+      // object guarantees reactivity for the header and Settings alike.
+      this.spaces = this.spaces.map((space) => (space.id === spaceId ? { ...space, name } : space));
     },
     // User- or auto-driven pick: persists to core.profiles.last_active_space_id
     // rather than a parallel localStorage key, so the choice follows the
