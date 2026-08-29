@@ -3,6 +3,7 @@ import {
   convertToCurrency,
   CURRENCIES,
   CURRENCY_EXPONENT,
+  dateKeyStartUtc,
   type Currency,
   remainingAfter,
   zonedDateKey,
@@ -18,7 +19,7 @@ import { usePocketHome } from '@/composables/usePocketHome';
 import { useToast } from '@/composables/useToast';
 import { formatMoney } from '@/lib/money';
 import { swatchCssVar } from '@/lib/swatch';
-import { firstIssueMessage, positiveAmountSchema } from '@/lib/validation';
+import { expenseDateSchema, firstIssueMessage, positiveAmountSchema } from '@/lib/validation';
 import { useSpaceStore } from '@/stores/space';
 import type { SwatchSlot } from '@roman-mik/kapa-core/theme';
 
@@ -29,12 +30,18 @@ const { summary, rates } = usePocketHome();
 const toast = useToast();
 const router = useRouter();
 
+const timeZone = space.currentSpace?.timezone ?? 'UTC';
 const amount = ref('');
 const currency = ref<Currency>((space.currentSpace?.currency ?? 'RSD') as Currency);
 const categoryId = ref<string>('');
 const note = ref('');
+const spentAtKey = ref(zonedDateKey(new Date(), timeZone));
 const submitting = ref(false);
 const error = ref<string | null>(null);
+
+// Backdating is capped at today: rates are fetched `onOrBefore` today, so
+// the "left after this" conversion is always covered.
+const todayKey = computed(() => zonedDateKey(new Date(), timeZone));
 
 const exponent = computed(() => CURRENCY_EXPONENT[currency.value]);
 
@@ -68,22 +75,24 @@ function pressKey(key: string): void {
   }
 }
 
-// Live "left after this" — converted into the space currency as of today,
-// same rates the home screen already fetched. Null (hidden, not a wrong
-// number) whenever there's no covering fx rate or the amount isn't valid yet.
+// Live "left after this" — converted into the space currency as of the
+// selected date, same rates the home screen already fetched. Null (hidden,
+// not a wrong number) whenever there's no covering fx rate or the amount
+// isn't valid yet.
 const leftAfterThis = computed<number | null>(() => {
   const home = summary.value;
   const value = Number(amount.value);
   if (!home || !Number.isFinite(value) || value <= 0) return null;
 
   const amountMinor = Math.round(value * 10 ** exponent.value);
-  const timeZone = space.currentSpace?.timezone ?? 'UTC';
-  const todayKey = zonedDateKey(new Date(), timeZone);
+  // The picker defaults to today and is capped at today, so the key always
+  // parses and is covered by the `onOrBefore`-today rates.
+  const asOfDate = spentAtKey.value || zonedDateKey(new Date(), timeZone);
   const converted = convertToCurrency(
     amountMinor,
     currency.value,
     home.currency,
-    todayKey,
+    asOfDate,
     rates.value
   );
   if (converted === undefined) return null;
@@ -98,6 +107,11 @@ async function onSubmit(): Promise<void> {
     error.value = firstIssueMessage(parsed) ?? 'Enter a valid amount.';
     return;
   }
+  const parsedDate = expenseDateSchema.safeParse(spentAtKey.value);
+  if (!parsedDate.success) {
+    error.value = firstIssueMessage(parsedDate) ?? 'Pick a valid date.';
+    return;
+  }
   submitting.value = true;
   try {
     await add({
@@ -105,6 +119,7 @@ async function onSubmit(): Promise<void> {
       currency: currency.value,
       categoryId: categoryId.value || null,
       note: note.value.trim() || null,
+      spentAt: dateKeyStartUtc(spentAtKey.value, timeZone).toISOString(),
     });
     toast.success('Expense added');
     await router.push({ name: 'home' });
@@ -146,6 +161,10 @@ async function onSubmit(): Promise<void> {
           {{ c }}
         </BaseButton>
       </div>
+
+      <BaseField label="Date" v-slot="{ id }">
+        <BaseInput :id="id" v-model="spentAtKey" type="date" :max="todayKey" />
+      </BaseField>
 
       <div class="chips" role="radiogroup" aria-label="Category">
         <BaseButton
