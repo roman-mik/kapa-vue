@@ -194,6 +194,15 @@ const dayGroups = computed<DayGroup[]>(() => {
           <span class="amount">{{ formatMoney(b.spent, summary!.currency) }}</span>
         </li>
       </ul>
+      <p v-if="summary!.unconverted.length" class="breakdown-note">
+        {{
+          summary!.unconverted
+            .map((bucket) => formatMoney(bucket.amountMinor, bucket.currency))
+            .join(' + ')
+        }}
+        couldn't be converted to {{ summary!.currency }} and
+        {{ summary!.unconverted.length === 1 ? "isn't" : "aren't" }} included in this breakdown.
+      </p>
     </div>
 
     <div class="chips" role="radiogroup" aria-label="Filter by category">
@@ -311,6 +320,12 @@ const dayGroups = computed<DayGroup[]>(() => {
   gap: var(--kapa-space-1);
   font-size: var(--kapa-text-caption-size);
   color: var(--kapa-ink-muted);
+}
+
+.breakdown-note {
+  margin: var(--kapa-space-2) 0 0;
+  font-size: var(--kapa-text-caption-size);
+  color: var(--kapa-negative);
 }
 
 .dot {
