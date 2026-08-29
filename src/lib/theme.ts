@@ -20,4 +20,18 @@ export function storeTheme(id: ThemeId): void {
 // so this is idempotent when called again once Vue mounts.
 export function applyTheme(id: ThemeId): void {
   document.documentElement.setAttribute('data-theme', id);
+  syncThemeColor();
+}
+
+// Keep the browser/status-bar chrome in step with the active theme instead of
+// a hardcoded value. Reads the theme's --kapa-accent from the CSS variables
+// that main.css's [data-theme] block just selected. No-op in environments
+// without a theme-color meta or computed styles (e.g. tests).
+function syncThemeColor(): void {
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (!meta) return;
+  const accent = getComputedStyle(document.documentElement)
+    .getPropertyValue('--kapa-accent')
+    .trim();
+  if (accent) meta.setAttribute('content', accent);
 }
