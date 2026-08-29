@@ -27,9 +27,11 @@ withDefaults(
 
 .value {
   margin: 0;
+  font-family: var(--font-heading);
   font-size: var(--kapa-text-display-size);
   line-height: calc(var(--kapa-text-display-line) / var(--kapa-text-display-size));
-  font-weight: var(--kapa-text-display-weight);
+  font-weight: 400;
+  letter-spacing: -0.015em;
   color: var(--kapa-ink);
 }
 
