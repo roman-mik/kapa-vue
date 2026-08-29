@@ -9,7 +9,6 @@ import {
   elapsedDays,
   currentMonth,
   evenPace,
-  type ExpenseAmount,
   monthWindow,
   overspend,
   paceGap,
@@ -27,6 +26,7 @@ import { computed, ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';
 import { useCap } from '@/composables/useCap';
 import { useSpaceStore } from '@/stores/space';
+import { toExpenseAmount } from '@/lib/expenseAmount';
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 
 export interface PocketSummary {
@@ -46,15 +46,6 @@ export interface PocketSummary {
   todayExpenses: ExpenseView[];
   daysUntilReset: number;
   home: PocketHomeView;
-}
-
-function toExpenseAmount(row: ExpenseView): ExpenseAmount {
-  return {
-    categoryId: row.category_id,
-    amountMinor: row.amount_minor ?? 0,
-    currency: (row.currency ?? 'RSD') as Currency,
-    spentAt: row.spent_at ?? new Date().toISOString(),
-  };
 }
 
 /**

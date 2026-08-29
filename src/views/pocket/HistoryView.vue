@@ -2,7 +2,9 @@
 import {
   attributionLabel,
   type Currency,
+  type CurrencyBucket,
   dayLabel,
+  dayTotals,
   zonedDateKey,
 } from '@roman-mik/kapa-core/pocket';
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
@@ -11,7 +13,9 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import ConfirmButton from '@/components/ui/ConfirmButton.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import { useCategories } from '@/composables/useCategories';
+import { useConvertedExpenses } from '@/composables/useConvertedExpenses';
 import { useExpenses } from '@/composables/useExpenses';
 import { usePocketHome } from '@/composables/usePocketHome';
 import { useSpaceMembers } from '@/composables/useSpaceMembers';
@@ -20,12 +24,23 @@ import { useSessionStore } from '@/stores/session';
 import { useSpaceStore } from '@/stores/space';
 import { formatMoney } from '@/lib/money';
 import { swatchCssVar } from '@/lib/swatch';
+import { toExpenseAmount } from '@/lib/expenseAmount';
 import type { SwatchSlot } from '@roman-mik/kapa-core/theme';
 
 const { expenses, loading, error, remove } = useExpenses();
+const {
+  summary,
+  refresh: refreshSummary,
+  rates,
+  loading: ratesLoading,
+  error: ratesError,
+} = usePocketHome();
+const { spaceCurrency, isForeign, convertedMinor, unconvertible } = useConvertedExpenses(
+  expenses,
+  rates
+);
 const { members } = useSpaceMembers();
 const { categories } = useCategories({ includeArchived: true });
-const { summary, refresh: refreshSummary } = usePocketHome();
 const space = useSpaceStore();
 const toast = useToast();
 const session = useSessionStore();
@@ -46,6 +61,17 @@ watch(
     categoryFilter.value = 'all';
   }
 );
+
+// Grouped the same way summary.unconverted is (by currency, summed) so
+// HistoryView and PocketHomeView can render the identical UnconvertedNote.
+const unconvertibleBuckets = computed<CurrencyBucket[]>(() => {
+  const totals = new Map<Currency, number>();
+  for (const row of unconvertible.value) {
+    const currency = (row.currency ?? 'RSD') as Currency;
+    totals.set(currency, (totals.get(currency) ?? 0) + (row.amount_minor ?? 0));
+  }
+  return [...totals.entries()].map(([currency, amountMinor]) => ({ currency, amountMinor }));
+});
 
 const isEmptyBecauseFiltered = computed(
   () => categoryFilter.value !== 'all' && expenses.value.length > 0 && rows.value.length === 0
@@ -141,8 +167,9 @@ interface DayGroup {
   dateKey: string;
   heading: string;
   rows: ExpenseView[];
-  total: number | null;
-  currency: Currency | null;
+  total: number;
+  currency: Currency;
+  unconverted: CurrencyBucket[];
 }
 
 // 'YYYY-MM-DD' parsed and reformatted via an explicit UTC anchor — the key
@@ -169,13 +196,23 @@ const dayGroups = computed<DayGroup[]>(() => {
     (byDay.get(dateKey) ?? byDay.set(dateKey, []).get(dateKey)!).push(row);
   }
 
+  // Day totals trace to kapa-core's own aggregation, same rule as
+  // usePocketHome — a day with an unconvertible row shows the convertible
+  // part's total, and its own `unconverted` bucket explains what's missing.
+  const totals = dayTotals(
+    rows.value.map(toExpenseAmount),
+    timeZone,
+    spaceCurrency.value,
+    rates.value
+  );
+  const totalsByDay = new Map(totals.value.map((t) => [t.dateKey, t]));
+
   const now = new Date();
   return [...byDay.entries()]
     .sort(([a], [b]) => (a < b ? 1 : -1))
     .map(([dateKey, dayRows]) => {
       const label = dayLabel(dateKey, now, timeZone);
-      const currencies = new Set(dayRows.map((r) => (r.currency ?? 'RSD') as Currency));
-      const singleCurrency = currencies.size === 1 ? [...currencies][0] : null;
+      const dayTotal = totalsByDay.get(dateKey);
       return {
         dateKey,
         heading:
@@ -185,8 +222,9 @@ const dayGroups = computed<DayGroup[]>(() => {
               ? 'Yesterday'
               : formatDateHeading(dateKey),
         rows: dayRows,
-        currency: singleCurrency,
-        total: singleCurrency ? dayRows.reduce((sum, r) => sum + (r.amount_minor ?? 0), 0) : null,
+        currency: spaceCurrency.value,
+        total: dayTotal?.amountMinor ?? 0,
+        unconverted: dayTotal?.unconverted ?? [],
       };
     });
 });
@@ -216,15 +254,12 @@ const dayGroups = computed<DayGroup[]>(() => {
           <span class="amount">{{ formatMoney(b.spent, summary!.currency) }}</span>
         </li>
       </ul>
-      <p v-if="summary!.unconverted.length" class="breakdown-note">
-        {{
-          summary!.unconverted
-            .map((bucket) => formatMoney(bucket.amountMinor, bucket.currency))
-            .join(' + ')
-        }}
-        couldn't be converted to {{ summary!.currency }} and
-        {{ summary!.unconverted.length === 1 ? "isn't" : "aren't" }} included in this breakdown.
-      </p>
+      <UnconvertedNote
+        class="breakdown-note"
+        :buckets="summary!.unconverted"
+        :currency="summary!.currency"
+        context="in this breakdown"
+      />
     </div>
 
     <div class="chips" role="radiogroup" aria-label="Filter by category">
@@ -282,10 +317,15 @@ const dayGroups = computed<DayGroup[]>(() => {
       <section v-for="group in dayGroups" :key="group.dateKey" class="day-group">
         <div class="day-heading">
           <h2>{{ group.heading }}</h2>
-          <span v-if="group.total !== null && group.currency" class="day-total">
-            {{ formatMoney(group.total, group.currency) }}
-          </span>
+          <span class="day-total">{{ formatMoney(group.total, group.currency) }}</span>
         </div>
+        <UnconvertedNote
+          v-if="group.unconverted.length"
+          class="day-unconverted-note"
+          :buckets="group.unconverted"
+          :currency="group.currency"
+          context="in this day's total"
+        />
 
         <ul class="list">
           <li v-for="row in group.rows" :key="row.id ?? ''">
@@ -293,6 +333,19 @@ const dayGroups = computed<DayGroup[]>(() => {
               <span class="amount">{{
                 formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)
               }}</span>
+              <span v-if="convertedMinor(row) !== null" class="converted">
+                ≈ {{ formatMoney(convertedMinor(row)!, spaceCurrency) }}
+              </span>
+              <span v-else-if="ratesError" class="unconvertible" :title="ratesError">
+                rates unavailable
+              </span>
+              <span
+                v-else-if="!ratesLoading && isForeign(row)"
+                class="unconvertible"
+                title="No fx rate for this pair"
+              >
+                no fx rate
+              </span>
               <span class="category">{{ row.category_name ?? 'Uncategorized' }}</span>
               <span class="attribution">{{ attribution(row.user_id) }}</span>
             </div>
@@ -313,6 +366,14 @@ const dayGroups = computed<DayGroup[]>(() => {
       </section>
     </template>
     <p v-if="rowError" role="alert" class="error">{{ rowError }}</p>
+    <p v-else-if="ratesError" role="alert" class="error">{{ ratesError }}</p>
+    <UnconvertedNote
+      v-else
+      class="unconverted-note"
+      :buckets="unconvertibleBuckets"
+      :currency="spaceCurrency"
+      context="in this list"
+    />
   </main>
 </template>
 
@@ -353,8 +414,6 @@ const dayGroups = computed<DayGroup[]>(() => {
 
 .breakdown-note {
   margin: var(--kapa-space-2) 0 0;
-  font-size: var(--kapa-text-caption-size);
-  color: var(--kapa-negative);
 }
 
 .dot {
@@ -435,6 +494,24 @@ const dayGroups = computed<DayGroup[]>(() => {
 
 .amount {
   font-weight: 600;
+}
+
+.converted {
+  color: var(--kapa-ink-muted);
+  font-size: var(--kapa-text-caption-size);
+}
+
+.unconvertible {
+  color: var(--kapa-negative);
+  font-size: var(--kapa-text-caption-size);
+}
+
+.unconverted-note {
+  margin-top: var(--kapa-space-3);
+}
+
+.day-unconverted-note {
+  margin-bottom: var(--kapa-space-2);
 }
 
 .category {
