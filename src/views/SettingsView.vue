@@ -37,7 +37,7 @@ async function onSignOut(): Promise<void> {
           type="button"
           class="theme-btn"
           :aria-pressed="theme.id === id"
-          @click="theme.setTheme(id)"
+          @click="theme.setTheme(id, session.user?.id)"
         >
           {{ themes[id].name }}
         </button>
