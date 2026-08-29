@@ -1,4 +1,4 @@
-import type { FxRate, PocketHomeView } from '@roman-mik/kapa-core/pocket';
+import type { CurrencyBucket, FxRate, PocketHomeView } from '@roman-mik/kapa-core/pocket';
 import {
   categoryBreakdown,
   completedDays,
@@ -42,6 +42,7 @@ export interface PocketSummary {
   categoryBreakdown: { categoryId: string | null; spent: number }[];
   dailyTotals: { dateKey: string; amountMinor: number }[];
   dailyCapReference: number;
+  unconverted: CurrencyBucket[];
   todayExpenses: ExpenseView[];
   daysUntilReset: number;
   home: PocketHomeView;
@@ -160,6 +161,7 @@ export function usePocketHome() {
       categoryBreakdown: categoryBreakdown(amounts, timeZone, spaceCurrency, rates.value).value,
       dailyTotals: dailyTotals(amounts, month, timeZone, spaceCurrency, rates.value).value,
       dailyCapReference: Math.floor(capMinor / D),
+      unconverted: spentResult.unconverted,
       todayExpenses,
       daysUntilReset: dl,
       home,
