@@ -6,7 +6,7 @@ import {
   zonedDateKey,
 } from '@roman-mik/kapa-core/pocket';
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import ConfirmButton from '@/components/ui/ConfirmButton.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
@@ -35,6 +35,19 @@ const rowError = ref<string | null>(null);
 // category id. The month breakdown bar below is intentionally unaffected by
 // this filter — it always reflects the whole month, per the plan.
 const categoryFilter = ref<string>('all');
+
+// A filter belonging to the previous space must not linger and silently empty
+// the list after a space switch.
+watch(
+  () => space.currentSpaceId,
+  () => {
+    categoryFilter.value = 'all';
+  }
+);
+
+const isEmptyBecauseFiltered = computed(
+  () => categoryFilter.value !== 'all' && expenses.value.length > 0 && rows.value.length === 0
+);
 
 function categoryName(categoryId: string | null): string {
   if (categoryId === null) return 'Uncategorized';
@@ -77,13 +90,20 @@ async function onDelete(id: string): Promise<void> {
   rowError.value = null;
   try {
     await remove(id);
-    await refreshSummary();
     toast.success('Expense deleted');
   } catch (err) {
     rowError.value = err instanceof Error ? err.message : "Couldn't delete that expense.";
     toast.error(rowError.value);
   } finally {
     busyId.value = null;
+  }
+  // Refresh the breakdown bar separately: a refresh failure after a
+  // successful delete is not a delete failure, so it must not surface as
+  // "Couldn't delete that expense.".
+  try {
+    await refreshSummary();
+  } catch {
+    // ignore — stale summary is better than a misleading delete error
   }
 }
 
@@ -179,6 +199,8 @@ const dayGroups = computed<DayGroup[]>(() => {
     <div class="chips" role="radiogroup" aria-label="Filter by category">
       <BaseButton
         type="button"
+        role="radio"
+        :aria-checked="categoryFilter === 'all'"
         :variant="categoryFilter === 'all' ? 'primary' : 'secondary'"
         @click="categoryFilter = 'all'"
       >
@@ -186,6 +208,8 @@ const dayGroups = computed<DayGroup[]>(() => {
       </BaseButton>
       <BaseButton
         type="button"
+        role="radio"
+        :aria-checked="categoryFilter === ''"
         :variant="categoryFilter === '' ? 'primary' : 'secondary'"
         @click="categoryFilter = ''"
       >
@@ -195,6 +219,8 @@ const dayGroups = computed<DayGroup[]>(() => {
         v-for="c in categories"
         :key="c.id"
         type="button"
+        role="radio"
+        :aria-checked="categoryFilter === c.id"
         :variant="categoryFilter === c.id ? 'primary' : 'secondary'"
         @click="categoryFilter = c.id"
       >
@@ -209,7 +235,10 @@ const dayGroups = computed<DayGroup[]>(() => {
     </template>
 
     <p v-else-if="error" role="alert" class="error">{{ error }}</p>
-    <EmptyState v-else-if="!rows.length" title="No expenses yet" />
+    <EmptyState
+      v-else-if="!rows.length"
+      :title="isEmptyBecauseFiltered ? 'No expenses match this category' : 'No expenses yet'"
+    />
 
     <template v-else>
       <section v-for="group in dayGroups" :key="group.dateKey" class="day-group">
