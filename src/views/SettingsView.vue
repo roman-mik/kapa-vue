@@ -30,6 +30,10 @@ async function onExport(): Promise<void> {
   if (!spaceId) return;
   exporting.value = true;
   try {
+    // Intentionally all-time (tracker's /api/export does the same), matching
+    // the "kapa-<date>.csv" full-history download. listExpenses is
+    // unpaginated, which is fine at this space's scale; revisit with a
+    // date-range filter + pagination if a space ever grows large.
     const rows = await listExpenses(supabase, spaceId);
     const csv = expensesToCsv(rows);
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
