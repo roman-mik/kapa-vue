@@ -1,6 +1,7 @@
 {
-  "installCommand": "echo \"//npm.pkg.github.com/:_authToken=$NPM_TOKEN\" >> ~/.npmrc && pnpm install",
-  "buildCommand": "pnpm run build",
+  "installCommand": "curl -fsSL https://vite.plus | bash && echo \"//npm.pkg.github.com/:_authToken=$NPM_TOKEN\" >> .npmrc && \"$HOME/.local/share/vite-plus/bin/vp\" install",
+  "buildCommand": "\"$HOME/.local/share/vite-plus/bin/vpr\" build",
   "outputDirectory": "dist",
+  "framework": null,
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
