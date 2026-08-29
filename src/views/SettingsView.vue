@@ -14,6 +14,7 @@ import { useSpaceStore } from '@/stores/space';
 import { useThemeStore } from '@/stores/theme';
 import { useToast } from '@/composables/useToast';
 import { useInstallPrompt } from '@/composables/useInstallPrompt';
+import { useInvite } from '@/composables/useInvite';
 import { displayNameSchema, firstIssueMessage } from '@/lib/validation';
 
 const theme = useThemeStore();
@@ -22,8 +23,10 @@ const session = useSessionStore();
 const router = useRouter();
 const toast = useToast();
 const { canInstall, installed, promptInstall } = useInstallPrompt();
+const { invite, busy: inviteBusy, error: inviteError, mint } = useInvite();
 
 const exporting = ref(false);
+const inviteCopying = ref(false);
 
 const displayNameInput = ref(space.displayName ?? '');
 
@@ -96,6 +99,28 @@ async function onExport(): Promise<void> {
     exporting.value = false;
   }
 }
+
+async function onGenerateInvite(): Promise<void> {
+  await mint();
+  if (invite.value) {
+    toast.success('Invite generated');
+  } else if (inviteError.value) {
+    toast.error(inviteError.value);
+  }
+}
+
+async function onCopyInvite(): Promise<void> {
+  if (!invite.value) return;
+  inviteCopying.value = true;
+  try {
+    await navigator.clipboard.writeText(invite.value.code);
+    toast.success('Invite code copied');
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Couldn't copy invite code.");
+  } finally {
+    inviteCopying.value = false;
+  }
+}
 </script>
 
 <template>
@@ -125,6 +150,29 @@ async function onExport(): Promise<void> {
       <h2>Space</h2>
       <p class="value">{{ space.currentSpace?.name }}</p>
       <router-link to="/spaces">Switch space</router-link>
+
+      <h3 class="invite-title">Invite</h3>
+      <p class="invite-hint">
+        Generate a single-use invite code to share with someone. It expires in 24 hours.
+      </p>
+      <p v-if="inviteError" role="alert" class="error">{{ inviteError }}</p>
+      <template v-if="invite">
+        <p class="invite-code">{{ invite.code }}</p>
+        <p class="invite-hint">Expires in 24h. Single-use.</p>
+      </template>
+      <div class="invite-actions">
+        <BaseButton variant="secondary" :disabled="inviteBusy" @click="onGenerateInvite">
+          {{ inviteBusy ? 'Generating…' : 'Generate invite code' }}
+        </BaseButton>
+        <BaseButton
+          v-if="invite"
+          variant="secondary"
+          :disabled="inviteCopying"
+          @click="onCopyInvite"
+        >
+          {{ inviteCopying ? 'Copying…' : 'Copy' }}
+        </BaseButton>
+      </div>
     </BaseCard>
 
     <BaseCard padding="sm" class="section">
@@ -201,6 +249,33 @@ async function onExport(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: var(--kapa-space-3);
+}
+
+.invite-title {
+  margin: var(--kapa-space-4) 0 var(--kapa-space-2);
+  font-size: var(--kapa-text-caption-size);
+  color: var(--kapa-ink-muted);
+}
+
+.invite-hint {
+  margin: 0 0 var(--kapa-space-2);
+  color: var(--kapa-ink-muted);
+  font-size: var(--kapa-text-caption-size);
+}
+
+.invite-code {
+  margin: 0 0 var(--kapa-space-2);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: var(--kapa-text-title-size);
+  letter-spacing: 0.1em;
+  color: var(--kapa-accent-700);
+}
+
+.invite-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kapa-space-2);
+  margin-top: var(--kapa-space-2);
 }
 
 .error {
