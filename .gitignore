@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Vercel
+.vercel
+
 # Generated from @roman-mik/kapa-core/theme by vite.config.ts's kapa-theme-css plugin
 src/styles/theme-vars.css
 
@@ -30,3 +33,4 @@ src/styles/theme-vars.css
 .env
 .env.*
 !.env.example
+.env*
