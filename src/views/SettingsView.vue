@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { THEME_IDS, themes } from '@roman-mik/kapa-core/theme';
 import { listExpenses } from '@roman-mik/kapa-core/pocket/queries';
-import { ref } from 'vue';
+import { ref, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import BaseField from '@/components/ui/BaseField.vue';
+import BaseInput from '@/components/ui/BaseInput.vue';
 import { expensesToCsv } from '@/lib/csv';
 import { supabase } from '@/lib/supabase';
 import { useSessionStore } from '@/stores/session';
@@ -12,6 +14,7 @@ import { useSpaceStore } from '@/stores/space';
 import { useThemeStore } from '@/stores/theme';
 import { useToast } from '@/composables/useToast';
 import { useInstallPrompt } from '@/composables/useInstallPrompt';
+import { displayNameSchema, firstIssueMessage } from '@/lib/validation';
 
 const theme = useThemeStore();
 const space = useSpaceStore();
@@ -21,6 +24,45 @@ const toast = useToast();
 const { canInstall, installed, promptInstall } = useInstallPrompt();
 
 const exporting = ref(false);
+
+const displayNameInput = ref(space.displayName ?? '');
+
+watch(
+  () => space.displayName,
+  (val) => {
+    displayNameInput.value = val ?? '';
+  },
+  { immediate: true }
+);
+
+const isClean = computed(() => {
+  const current = (space.displayName ?? '').trim();
+  const input = displayNameInput.value.trim();
+  return current === input;
+});
+
+const profileError = ref<string | null>(null);
+const profileBusy = ref(false);
+
+async function onProfileSubmit(): Promise<void> {
+  profileError.value = null;
+  const parsed = displayNameSchema.safeParse(displayNameInput.value);
+  if (!parsed.success) {
+    profileError.value = firstIssueMessage(parsed) ?? 'Invalid display name.';
+    return;
+  }
+
+  profileBusy.value = true;
+  try {
+    await space.setDisplayName(parsed.data);
+    toast.success('Display name updated');
+  } catch (err) {
+    profileError.value = err instanceof Error ? err.message : "Couldn't update display name.";
+    toast.error(profileError.value);
+  } finally {
+    profileBusy.value = false;
+  }
+}
 
 async function onSignOut(): Promise<void> {
   await session.signOut();
@@ -59,6 +101,25 @@ async function onExport(): Promise<void> {
 <template>
   <main class="page settings">
     <h1>Settings</h1>
+
+    <BaseCard padding="sm" class="section">
+      <h2>Profile</h2>
+      <form @submit.prevent="onProfileSubmit" class="profile-form">
+        <BaseField label="Display name" v-slot="{ id }">
+          <BaseInput
+            :id="id"
+            v-model="displayNameInput"
+            type="text"
+            maxlength="60"
+            placeholder="No display name"
+          />
+        </BaseField>
+        <p v-if="profileError" role="alert" class="error">{{ profileError }}</p>
+        <BaseButton type="submit" block :disabled="profileBusy || isClean">
+          {{ profileBusy ? 'Saving…' : 'Save changes' }}
+        </BaseButton>
+      </form>
+    </BaseCard>
 
     <BaseCard padding="sm" class="section">
       <h2>Space</h2>
@@ -134,5 +195,16 @@ async function onExport(): Promise<void> {
   border-color: var(--kapa-accent);
   color: var(--kapa-accent-700);
   background: var(--kapa-accent-100);
+}
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kapa-space-3);
+}
+
+.error {
+  color: var(--kapa-negative);
+  margin: 0;
 }
 </style>

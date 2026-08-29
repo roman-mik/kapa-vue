@@ -6,6 +6,13 @@ export const categoryNameSchema = z
   .min(1, 'Enter a name.')
   .max(60, 'Category names are limited to 60 characters.');
 
+export const displayNameSchema = z
+  .string()
+  .trim()
+  .max(60, 'Display names are limited to 60 characters.')
+  .transform((val) => (val === '' ? null : val))
+  .nullable();
+
 export const positiveAmountSchema = z.coerce
   .number({ error: 'Enter a valid amount.' })
   .positive('Enter a valid amount.');

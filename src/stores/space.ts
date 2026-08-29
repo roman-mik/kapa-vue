@@ -4,6 +4,7 @@ import {
   joinSpace,
   leaveSpace,
   listMySpaces,
+  updateDisplayName,
   updateLastActiveSpace,
 } from '@roman-mik/kapa-core/core';
 import { isThemeId } from '@/lib/theme';
@@ -16,6 +17,7 @@ export const useSpaceStore = defineStore('space', {
   state: () => ({
     spaces: [] as Space[],
     currentSpaceId: null as string | null,
+    displayName: null as string | null,
     ready: false,
   }),
   getters: {
@@ -43,6 +45,7 @@ export const useSpaceStore = defineStore('space', {
         getProfile(supabase, session.user.id),
       ]);
       this.spaces = spaces;
+      this.displayName = profile?.display_name ?? null;
 
       if (profile && isThemeId(profile.theme) && useThemeStore().id === themeBefore) {
         useThemeStore().applyRemote(profile.theme);
@@ -60,6 +63,16 @@ export const useSpaceStore = defineStore('space', {
         this.currentSpaceId = null;
       }
       this.ready = true;
+    },
+    async setDisplayName(name: string | null): Promise<void> {
+      const session = useSessionStore();
+      if (session.user) {
+        await updateDisplayName(supabase, session.user.id, name);
+      }
+      // Reflect the change only after a successful write, so a failure leaves
+      // the store holding the backend's value and the form's save button stays
+      // enabled instead of showing a stale name as "saved".
+      this.displayName = name;
     },
     // User- or auto-driven pick: persists to core.profiles.last_active_space_id
     // rather than a parallel localStorage key, so the choice follows the
@@ -87,6 +100,7 @@ export const useSpaceStore = defineStore('space', {
     reset(): void {
       this.spaces = [];
       this.currentSpaceId = null;
+      this.displayName = null;
       this.ready = false;
     },
   },
