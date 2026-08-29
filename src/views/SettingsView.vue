@@ -1,20 +1,56 @@
 <script setup lang="ts">
 import { THEME_IDS, themes } from '@roman-mik/kapa-core/theme';
+import { listExpenses } from '@roman-mik/kapa-core/pocket/queries';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import { expensesToCsv } from '@/lib/csv';
+import { supabase } from '@/lib/supabase';
 import { useSessionStore } from '@/stores/session';
 import { useSpaceStore } from '@/stores/space';
 import { useThemeStore } from '@/stores/theme';
+import { useToast } from '@/composables/useToast';
 
 const theme = useThemeStore();
 const space = useSpaceStore();
 const session = useSessionStore();
 const router = useRouter();
+const toast = useToast();
+
+const exporting = ref(false);
 
 async function onSignOut(): Promise<void> {
   await session.signOut();
   await router.replace({ name: 'login' });
+}
+
+async function onExport(): Promise<void> {
+  const spaceId = space.currentSpaceId;
+  if (!spaceId) return;
+  exporting.value = true;
+  try {
+    // Intentionally all-time (tracker's /api/export does the same), matching
+    // the "kapa-<date>.csv" full-history download. listExpenses is
+    // unpaginated, which is fine at this space's scale; revisit with a
+    // date-range filter + pagination if a space ever grows large.
+    const rows = await listExpenses(supabase, spaceId);
+    const csv = expensesToCsv(rows);
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `kapa-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    // Defer revoking so the browser snapshots the blob before it can be
+    // dropped — an immediate revoke can cancel the download in some browsers.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Couldn't export.");
+  } finally {
+    exporting.value = false;
+  }
 }
 </script>
 
@@ -42,6 +78,13 @@ async function onSignOut(): Promise<void> {
           {{ themes[id].name }}
         </button>
       </div>
+    </BaseCard>
+
+    <BaseCard padding="sm" class="section">
+      <h2>Data</h2>
+      <BaseButton variant="secondary" block :disabled="exporting" @click="onExport">
+        {{ exporting ? 'Exporting…' : 'Export CSV' }}
+      </BaseButton>
     </BaseCard>
 
     <BaseButton variant="secondary" block @click="onSignOut">Sign out</BaseButton>
