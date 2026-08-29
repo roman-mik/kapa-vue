@@ -8,12 +8,16 @@ import ProgressBar from '@/components/ui/ProgressBar.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import StatBlock from '@/components/ui/StatBlock.vue';
 import DailySpendChart from '@/components/pocket/DailySpendChart.vue';
+import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import { usePocketHome } from '@/composables/usePocketHome';
+import { useConvertedExpenses } from '@/composables/useConvertedExpenses';
 import { useCategories } from '@/composables/useCategories';
 import { formatMoney } from '@/lib/money';
 
-const { summary, loading, error } = usePocketHome();
+const { summary, loading, error, rates } = usePocketHome();
 const { categories } = useCategories({ includeArchived: true });
+const todayExpenses = computed(() => summary.value?.todayExpenses ?? []);
+const { isForeign, convertedMinor } = useConvertedExpenses(todayExpenses, rates);
 
 function categoryName(categoryId: string | null): string {
   if (categoryId === null) return 'Uncategorized';
@@ -110,15 +114,11 @@ const barState = computed<'healthy' | 'nudge' | 'over'>(() => {
       </BaseCard>
 
       <BaseCard v-if="summary.unconverted.length" padding="sm">
-        <p class="line negative">
-          {{
-            summary.unconverted
-              .map((bucket) => formatMoney(bucket.amountMinor, bucket.currency))
-              .join(' + ')
-          }}
-          couldn't be converted to {{ summary.currency }} and
-          {{ summary.unconverted.length === 1 ? "isn't" : "aren't" }} included above.
-        </p>
+        <UnconvertedNote
+          :buckets="summary.unconverted"
+          :currency="summary.currency"
+          context="above"
+        />
       </BaseCard>
 
       <BaseCard padding="sm">
@@ -127,9 +127,21 @@ const barState = computed<'healthy' | 'nudge' | 'over'>(() => {
         <ul v-else class="today-list">
           <li v-for="row in summary.todayExpenses" :key="row.id ?? ''">
             <span class="category">{{ categoryName(row.category_id) }}</span>
-            <span class="amount">{{
-              formatMoney(row.amount_minor ?? 0, (row.currency ?? summary.currency) as Currency)
-            }}</span>
+            <span class="amounts">
+              <span class="amount">{{
+                formatMoney(row.amount_minor ?? 0, (row.currency ?? summary.currency) as Currency)
+              }}</span>
+              <span v-if="convertedMinor(row) !== null" class="converted">
+                ≈ {{ formatMoney(convertedMinor(row)!, summary.currency) }}
+              </span>
+              <span
+                v-else-if="isForeign(row)"
+                class="unconvertible"
+                title="No fx rate for this pair"
+              >
+                no fx rate
+              </span>
+            </span>
           </li>
         </ul>
       </BaseCard>
@@ -214,9 +226,23 @@ const barState = computed<'healthy' | 'nudge' | 'over'>(() => {
   font-size: var(--kapa-text-caption-size);
 }
 
+.today-list .amounts {
+  display: flex;
+  align-items: baseline;
+  gap: var(--kapa-space-2);
+}
+
 .today-list .amount {
   font-weight: 600;
   color: var(--kapa-ink);
+}
+
+.today-list .converted {
+  color: var(--kapa-ink-muted);
+}
+
+.today-list .unconvertible {
+  color: var(--kapa-negative);
 }
 
 .error {

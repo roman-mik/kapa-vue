@@ -2,6 +2,7 @@
 import {
   attributionLabel,
   type Currency,
+  type CurrencyBucket,
   dayLabel,
   zonedDateKey,
 } from '@roman-mik/kapa-core/pocket';
@@ -11,6 +12,7 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import ConfirmButton from '@/components/ui/ConfirmButton.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useConvertedExpenses } from '@/composables/useConvertedExpenses';
 import { useExpenses } from '@/composables/useExpenses';
@@ -24,10 +26,19 @@ import { swatchCssVar } from '@/lib/swatch';
 import type { SwatchSlot } from '@roman-mik/kapa-core/theme';
 
 const { expenses, loading, error, remove } = useExpenses();
-const { spaceCurrency, isForeign, convertedMinor, unconvertible } = useConvertedExpenses(expenses);
+const {
+  summary,
+  refresh: refreshSummary,
+  rates,
+  loading: ratesLoading,
+  error: ratesError,
+} = usePocketHome();
+const { spaceCurrency, isForeign, convertedMinor, unconvertible } = useConvertedExpenses(
+  expenses,
+  rates
+);
 const { members } = useSpaceMembers();
 const { categories } = useCategories({ includeArchived: true });
-const { summary, refresh: refreshSummary } = usePocketHome();
 const space = useSpaceStore();
 const toast = useToast();
 const session = useSessionStore();
@@ -48,6 +59,17 @@ watch(
     categoryFilter.value = 'all';
   }
 );
+
+// Grouped the same way summary.unconverted is (by currency, summed) so
+// HistoryView and PocketHomeView can render the identical UnconvertedNote.
+const unconvertibleBuckets = computed<CurrencyBucket[]>(() => {
+  const totals = new Map<Currency, number>();
+  for (const row of unconvertible.value) {
+    const currency = (row.currency ?? 'RSD') as Currency;
+    totals.set(currency, (totals.get(currency) ?? 0) + (row.amount_minor ?? 0));
+  }
+  return [...totals.entries()].map(([currency, amountMinor]) => ({ currency, amountMinor }));
+});
 
 const isEmptyBecauseFiltered = computed(
   () => categoryFilter.value !== 'all' && expenses.value.length > 0 && rows.value.length === 0
@@ -231,15 +253,12 @@ const dayGroups = computed<DayGroup[]>(() => {
           <span class="amount">{{ formatMoney(b.spent, summary!.currency) }}</span>
         </li>
       </ul>
-      <p v-if="summary!.unconverted.length" class="breakdown-note">
-        {{
-          summary!.unconverted
-            .map((bucket) => formatMoney(bucket.amountMinor, bucket.currency))
-            .join(' + ')
-        }}
-        couldn't be converted to {{ summary!.currency }} and
-        {{ summary!.unconverted.length === 1 ? "isn't" : "aren't" }} included in this breakdown.
-      </p>
+      <UnconvertedNote
+        class="breakdown-note"
+        :buckets="summary!.unconverted"
+        :currency="summary!.currency"
+        context="in this breakdown"
+      />
     </div>
 
     <div class="chips" role="radiogroup" aria-label="Filter by category">
@@ -311,8 +330,11 @@ const dayGroups = computed<DayGroup[]>(() => {
               <span v-if="convertedMinor(row) !== null" class="converted">
                 ≈ {{ formatMoney(convertedMinor(row)!, spaceCurrency) }}
               </span>
+              <span v-else-if="ratesError" class="unconvertible" :title="ratesError">
+                rates unavailable
+              </span>
               <span
-                v-else-if="isForeign(row)"
+                v-else-if="!ratesLoading && isForeign(row)"
                 class="unconvertible"
                 title="No fx rate for this pair"
               >
@@ -338,15 +360,14 @@ const dayGroups = computed<DayGroup[]>(() => {
       </section>
     </template>
     <p v-if="rowError" role="alert" class="error">{{ rowError }}</p>
-    <p v-if="unconvertible.length" role="status" class="error unconverted-note">
-      {{
-        unconvertible
-          .map((row) => formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency))
-          .join(' + ')
-      }}
-      couldn't be converted to {{ spaceCurrency }} because no fx rate covers
-      {{ unconvertible.length === 1 ? 'it' : 'them' }}.
-    </p>
+    <p v-else-if="ratesError" role="alert" class="error">{{ ratesError }}</p>
+    <UnconvertedNote
+      v-else
+      class="unconverted-note"
+      :buckets="unconvertibleBuckets"
+      :currency="spaceCurrency"
+      context="in this list"
+    />
   </main>
 </template>
 
@@ -387,8 +408,6 @@ const dayGroups = computed<DayGroup[]>(() => {
 
 .breakdown-note {
   margin: var(--kapa-space-2) 0 0;
-  font-size: var(--kapa-text-caption-size);
-  color: var(--kapa-negative);
 }
 
 .dot {
