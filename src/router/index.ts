@@ -1,16 +1,20 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useSessionStore } from '@/stores/session';
 import { useSpaceStore } from '@/stores/space';
-import LoginView from '@/views/LoginView.vue';
-import SpaceView from '@/views/SpaceView.vue';
-import SettingsView from '@/views/SettingsView.vue';
-import NotFoundView from '@/views/NotFoundView.vue';
-import PocketHomeView from '@/views/pocket/PocketHomeView.vue';
-import CapView from '@/views/pocket/CapView.vue';
-import CategoriesView from '@/views/pocket/CategoriesView.vue';
-import AddExpenseView from '@/views/pocket/AddExpenseView.vue';
-import EditExpenseView from '@/views/pocket/EditExpenseView.vue';
-import HistoryView from '@/views/pocket/HistoryView.vue';
+
+// Lazy per-route chunks: a session only ever needs one or two of these
+// screens per visit, and none of them need to be in the initial bundle
+// that has to parse before login even renders.
+const LoginView = () => import('@/views/LoginView.vue');
+const SpaceView = () => import('@/views/SpaceView.vue');
+const SettingsView = () => import('@/views/SettingsView.vue');
+const NotFoundView = () => import('@/views/NotFoundView.vue');
+const PocketHomeView = () => import('@/views/pocket/PocketHomeView.vue');
+const CapView = () => import('@/views/pocket/CapView.vue');
+const CategoriesView = () => import('@/views/pocket/CategoriesView.vue');
+const AddExpenseView = () => import('@/views/pocket/AddExpenseView.vue');
+const EditExpenseView = () => import('@/views/pocket/EditExpenseView.vue');
+const HistoryView = () => import('@/views/pocket/HistoryView.vue');
 
 declare module 'vue-router' {
   interface RouteMeta {
