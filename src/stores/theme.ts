@@ -4,7 +4,6 @@ import { defineStore } from 'pinia';
 import { applyTheme, DEFAULT_THEME, readStoredTheme, storeTheme } from '@/lib/theme';
 import { useToast } from '@/composables/useToast';
 import { supabase } from '@/lib/supabase';
-import { useSessionStore } from '@/stores/session';
 
 export const useThemeStore = defineStore('theme', {
   state: () => ({
@@ -22,14 +21,18 @@ export const useThemeStore = defineStore('theme', {
     // choice follows the user to their next device. Persistence failure is
     // reported (the local choice stands) rather than swallowed, so the
     // cross-device guarantee doesn't fail silently.
-    async setTheme(id: ThemeId): Promise<void> {
+    //
+    // `userId` is passed in by the caller rather than read from the session
+    // store here, so this store stays free of a static import back into
+    // session/space (which would close an import cycle: theme -> session ->
+    // space -> theme). Providing undefined skips the server write.
+    async setTheme(id: ThemeId, userId?: string): Promise<void> {
       this.id = id;
       applyTheme(id);
       storeTheme(id);
-      const session = useSessionStore();
-      if (!session.user) return;
+      if (!userId) return;
       try {
-        await updateTheme(supabase, session.user.id, id);
+        await updateTheme(supabase, userId, id);
       } catch {
         useToast().error("Couldn't save your theme to your profile.");
       }
