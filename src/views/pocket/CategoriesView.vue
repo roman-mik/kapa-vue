@@ -149,7 +149,11 @@ async function onRestore(id: string): Promise<void> {
               type="button"
               class="swatch-dot"
               :class="{ 'swatch-dot--empty': !category.color }"
-              :style="category.color ? { background: swatchCssVar(category.color) } : undefined"
+              :style="
+                category.color
+                  ? { background: swatchCssVar(category.color as SwatchSlot) }
+                  : undefined
+              "
               :aria-label="
                 category.color ? `Change colour (current: ${category.color})` : 'Choose a colour'
               "
