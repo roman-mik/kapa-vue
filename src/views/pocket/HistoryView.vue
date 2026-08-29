@@ -22,7 +22,7 @@ import { formatMoney } from '@/lib/money';
 
 const { expenses, loading, error, remove } = useExpenses();
 const { members } = useSpaceMembers();
-const { categories } = useCategories();
+const { categories } = useCategories({ includeArchived: true });
 const { summary, refresh: refreshSummary } = usePocketHome();
 const space = useSpaceStore();
 const toast = useToast();
