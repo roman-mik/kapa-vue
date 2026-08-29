@@ -15,7 +15,7 @@ import { useThemeStore } from '@/stores/theme';
 import { useToast } from '@/composables/useToast';
 import { useInstallPrompt } from '@/composables/useInstallPrompt';
 import { useInvite } from '@/composables/useInvite';
-import { displayNameSchema, firstIssueMessage } from '@/lib/validation';
+import { displayNameSchema, firstIssueMessage, spaceNameSchema } from '@/lib/validation';
 
 const theme = useThemeStore();
 const space = useSpaceStore();
@@ -70,6 +70,45 @@ async function onProfileSubmit(): Promise<void> {
 async function onSignOut(): Promise<void> {
   await session.signOut();
   await router.replace({ name: 'login' });
+}
+
+const spaceNameInput = ref(space.currentSpace?.name ?? '');
+
+watch(
+  () => space.currentSpace?.name,
+  (val) => {
+    spaceNameInput.value = val ?? '';
+  },
+  { immediate: true }
+);
+
+const spaceNameClean = computed(() => {
+  const current = (space.currentSpace?.name ?? '').trim();
+  const input = spaceNameInput.value.trim();
+  return current === input;
+});
+
+const spaceError = ref<string | null>(null);
+const spaceBusy = ref(false);
+
+async function onSpaceRenameSubmit(): Promise<void> {
+  spaceError.value = null;
+  const parsed = spaceNameSchema.safeParse(spaceNameInput.value);
+  if (!parsed.success) {
+    spaceError.value = firstIssueMessage(parsed) ?? 'Enter a name.';
+    return;
+  }
+
+  spaceBusy.value = true;
+  try {
+    await space.renameCurrentSpace(parsed.data);
+    toast.success('Space renamed');
+  } catch (err) {
+    spaceError.value = err instanceof Error ? err.message : "Couldn't rename the space.";
+    toast.error(spaceError.value);
+  } finally {
+    spaceBusy.value = false;
+  }
 }
 
 async function onExport(): Promise<void> {
@@ -148,7 +187,21 @@ async function onCopyInvite(): Promise<void> {
 
     <BaseCard padding="sm" class="section">
       <h2>Space</h2>
-      <p class="value">{{ space.currentSpace?.name }}</p>
+      <form @submit.prevent="onSpaceRenameSubmit" class="profile-form">
+        <BaseField label="Space name" v-slot="{ id }">
+          <BaseInput
+            :id="id"
+            v-model="spaceNameInput"
+            type="text"
+            maxlength="60"
+            placeholder="Space name"
+          />
+        </BaseField>
+        <p v-if="spaceError" role="alert" class="error">{{ spaceError }}</p>
+        <BaseButton type="submit" block :disabled="spaceBusy || spaceNameClean">
+          {{ spaceBusy ? 'Saving…' : 'Save changes' }}
+        </BaseButton>
+      </form>
       <router-link to="/spaces">Switch space</router-link>
 
       <h3 class="invite-title">Invite</h3>
@@ -216,11 +269,6 @@ async function onCopyInvite(): Promise<void> {
 
 .section h2 {
   margin: 0 0 var(--kapa-space-2);
-}
-
-.value {
-  margin: 0 0 var(--kapa-space-2);
-  color: var(--kapa-ink);
 }
 
 .theme-switcher {

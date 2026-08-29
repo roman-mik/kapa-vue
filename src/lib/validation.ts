@@ -13,6 +13,12 @@ export const displayNameSchema = z
   .transform((val) => (val === '' ? null : val))
   .nullable();
 
+export const spaceNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter a name.')
+  .max(60, 'Space names are limited to 60 characters.');
+
 export const positiveAmountSchema = z.coerce
   .number({ error: 'Enter a valid amount.' })
   .positive('Enter a valid amount.');
