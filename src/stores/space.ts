@@ -65,11 +65,14 @@ export const useSpaceStore = defineStore('space', {
       this.ready = true;
     },
     async setDisplayName(name: string | null): Promise<void> {
-      this.displayName = name;
       const session = useSessionStore();
       if (session.user) {
         await updateDisplayName(supabase, session.user.id, name);
       }
+      // Reflect the change only after a successful write, so a failure leaves
+      // the store holding the backend's value and the form's save button stays
+      // enabled instead of showing a stale name as "saved".
+      this.displayName = name;
     },
     // User- or auto-driven pick: persists to core.profiles.last_active_space_id
     // rather than a parallel localStorage key, so the choice follows the
