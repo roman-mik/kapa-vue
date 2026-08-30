@@ -73,15 +73,7 @@ describe('useAccounts', () => {
     expect(accounts.value).toHaveLength(2);
   });
 
-  it('sums the hero total only from include_in_total accounts in the space currency', async () => {
-    const { totalMinor, totalCurrency } = useAccounts();
-    await flush();
-    // a1 (EUR, include) counts; a2 (USD) is excluded — single-currency math.
-    expect(totalMinor.value).toBe(1000);
-    expect(totalCurrency.value).toBe('EUR');
-  });
-
-  it('drops archived accounts from the list and the total', async () => {
+  it('drops archived accounts from the active list', async () => {
     listAccounts.mockResolvedValueOnce([
       {
         id: 'a1',
@@ -97,10 +89,9 @@ describe('useAccounts', () => {
         updated_at: '2026-01-01T00:00:00Z',
       },
     ]);
-    const { accounts, totalMinor } = useAccounts();
+    const { accounts } = useAccounts();
     await flush();
     expect(accounts.value).toHaveLength(0);
-    expect(totalMinor.value).toBe(0);
   });
 
   it('add() creates the account through and refreshes', async () => {

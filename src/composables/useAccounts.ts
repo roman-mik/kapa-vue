@@ -45,21 +45,11 @@ export function useAccounts() {
 
   watch(() => space.currentSpaceId, refresh, { immediate: true });
 
-  // Archived accounts drop out of the active list and never contribute to
-  // the total; they stay in the DB so projections keep their references.
+  // Archived accounts drop out of the active list; they stay in the DB so
+  // projections keep their references. The hero total no longer lives here —
+  // H3's currency display (`useConvertedAmount`) computes the converted total,
+  // since foreign accounts are now included via fx rates.
   const accounts = computed(() => allAccounts.value.filter((a) => !a.archived));
-
-  // The hero total is single-currency math for now: it sums only accounts in
-  // the space's own currency. Foreign-currency accounts (and their eventual
-  // conversion) are H3's currency-display concern.
-  const totalCurrency = computed<Currency>(
-    () => (space.currentSpace?.currency ?? 'RSD') as Currency
-  );
-  const totalMinor = computed(() =>
-    accounts.value
-      .filter((a) => a.include_in_total && a.currency === totalCurrency.value)
-      .reduce((sum, a) => sum + a.current_balance_minor, 0)
-  );
 
   async function add(input: NewAccount): Promise<void> {
     const spaceId = space.currentSpaceId;
@@ -95,5 +85,5 @@ export function useAccounts() {
     return outcome;
   }
 
-  return { accounts, loading, error, refresh, add, update, archive, totalMinor, totalCurrency };
+  return { accounts, loading, error, refresh, add, update, archive };
 }
