@@ -18,6 +18,7 @@ const EditExpenseView = () => import('@/views/pocket/EditExpenseView.vue');
 const HistoryView = () => import('@/views/pocket/HistoryView.vue');
 const HorizonLayout = () => import('@/views/horizon/HorizonLayout.vue');
 const TodayView = () => import('@/views/horizon/TodayView.vue');
+const AccountsView = () => import('@/views/horizon/AccountsView.vue');
 const TimelineView = () => import('@/views/horizon/TimelineView.vue');
 const MoneyInView = () => import('@/views/horizon/MoneyInView.vue');
 const MoneyOutView = () => import('@/views/horizon/MoneyOutView.vue');
@@ -79,6 +80,7 @@ const router = createRouter({
       component: HorizonLayout,
       children: [
         { path: '', name: 'horizon-today', component: TodayView },
+        { path: 'accounts', name: 'horizon-accounts', component: AccountsView },
         { path: 'timeline', name: 'horizon-timeline', component: TimelineView },
         { path: 'money-in', name: 'horizon-money-in', component: MoneyInView },
         { path: 'money-out', name: 'horizon-money-out', component: MoneyOutView },

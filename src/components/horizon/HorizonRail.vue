@@ -3,6 +3,7 @@ import AppSwitcher from '@/components/layout/AppSwitcher.vue';
 
 const links = [
   { name: 'horizon-today', label: 'Today' },
+  { name: 'horizon-accounts', label: 'Accounts' },
   { name: 'horizon-timeline', label: 'Timeline' },
   { name: 'horizon-money-in', label: 'Money in' },
   { name: 'horizon-money-out', label: 'Money out' },
