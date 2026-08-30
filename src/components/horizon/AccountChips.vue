@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Account } from '@roman-mik/kapa-core/horizon';
+import type { Account } from '@roman-mik/kapa-core/horizon/queries';
 import type { Currency } from '@roman-mik/kapa-core/pocket';
 import { formatMoney } from '@/lib/money';
 

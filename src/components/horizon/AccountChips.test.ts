@@ -1,4 +1,4 @@
-import type { Account } from '@roman-mik/kapa-core/horizon';
+import type { Account } from '@roman-mik/kapa-core/horizon/queries';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vite-plus/test';
 import AccountChips from './AccountChips.vue';

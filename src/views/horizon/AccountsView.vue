@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ACCOUNT_TYPES, type AccountType } from '@roman-mik/kapa-core/horizon';
+import { ACCOUNT_TYPES, type AccountType } from '@roman-mik/kapa-core/horizon/queries';
 import {
   CURRENCIES,
   CURRENCY_EXPONENT,

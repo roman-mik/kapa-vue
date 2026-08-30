@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
-import { OBLIGATION_CATEGORIES } from '@roman-mik/kapa-core/horizon/categories';
+import { OBLIGATION_CATEGORIES } from '@roman-mik/kapa-core/horizon';
 import { ref, watch } from 'vue';
-import type { Account } from '@roman-mik/kapa-core/horizon';
+import type { Account } from '@roman-mik/kapa-core/horizon/queries';
 import {
   OBLIGATION_CATEGORY_LABELS,
   type NewObligation,

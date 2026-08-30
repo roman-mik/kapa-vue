@@ -8,8 +8,8 @@ const { listOneOffEvents, createOneOffEvent } = vi.hoisted(() => ({
   createOneOffEvent: vi.fn(),
 }));
 
-vi.mock('@roman-mik/kapa-core/horizon', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@roman-mik/kapa-core/horizon')>();
+vi.mock('@roman-mik/kapa-core/horizon/queries', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@roman-mik/kapa-core/horizon/queries')>();
   return {
     ...actual,
     listOneOffEvents,
