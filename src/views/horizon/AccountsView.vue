@@ -16,12 +16,12 @@ import { formatMoney } from '@/lib/money';
 import { accountNameSchema, firstIssueMessage, signedAmountSchema } from '@/lib/validation';
 import { useSpaceStore } from '@/stores/space';
 
+// Must match horizon.accounts' `type` check constraint in kapa-core
+// (kapa-core/supabase/migrations/20260823223247_horizon_schema.sql).
 const ACCOUNT_TYPES = [
-  { value: 'bank', label: 'Bank account' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'credit', label: 'Credit card' },
-  { value: 'investment', label: 'Investment' },
-  { value: 'other', label: 'Other' },
+  { value: 'personal', label: 'Personal' },
+  { value: 'business', label: 'Business' },
+  { value: 'savings', label: 'Savings' },
 ] as const;
 
 const space = useSpaceStore();
