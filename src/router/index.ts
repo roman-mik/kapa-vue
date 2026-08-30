@@ -16,6 +16,12 @@ const CategoriesView = () => import('@/views/pocket/CategoriesView.vue');
 const AddExpenseView = () => import('@/views/pocket/AddExpenseView.vue');
 const EditExpenseView = () => import('@/views/pocket/EditExpenseView.vue');
 const HistoryView = () => import('@/views/pocket/HistoryView.vue');
+const HorizonLayout = () => import('@/views/horizon/HorizonLayout.vue');
+const TodayView = () => import('@/views/horizon/TodayView.vue');
+const TimelineView = () => import('@/views/horizon/TimelineView.vue');
+const MoneyInView = () => import('@/views/horizon/MoneyInView.vue');
+const MoneyOutView = () => import('@/views/horizon/MoneyOutView.vue');
+const HorizonSettingsView = () => import('@/views/horizon/HorizonSettingsView.vue');
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -65,6 +71,19 @@ const router = createRouter({
       name: 'settings',
       component: SettingsView,
       meta: { showHeader: true },
+    },
+    {
+      // Horizon is its own app: no Pocket header/tab bar (no showHeader).
+      // The layout renders the app switcher and the mobile/desktop gate.
+      path: '/horizon',
+      component: HorizonLayout,
+      children: [
+        { path: '', name: 'horizon-today', component: TodayView },
+        { path: 'timeline', name: 'horizon-timeline', component: TimelineView },
+        { path: 'money-in', name: 'horizon-money-in', component: MoneyInView },
+        { path: 'money-out', name: 'horizon-money-out', component: MoneyOutView },
+        { path: 'settings', name: 'horizon-settings', component: HorizonSettingsView },
+      ],
     },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundView },
   ],

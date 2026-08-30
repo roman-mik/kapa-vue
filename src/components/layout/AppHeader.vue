@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { currentMonth } from '@roman-mik/kapa-core/pocket';
 import { computed } from 'vue';
+import AppSwitcher from '@/components/layout/AppSwitcher.vue';
 import { useSpaceStore } from '@/stores/space';
 
 const space = useSpaceStore();
@@ -20,8 +21,11 @@ const monthLabel = computed(() => {
 
 <template>
   <header class="app-header">
-    <span class="space">{{ space.currentSpace?.name }}</span>
-    <span class="month">{{ monthLabel }}</span>
+    <div class="identity">
+      <span class="space">{{ space.currentSpace?.name }}</span>
+      <span class="month">{{ monthLabel }}</span>
+    </div>
+    <AppSwitcher />
   </header>
 </template>
 
@@ -31,13 +35,19 @@ const monthLabel = computed(() => {
   top: 0;
   z-index: 30;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--kapa-space-3);
   padding: calc(var(--kapa-space-3) + env(safe-area-inset-top, 0px)) var(--kapa-space-4)
     var(--kapa-space-3);
   border-bottom: 1px solid var(--kapa-neutral-400);
   background: var(--kapa-surface);
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .space {
