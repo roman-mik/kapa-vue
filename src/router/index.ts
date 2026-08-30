@@ -5,6 +5,7 @@ import { useSpaceStore } from '@/stores/space';
 // Lazy per-route chunks: a session only ever needs one or two of these
 // screens per visit, and none of them need to be in the initial bundle
 // that has to parse before login even renders.
+const LandingView = () => import('@/views/LandingView.vue');
 const LoginView = () => import('@/views/LoginView.vue');
 const SpaceView = () => import('@/views/SpaceView.vue');
 const SettingsView = () => import('@/views/SettingsView.vue');
@@ -21,15 +22,19 @@ declare module 'vue-router' {
     // Whether App.vue renders the space/theme/sign-out header — off for
     // /login and /spaces, on for every Pocket screen.
     showHeader?: boolean;
+    // Reachable without a session — only the public landing page. Checked
+    // ahead of the auth redirect in beforeEach below.
+    public?: boolean;
   }
 }
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/', name: 'landing', component: LandingView, meta: { public: true } },
     { path: '/login', name: 'login', component: LoginView },
     { path: '/spaces', name: 'spaces', component: SpaceView },
-    { path: '/', name: 'home', component: PocketHomeView, meta: { showHeader: true } },
+    { path: '/pocket', name: 'home', component: PocketHomeView, meta: { showHeader: true } },
     { path: '/pocket/cap', name: 'pocket-cap', component: CapView, meta: { showHeader: true } },
     {
       path: '/pocket/categories',
@@ -74,7 +79,14 @@ router.beforeEach(async (to) => {
   const session = useSessionStore();
   const authenticated = session.user !== null;
 
-  if (to.name !== 'login' && !authenticated) {
+  // The landing page is the public face of the project — reachable signed
+  // out, but a signed-in visitor should land on their actual app, not the
+  // marketing page.
+  if (to.name === 'landing') {
+    return authenticated ? { name: 'home' } : true;
+  }
+
+  if (to.name !== 'login' && !to.meta.public && !authenticated) {
     return { name: 'login', query: { redirect: to.fullPath } };
   }
   if (to.name === 'login' && authenticated) {

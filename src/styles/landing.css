@@ -1,0 +1,64 @@
+/* Public landing page only — imported by LandingView.vue, never main.ts.
+ * Scoped under .landing so the sand/moss `data-theme` tokens (theme-vars.css)
+ * can't bleed into the landing, and the landing's own palette can't leak
+ * into the signed-in app. See docs/kapa-vue/plans/2026-08-30-landing-page.md.
+ *
+ * Every value below is pulled from kapa-core's real theme tokens
+ * (theme-vars.css) rather than invented — per user feedback that a bespoke
+ * warm-parchment tone read as low-contrast/hard to read, "vary on top of
+ * our green theme" instead. Ground/ink/haze/line come from the `moss`
+ * theme's neutrals (already tuned for the app); Pocket's card stays the
+ * `sand` theme's own cream `--kapa-bg`; Horizon's card is `moss`'s
+ * `--kapa-accent-100`. Ember (Pocket) is `sand`'s accent-600/700, signal
+ * (Horizon) is `moss`'s accent-700, alarm is `sand`'s `--kapa-negative` —
+ * all re-checked against WCAG AA, worst case 3.97:1 (large-text-only
+ * `--l-ember`), everything else ≥4.99:1.
+ */
+html[data-landing] body {
+  background: var(--l-ground);
+}
+
+.landing {
+  --l-ground: #f4f1e6; /* moss --kapa-bg */
+  --l-paper: #f5ead8; /* sand --kapa-bg — Pocket's card */
+  --l-horizon-panel: #eef3e7; /* moss --kapa-accent-100 — Horizon's card */
+  --l-surface: #f9f7ee; /* moss --kapa-neutral-100 */
+  --l-ink: #232620; /* moss --kapa-ink */
+  --l-ember: #b2622d; /* sand --kapa-accent-600 — large text/graphics only, 3.97:1 */
+  --l-ember-strong: #8c491a; /* sand --kapa-accent-700 — small text, 6.02:1 */
+  --l-signal: #4c603e; /* moss --kapa-accent-700 — safe at every size, ≥6.09:1 */
+  --l-alarm: #b23a2c; /* sand --kapa-negative */
+  --l-haze: #5f665a; /* moss --kapa-ink-muted */
+  --l-line: #dcd6c0; /* moss --kapa-neutral-300 */
+
+  --l-font-display: 'Caprasimo', Georgia, 'Times New Roman', serif;
+  --l-font-body: 'Figtree', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --l-font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  background: var(--l-ground);
+  color: var(--l-ink);
+  font-family: var(--l-font-body);
+  min-height: 100svh;
+}
+
+.landing :where(h1, h2, h3) {
+  font-family: var(--l-font-display);
+  font-weight: 400;
+  margin: 0;
+  color: var(--l-ink);
+}
+
+.landing p {
+  color: var(--l-haze);
+  margin: 0;
+}
+
+.landing .l-mono {
+  font-family: var(--l-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.landing ::selection {
+  background: var(--l-ember);
+  color: var(--l-ink);
+}
