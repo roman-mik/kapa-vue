@@ -1,7 +1,13 @@
 <script setup lang="ts">
-import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
+import {
+  CURRENCIES,
+  CURRENCY_EXPONENT,
+  type Currency,
+  type CurrencyBucket,
+} from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
 import AccountChips from '@/components/horizon/AccountChips.vue';
+import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseCheckbox from '@/components/ui/BaseCheckbox.vue';
@@ -11,6 +17,7 @@ import BaseSelect from '@/components/ui/BaseSelect.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useAccounts } from '@/composables/useAccounts';
+import { useConvertedAmount, type Convertible } from '@/composables/useConvertedAmount';
 import { useToast } from '@/composables/useToast';
 import { formatMoney } from '@/lib/money';
 import { accountNameSchema, firstIssueMessage, signedAmountSchema } from '@/lib/validation';
@@ -25,9 +32,48 @@ const ACCOUNT_TYPES = [
 ] as const;
 
 const space = useSpaceStore();
-const { accounts, loading, error, add, update, archive, totalMinor, totalCurrency } = useAccounts();
+const { accounts, loading, error, add, update, archive } = useAccounts();
 
 const spaceCurrency = computed<Currency>(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
+
+const convertibles = computed<Convertible[]>(() => accounts.value.map(toConvertible));
+
+function toConvertible(a: {
+  id: string;
+  currency: string;
+  current_balance_minor: number;
+}): Convertible {
+  return {
+    id: a.id,
+    currency: a.currency as Currency,
+    amountMinor: a.current_balance_minor,
+  };
+}
+
+const { convertedMinor, spaceCurrencyAmount, unconvertible } = useConvertedAmount(convertibles);
+
+// The hero total is now conversion-aware (H3): every include_in_total account
+// counts at its space-currency figure, including foreign ones converted via
+// `core.fx_rates`. An un-ratable foreign account contributes nothing and is
+// surfaced in the unconverted note, never silently dropped.
+const includedAccounts = computed(() => accounts.value.filter((a) => a.include_in_total));
+const totalMinor = computed(() =>
+  includedAccounts.value.reduce((sum, a) => sum + (spaceCurrencyAmount(toConvertible(a)) ?? 0), 0)
+);
+const totalCurrency = computed<Currency>(() => spaceCurrency.value);
+
+// Foreign include_in_total accounts with no covering rate, bucketed by
+// currency, for the shared UnconvertedNote (same wording as Pocket).
+const unconvertibleBuckets = computed<CurrencyBucket[]>(() => {
+  const totals = new Map<Currency, number>();
+  for (const item of unconvertible.value) {
+    const acc = accounts.value.find((a) => a.id === item.id);
+    if (!acc?.include_in_total) continue;
+    const currency = item.currency;
+    totals.set(currency, (totals.get(currency) ?? 0) + item.amountMinor);
+  }
+  return [...totals.entries()].map(([currency, amountMinor]) => ({ currency, amountMinor }));
+});
 
 const editingId = ref<string | null>(null);
 const name = ref('');
@@ -140,6 +186,11 @@ async function onArchive(accountId: string): Promise<void> {
     <div class="hero">
       <span class="hero-label">Total balance</span>
       <span class="hero-amount">{{ formatMoney(totalMinor, totalCurrency) }}</span>
+      <UnconvertedNote
+        :buckets="unconvertibleBuckets"
+        :currency="spaceCurrency"
+        context="in the total"
+      />
     </div>
 
     <template v-if="loading && !accounts.length">
@@ -209,16 +260,16 @@ async function onArchive(accountId: string): Promise<void> {
         <li v-for="account in accounts" :key="account.id" class="row">
           <div class="row-info">
             <span class="row-name">{{ account.name }}</span>
-            <span
-              v-if="!account.include_in_total || account.currency !== spaceCurrency"
-              class="note"
-            >
-              not in total
-            </span>
+            <span v-if="!account.include_in_total" class="note">not in total</span>
           </div>
-          <span class="row-balance">{{
-            formatMoney(account.current_balance_minor, account.currency as Currency)
-          }}</span>
+          <span class="row-balance">
+            <span class="native">{{
+              formatMoney(account.current_balance_minor, account.currency as Currency)
+            }}</span>
+            <span v-if="convertedMinor(toConvertible(account)) !== null" class="converted">
+              ≈ {{ formatMoney(convertedMinor(toConvertible(account))!, spaceCurrency) }}
+            </span>
+          </span>
           <div class="row-actions">
             <BaseButton variant="ghost" @click="startEdit(account.id)">Edit</BaseButton>
             <BaseButton variant="ghost" @click="onArchive(account.id)">Archive</BaseButton>
@@ -320,9 +371,19 @@ async function onArchive(accountId: string): Promise<void> {
 }
 
 .row-balance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0;
   margin-left: auto;
   color: var(--kapa-ink);
   font-weight: 600;
+}
+
+.converted {
+  font-size: var(--kapa-text-caption-size);
+  font-weight: 400;
+  color: var(--kapa-ink-muted);
 }
 
 .row-actions {
