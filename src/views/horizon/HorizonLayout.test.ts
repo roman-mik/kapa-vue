@@ -25,13 +25,15 @@ function mockViewport(matches: boolean): void {
   );
 }
 
-// The shell is gate-only; stub the router primitives and the app switcher
-// (which needs a live router's useRoute) so the layout and rail mount
-// without a real session or router wiring.
+// The shell is gate-only; stub the router primitives, the app switcher
+// (which needs a live router's useRoute), and TodayView (which fetches real
+// data via composables) so the layout and rail mount without a real
+// session, router wiring, or backend.
 const stubs = {
   RouterLink: { template: '<a><slot /></a>' },
   RouterView: { template: '<div class="router-view-stub" />' },
   AppSwitcher: { template: '<div class="app-switcher-stub" />' },
+  TodayView: { template: '<div class="today-view-stub" />' },
 };
 
 describe('HorizonLayout mobile/desktop gate', () => {
@@ -51,10 +53,9 @@ describe('HorizonLayout mobile/desktop gate', () => {
     mockViewport(false);
     const wrapper = mount(HorizonLayout, { global: { stubs } });
 
-    // The stub TodayView renders its stub message through EmptyState.
     expect(wrapper.find('[aria-label="Horizon"]').exists()).toBe(false);
     expect(wrapper.find('.shell').exists()).toBe(false);
-    expect(wrapper.text()).toContain('Horizon summary');
+    expect(wrapper.find('.today-view-stub').exists()).toBe(true);
   });
 });
 
