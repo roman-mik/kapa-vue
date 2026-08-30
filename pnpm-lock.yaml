@@ -229,8 +229,8 @@ importers:
         specifier: ^5.3.0
         version: 5.3.0
       '@roman-mik/kapa-core':
-        specifier: 1.10.0
-        version: 1.10.0(@supabase/supabase-js@2.112.4)
+        specifier: 1.12.0
+        version: 1.12.0(@supabase/supabase-js@2.112.4)
       '@supabase/supabase-js':
         specifier: ^2.112.4
         version: 2.112.4
@@ -684,8 +684,8 @@ packages:
   '@rolldown/pluginutils@1.0.1':
     resolution: {integrity: sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw==}
 
-  '@roman-mik/kapa-core@1.10.0':
-    resolution: {integrity: sha512-z2SbfyLW3R9P5l36udRcTH3DBOh/OTN49gGhhuL6VYRdNTLWxAdOCkuAcsZGdVQ9V5b7RseA9WISEGGB++Sxlg==, tarball: https://npm.pkg.github.com/download/@roman-mik/kapa-core/1.10.0/ff8659112562d4e8fbebdbdf56c1988d23ed807f}
+  '@roman-mik/kapa-core@1.12.0':
+    resolution: {integrity: sha512-S0QlWmu1sK8E6xz/RxZrWBJUX0WVYJKV+JJfE8HE1jlC977Jb3eZ8crdbwDIC5bdRLNyjkPvkcJOnVUtbiOJ9w==, tarball: https://npm.pkg.github.com/download/@roman-mik/kapa-core/1.12.0/2a4ce4f91cc19ecd245eb84fcb58fb383927a762}
     peerDependencies:
       '@supabase/supabase-js': ^2.45.0
 
@@ -2274,7 +2274,7 @@ snapshots:
 
   '@rolldown/pluginutils@1.0.1': {}
 
-  '@roman-mik/kapa-core@1.10.0(@supabase/supabase-js@2.112.4)':
+  '@roman-mik/kapa-core@1.12.0(@supabase/supabase-js@2.112.4)':
     dependencies:
       '@supabase/supabase-js': 2.112.4
       zod: 3.25.76
