@@ -27,6 +27,20 @@ export const nonNegativeAmountSchema = z.coerce
   .number({ error: 'Enter a valid amount.' })
   .min(0, 'Enter a valid amount.');
 
+/**
+ * Account balances are signed — a credit account's current balance is
+ * negative. Coerces to a finite number of any sign.
+ */
+export const signedAmountSchema = z.coerce
+  .number({ error: 'Enter a valid amount.' })
+  .refine(Number.isFinite, 'Enter a valid amount.');
+
+export const accountNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter a name.')
+  .max(60, 'Account names are limited to 60 characters.');
+
 export const nudgePctSchema = z.coerce
   .number({ error: 'Enter a value between 1 and 100.' })
   .int('Enter a whole number between 1 and 100.')
