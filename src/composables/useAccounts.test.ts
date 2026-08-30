@@ -10,7 +10,7 @@ const { listAccounts, createAccount, updateAccount, archiveAccount } = vi.hoiste
   archiveAccount: vi.fn(),
 }));
 
-vi.mock('@roman-mik/kapa-core/horizon', () => ({
+vi.mock('@roman-mik/kapa-core/horizon/queries', () => ({
   listAccounts,
   createAccount,
   updateAccount,

@@ -3,9 +3,9 @@ import {
   coveredPeriod,
   generateDates,
   monthBounds,
+  OBLIGATION_CATEGORIES,
   type ScheduleCalendar,
-} from '@roman-mik/kapa-core/horizon/schedule';
-import { OBLIGATION_CATEGORIES } from '@roman-mik/kapa-core/horizon/categories';
+} from '@roman-mik/kapa-core/horizon';
 import {
   createObligation,
   createObligationSchedule,
@@ -14,7 +14,7 @@ import {
   listObligations,
   obligationScheduleRule,
   type ObligationWithSchedules,
-} from '@roman-mik/kapa-core/horizon';
+} from '@roman-mik/kapa-core/horizon/queries';
 import { currentMonth, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';

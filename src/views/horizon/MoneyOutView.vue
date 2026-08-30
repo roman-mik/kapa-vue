@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { type Currency, type CurrencyBucket, zonedDateKey } from '@roman-mik/kapa-core/pocket';
 import { computed } from 'vue';
+import type { ChargeCadence } from '@roman-mik/kapa-core/horizon';
 import ObligationForm from '@/components/horizon/ObligationForm.vue';
 import OneOffEventForm from '@/components/horizon/OneOffEventForm.vue';
+import PlannedSpendForm from '@/components/horizon/PlannedSpendForm.vue';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useAccounts } from '@/composables/useAccounts';
+import { useCategories } from '@/composables/useCategories';
 import { useConvertedAmount } from '@/composables/useConvertedAmount';
 import {
   OBLIGATION_CATEGORY_LABELS,
@@ -19,9 +22,16 @@ import {
   useOneOffEvents,
   type OneOffCategory,
 } from '@/composables/useOneOffEvents';
+import { usePlannedSpend } from '@/composables/usePlannedSpend';
 import { useToast } from '@/composables/useToast';
 import { formatMoney } from '@/lib/money';
 import { useSpaceStore } from '@/stores/space';
+
+const CADENCE_LABELS: Record<ChargeCadence, string> = {
+  daily: 'Daily',
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+};
 
 function categoryLabel(category: string): string {
   return OBLIGATION_CATEGORY_LABELS[category as ObligationCategory] ?? category;
@@ -29,6 +39,10 @@ function categoryLabel(category: string): string {
 
 function oneOffCategoryLabel(category: string): string {
   return ONE_OFF_CATEGORY_LABELS[category as OneOffCategory] ?? category;
+}
+
+function cadenceLabel(cadence: string): string {
+  return CADENCE_LABELS[cadence as ChargeCadence] ?? cadence;
 }
 
 const MONTH_LABELS = [
@@ -62,9 +76,27 @@ const {
   error: oneOffsError,
   add: addOneOff,
 } = useOneOffEvents();
+const {
+  itemsWithMonth: plannedSpendWithMonth,
+  convertibles: plannedSpendConvertibles,
+  loading: plannedSpendLoading,
+  error: plannedSpendError,
+  add: addPlannedSpend,
+} = usePlannedSpend();
 const { accounts } = useAccounts();
+const { categories } = useCategories();
 const { convertedMinor, spaceCurrencyAmount, unconvertible } = useConvertedAmount(convertibles);
 const { convertedMinor: convertedOneOffMinor } = useConvertedAmount(oneOffConvertibles);
+const {
+  convertedMinor: convertedPlannedSpendMinor,
+  spaceCurrencyAmount: plannedSpendSpaceCurrencyAmount,
+  unconvertible: plannedSpendUnconvertible,
+} = useConvertedAmount(plannedSpendConvertibles);
+
+function categoryName(categoryId: string | null): string {
+  if (!categoryId) return 'Uncategorized';
+  return categories.value.find((c) => c.id === categoryId)?.name ?? 'Uncategorized';
+}
 
 const defaultOneOffDate = computed(() =>
   space.currentSpace ? zonedDateKey(new Date(), space.currentSpace.timezone) : ''
@@ -76,16 +108,22 @@ const monthLabel = computed(() => {
   return `${MONTH_LABELS[Number(month1) - 1]}`;
 });
 
-// Every active obligation counts at its space-currency figure; an
-// unconvertible foreign obligation contributes nothing and is surfaced in the
-// note below.
-const totalMinor = computed(() =>
-  convertibles.value.reduce((sum, item) => sum + (spaceCurrencyAmount(item) ?? 0), 0)
+// Every active obligation and planned-spend item counts at its space-currency
+// figure — both are recurring/budgeted, unlike one-offs, which are one-time
+// and deliberately excluded from this total. An unconvertible foreign item
+// contributes nothing and is surfaced in the note below.
+const totalMinor = computed(
+  () =>
+    convertibles.value.reduce((sum, item) => sum + (spaceCurrencyAmount(item) ?? 0), 0) +
+    plannedSpendConvertibles.value.reduce(
+      (sum, item) => sum + (plannedSpendSpaceCurrencyAmount(item) ?? 0),
+      0
+    )
 );
 
 const unconvertibleBuckets = computed<CurrencyBucket[]>(() => {
   const totals = new Map<Currency, number>();
-  for (const item of unconvertible.value) {
+  for (const item of [...unconvertible.value, ...plannedSpendUnconvertible.value]) {
     totals.set(item.currency, (totals.get(item.currency) ?? 0) + item.amountMinor);
   }
   return [...totals.entries()].map(([currency, amountMinor]) => ({ currency, amountMinor }));
@@ -99,6 +137,10 @@ function onSaved(): void {
 
 function onOneOffSaved(): void {
   toast.success('One-off added');
+}
+
+function onPlannedSpendSaved(): void {
+  toast.success('Planned spend added');
 }
 
 function native(obligation: ObligationMonth, amountMinor: number): string {
@@ -250,6 +292,69 @@ function native(obligation: ObligationMonth, amountMinor: number): string {
                     currency: event.currency as Currency,
                     amountMinor: event.amount_minor,
                     asOfDate: event.date,
+                  })!,
+                  spaceCurrency
+                )
+              }}
+            </span>
+          </span>
+        </li>
+      </ul>
+
+      <h2 class="section-title">Planned spend</h2>
+
+      <PlannedSpendForm
+        :accounts="accounts.filter((a) => !a.archived)"
+        :categories="categories"
+        :space-currency="spaceCurrency"
+        :default-start-date="month ? `${month}-01` : ''"
+        :save="addPlannedSpend"
+        @saved="onPlannedSpendSaved"
+      />
+
+      <template v-if="plannedSpendLoading && !plannedSpendWithMonth.length">
+        <SkeletonBlock height="42px" />
+      </template>
+
+      <p v-else-if="plannedSpendError" role="alert" class="error">{{ plannedSpendError }}</p>
+
+      <EmptyState
+        v-else-if="!plannedSpendWithMonth.length"
+        title="No planned spend yet"
+        message="Add a category allowance or subscription bucket Pocket doesn't track per-expense."
+      />
+
+      <ul v-else class="list">
+        <li v-for="item in plannedSpendWithMonth" :key="item.id" class="row">
+          <div class="row-info">
+            <span class="row-name">{{ item.name }}</span>
+            <span class="badges">
+              <span class="badge">{{ cadenceLabel(item.charge_cadence) }}</span>
+              <span class="badge">{{ categoryName(item.category_id) }}</span>
+            </span>
+          </div>
+
+          <span class="row-total">
+            <span class="native">{{
+              formatMoney(item.monthlyMinor, item.currency as Currency)
+            }}</span>
+            <span
+              v-if="
+                convertedPlannedSpendMinor({
+                  id: item.id,
+                  currency: item.currency as Currency,
+                  amountMinor: item.monthlyMinor,
+                }) !== null
+              "
+              class="converted"
+            >
+              ≈
+              {{
+                formatMoney(
+                  convertedPlannedSpendMinor({
+                    id: item.id,
+                    currency: item.currency as Currency,
+                    amountMinor: item.monthlyMinor,
                   })!,
                   spaceCurrency
                 )

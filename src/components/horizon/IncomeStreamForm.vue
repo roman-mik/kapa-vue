@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
-import type { Account } from '@roman-mik/kapa-core/horizon';
+import type { Account } from '@roman-mik/kapa-core/horizon/queries';
 import type { NewIncomeStream } from '@/composables/useIncomeStreams';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';

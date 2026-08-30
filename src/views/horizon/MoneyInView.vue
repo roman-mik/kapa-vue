@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { type Currency, type CurrencyBucket } from '@roman-mik/kapa-core/pocket';
-import { formatMonthLabel } from '@roman-mik/kapa-core/horizon/incomeMath';
+import { formatMonthLabel } from '@roman-mik/kapa-core/horizon';
 import { computed } from 'vue';
 import IncomeStreamForm from '@/components/horizon/IncomeStreamForm.vue';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';

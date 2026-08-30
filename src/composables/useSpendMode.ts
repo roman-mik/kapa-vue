@@ -1,4 +1,4 @@
-import { getSettings, setSpendMode, type SpendMode } from '@roman-mik/kapa-core/horizon';
+import { getSettings, setSpendMode, type SpendMode } from '@roman-mik/kapa-core/horizon/queries';
 import { ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';

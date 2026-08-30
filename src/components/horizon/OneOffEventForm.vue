@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
-import type { Account, OneOffDirection } from '@roman-mik/kapa-core/horizon';
+import type { Account, OneOffDirection } from '@roman-mik/kapa-core/horizon/queries';
 import { ref, watch } from 'vue';
 import {
   ONE_OFF_CATEGORY_LABELS,

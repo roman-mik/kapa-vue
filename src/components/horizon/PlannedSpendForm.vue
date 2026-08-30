@@ -1,56 +1,65 @@
 <script setup lang="ts">
 import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
-import { OBLIGATION_CATEGORIES } from '@roman-mik/kapa-core/horizon';
-import { ref, watch } from 'vue';
+import { CHARGE_CADENCES, type ChargeCadence } from '@roman-mik/kapa-core/horizon';
 import type { Account } from '@roman-mik/kapa-core/horizon/queries';
-import {
-  OBLIGATION_CATEGORY_LABELS,
-  type NewObligation,
-  type ObligationCategory,
-} from '@/composables/useObligations';
+import type { Category } from '@roman-mik/kapa-core/core';
+import { ref, watch, computed } from 'vue';
+import type { NewPlannedSpend } from '@/composables/usePlannedSpend';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
-import { accountNameSchema, firstIssueMessage, positiveAmountSchema } from '@/lib/validation';
-import { z } from 'zod';
+import {
+  accountNameSchema,
+  expenseDateSchema,
+  firstIssueMessage,
+  optionalPositiveAmountSchema,
+  positiveAmountSchema,
+} from '@/lib/validation';
 
 const props = defineProps<{
   accounts: Account[];
+  categories: Category[];
   spaceCurrency: Currency;
   /** 'YYYY-MM-DD' — the form's default start date. */
   defaultStartDate: string;
-  save: (input: NewObligation) => Promise<void>;
+  save: (input: NewPlannedSpend) => Promise<void>;
 }>();
 
 const emit = defineEmits<{ saved: [] }>();
 
+const CADENCE_LABELS: Record<ChargeCadence, string> = {
+  daily: 'Amount per day',
+  weekly: 'Amount per week',
+  monthly: 'Amount per month',
+};
+
 const name = ref('');
 const accountId = ref('');
-const category = ref<ObligationCategory>('housing');
+const categoryId = ref('');
 const currency = ref<Currency>(props.spaceCurrency);
-const amount = ref('');
-const when = ref<'dayOfMonth' | 'monthEnd'>('dayOfMonth');
-const dueDay = ref('1');
+const dailyAmount = ref('');
+const chargeCadence = ref<ChargeCadence>('daily');
+const cap = ref('');
+const startDate = ref(props.defaultStartDate);
+const endDate = ref('');
 
 const saving = ref(false);
 const saveError = ref<string | null>(null);
 
-const dueDaySchema = z.coerce
-  .number({ error: 'Enter a day between 1 and 31.' })
-  .int('Enter a whole day between 1 and 31.')
-  .min(1, 'Enter a day between 1 and 31.')
-  .max(31, 'Enter a day between 1 and 31.');
+const amountLabel = computed(() => CADENCE_LABELS[chargeCadence.value]);
 
 function resetForm(): void {
   name.value = '';
   accountId.value = props.accounts[0]?.id ?? '';
-  category.value = 'housing';
+  categoryId.value = '';
   currency.value = props.spaceCurrency;
-  amount.value = '';
-  when.value = 'dayOfMonth';
-  dueDay.value = '1';
+  dailyAmount.value = '';
+  chargeCadence.value = 'daily';
+  cap.value = '';
+  startDate.value = props.defaultStartDate;
+  endDate.value = '';
   saveError.value = null;
 }
 
@@ -64,6 +73,12 @@ watch(
     if (!accountId.value && accounts.length) accountId.value = accounts[0].id;
   }
 );
+watch(
+  () => props.defaultStartDate,
+  (d) => {
+    if (!startDate.value) startDate.value = d;
+  }
+);
 
 async function onSubmit(): Promise<void> {
   saveError.value = null;
@@ -72,39 +87,48 @@ async function onSubmit(): Promise<void> {
     saveError.value = firstIssueMessage(parsedName) ?? 'Enter a name.';
     return;
   }
-  const parsedAmount = positiveAmountSchema.safeParse(amount.value);
+  const parsedAmount = positiveAmountSchema.safeParse(dailyAmount.value);
   if (!parsedAmount.success) {
     saveError.value = firstIssueMessage(parsedAmount) ?? 'Enter a valid amount.';
     return;
   }
-  let due = 1;
-  if (when.value === 'dayOfMonth') {
-    const parsedDue = dueDaySchema.safeParse(dueDay.value);
-    if (!parsedDue.success) {
-      saveError.value = firstIssueMessage(parsedDue) ?? 'Enter a day between 1 and 31.';
+  const parsedCap = optionalPositiveAmountSchema.safeParse(cap.value);
+  if (!parsedCap.success) {
+    saveError.value = firstIssueMessage(parsedCap) ?? 'Enter a valid amount.';
+    return;
+  }
+  const parsedStart = expenseDateSchema.safeParse(startDate.value);
+  if (!parsedStart.success) {
+    saveError.value = firstIssueMessage(parsedStart) ?? 'Pick a valid date.';
+    return;
+  }
+  if (endDate.value) {
+    const parsedEnd = expenseDateSchema.safeParse(endDate.value);
+    if (!parsedEnd.success) {
+      saveError.value = firstIssueMessage(parsedEnd) ?? 'Pick a valid date.';
       return;
     }
-    due = parsedDue.data;
-    dueDay.value = String(due);
   }
   const exponent = CURRENCY_EXPONENT[currency.value];
+  const capExponent = CURRENCY_EXPONENT[currency.value];
 
   saving.value = true;
   try {
     await props.save({
       name: parsedName.data,
-      category: category.value,
+      categoryId: categoryId.value || null,
       currency: currency.value,
       accountId: accountId.value,
-      startDate: props.defaultStartDate,
-      amountMinor: Math.round(parsedAmount.data * 10 ** exponent),
-      rule:
-        when.value === 'monthEnd' ? { kind: 'monthEnd' } : { kind: 'dayOfMonth', dayOfMonth: due },
+      dailyAmountMinor: Math.round(parsedAmount.data * 10 ** exponent),
+      chargeCadence: chargeCadence.value,
+      capMinor: parsedCap.data == null ? null : Math.round(parsedCap.data * 10 ** capExponent),
+      startDate: startDate.value,
+      endDate: endDate.value || null,
     });
     resetForm();
     emit('saved');
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : "Couldn't add the obligation.";
+    saveError.value = err instanceof Error ? err.message : "Couldn't add the planned spend.";
   } finally {
     saving.value = false;
   }
@@ -113,7 +137,7 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <BaseCard class="form-card">
-    <h2>Add obligation</h2>
+    <h2>Add planned spend</h2>
     <form class="form" @submit.prevent="onSubmit">
       <div class="grid">
         <BaseField label="Name" v-slot="{ id }">
@@ -121,10 +145,9 @@ async function onSubmit(): Promise<void> {
         </BaseField>
 
         <BaseField label="Category" v-slot="{ id }">
-          <BaseSelect :id="id" v-model="category">
-            <option v-for="c in OBLIGATION_CATEGORIES" :key="c" :value="c">
-              {{ OBLIGATION_CATEGORY_LABELS[c] }}
-            </option>
+          <BaseSelect :id="id" v-model="categoryId">
+            <option value="">Uncategorized</option>
+            <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
           </BaseSelect>
         </BaseField>
       </div>
@@ -146,30 +169,48 @@ async function onSubmit(): Promise<void> {
       </div>
 
       <div class="grid">
-        <BaseField label="Amount per payment" v-slot="{ id }">
+        <BaseField :label="amountLabel" v-slot="{ id }">
           <BaseInput
             :id="id"
-            v-model="amount"
+            v-model="dailyAmount"
             type="number"
             :step="CURRENCY_EXPONENT[currency] > 0 ? '0.01' : '1'"
           />
         </BaseField>
 
-        <BaseField label="When" v-slot="{ id }">
-          <BaseSelect :id="id" v-model="when">
-            <option value="dayOfMonth">Day of month</option>
-            <option value="monthEnd">End of month</option>
+        <BaseField label="Cadence" v-slot="{ id }">
+          <BaseSelect :id="id" v-model="chargeCadence">
+            <option v-for="c in CHARGE_CADENCES" :key="c" :value="c">
+              {{ CADENCE_LABELS[c] }}
+            </option>
           </BaseSelect>
         </BaseField>
       </div>
 
-      <BaseField v-if="when === 'dayOfMonth'" label="Due day" v-slot="{ id }">
-        <BaseInput :id="id" v-model="dueDay" type="number" min="1" max="31" step="1" />
-      </BaseField>
+      <div class="grid">
+        <BaseField label="Cap (optional)" v-slot="{ id }">
+          <BaseInput
+            :id="id"
+            v-model="cap"
+            type="number"
+            :step="CURRENCY_EXPONENT[currency] > 0 ? '0.01' : '1'"
+          />
+        </BaseField>
+      </div>
+
+      <div class="grid">
+        <BaseField label="Start date" v-slot="{ id }">
+          <BaseInput :id="id" v-model="startDate" type="date" required />
+        </BaseField>
+
+        <BaseField label="End date (optional)" v-slot="{ id }">
+          <BaseInput :id="id" v-model="endDate" type="date" />
+        </BaseField>
+      </div>
 
       <div class="actions">
         <BaseButton type="submit" :disabled="saving">
-          {{ saving ? 'Adding…' : 'Add obligation' }}
+          {{ saving ? 'Adding…' : 'Add planned spend' }}
         </BaseButton>
       </div>
       <p v-if="saveError" role="alert" class="error">{{ saveError }}</p>

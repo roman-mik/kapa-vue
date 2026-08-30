@@ -8,12 +8,12 @@ import {
   listIncomeStreams,
   type IncomeScheduleInsert,
   type IncomeStreamWithSchedules,
-} from '@roman-mik/kapa-core/horizon';
+} from '@roman-mik/kapa-core/horizon/queries';
 import {
   monthlyIncomeMinor,
   paymentOccurrences,
   type IncomePaymentOccurrence,
-} from '@roman-mik/kapa-core/horizon/incomeMath';
+} from '@roman-mik/kapa-core/horizon';
 import { currentMonth, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';

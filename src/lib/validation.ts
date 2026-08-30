@@ -23,6 +23,16 @@ export const positiveAmountSchema = z.coerce
   .number({ error: 'Enter a valid amount.' })
   .positive('Enter a valid amount.');
 
+/** Empty input means "no cap" (`null`); anything entered must be a valid positive amount. */
+export const optionalPositiveAmountSchema = z
+  .string()
+  .trim()
+  .refine(
+    (val) => val === '' || (Number.isFinite(Number(val)) && Number(val) > 0),
+    'Enter a valid amount.'
+  )
+  .transform((val) => (val === '' ? null : Number(val)));
+
 export const nonNegativeAmountSchema = z.coerce
   .number({ error: 'Enter a valid amount.' })
   .min(0, 'Enter a valid amount.');

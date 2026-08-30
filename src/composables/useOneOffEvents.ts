@@ -1,11 +1,11 @@
-import { SPEND_CATEGORIES, type SpendCategory } from '@roman-mik/kapa-core/horizon/categories';
+import { SPEND_CATEGORIES, type SpendCategory } from '@roman-mik/kapa-core/horizon';
 import {
   createOneOffEvent,
   deleteOneOffEvent,
   listOneOffEvents,
   type OneOffDirection,
   type OneOffEvent,
-} from '@roman-mik/kapa-core/horizon';
+} from '@roman-mik/kapa-core/horizon/queries';
 import { currentMonth, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';
