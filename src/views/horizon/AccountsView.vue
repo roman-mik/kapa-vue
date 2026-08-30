@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ACCOUNT_TYPES, type AccountType } from '@roman-mik/kapa-core/horizon';
 import {
   CURRENCIES,
   CURRENCY_EXPONENT,
@@ -23,13 +24,17 @@ import { formatMoney } from '@/lib/money';
 import { accountNameSchema, firstIssueMessage, signedAmountSchema } from '@/lib/validation';
 import { useSpaceStore } from '@/stores/space';
 
-const ACCOUNT_TYPES = [
-  { value: 'bank', label: 'Bank account' },
-  { value: 'cash', label: 'Cash' },
-  { value: 'credit', label: 'Credit card' },
-  { value: 'investment', label: 'Investment' },
-  { value: 'other', label: 'Other' },
-] as const;
+// ACCOUNT_TYPES itself is generated from horizon.account_type (kapa-core);
+// only the display labels are a UI concern and live here. The Record makes
+// a future enum value a compile error here too, not a silently unlabelled
+// option.
+const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
+  bank: 'Bank account',
+  cash: 'Cash',
+  credit: 'Credit card',
+  investment: 'Investment',
+  other: 'Other',
+};
 
 const space = useSpaceStore();
 const { accounts, loading, error, add, update, archive } = useAccounts();
@@ -79,7 +84,7 @@ const editingId = ref<string | null>(null);
 const name = ref('');
 const currency = ref<Currency>('RSD');
 const balance = ref('');
-const type = ref<string>('bank');
+const type = ref<AccountType>('bank');
 const includeInTotal = ref(true);
 const saving = ref(false);
 const saveError = ref<string | null>(null);
@@ -235,8 +240,8 @@ async function onArchive(accountId: string): Promise<void> {
 
             <BaseField label="Type" v-slot="{ id }">
               <BaseSelect :id="id" v-model="type">
-                <option v-for="t in ACCOUNT_TYPES" :key="t.value" :value="t.value">
-                  {{ t.label }}
+                <option v-for="t in ACCOUNT_TYPES" :key="t" :value="t">
+                  {{ ACCOUNT_TYPE_LABELS[t] }}
                 </option>
               </BaseSelect>
             </BaseField>

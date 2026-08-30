@@ -5,6 +5,7 @@ import {
   listAccounts,
   updateAccount,
   type Account,
+  type AccountType,
   type AccountUpdate,
   type MutationOutcome,
 } from '@roman-mik/kapa-core/horizon';
@@ -16,7 +17,7 @@ export interface NewAccount {
   name: string;
   currency: Currency;
   balanceMinor: number;
-  type: string;
+  type: AccountType;
   includeInTotal: boolean;
 }
 
