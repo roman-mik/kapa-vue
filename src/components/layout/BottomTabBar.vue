@@ -93,12 +93,15 @@ const tabs = [
 </template>
 
 <style scoped>
+/* sticky, not fixed, and a real flex item (see #app/.app-main in
+ * main.css) — fixed positioning lags the visual viewport on mobile
+ * browsers while the address bar is animating, leaving a gap under the
+ * bar; sticky at the end of a full-height column doesn't. */
 .shell {
-  position: fixed;
-  left: 0;
-  right: 0;
+  position: sticky;
   bottom: 0;
   z-index: 40;
+  flex-shrink: 0;
 }
 
 .tabbar {
