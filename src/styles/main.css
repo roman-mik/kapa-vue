@@ -76,20 +76,38 @@ textarea {
   font-family: inherit;
 }
 
+/* A flex column, not just a min-height box: BottomTabBar.vue relies on
+ * being the last flex item so it can use `position: sticky` instead of
+ * `fixed`. `fixed` is pinned to the layout viewport, which lags behind the
+ * visual viewport while a mobile browser's address bar is expanded/
+ * animating — the bar reads as floating above the true screen edge until
+ * the page is scrolled. Sticky-at-the-end-of-a-full-height-column doesn't
+ * have that gap. */
 #app {
-  min-height: 100svh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
   overflow-x: clip;
 }
 
+/* Wraps <router-view> so it grows to fill the space between AppHeader and
+ * BottomTabBar — without this, a short page's content would end early and
+ * leave the (sticky, in-flow) tab bar sitting right under it instead of at
+ * the bottom of the screen. */
+.app-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 /* Shared page container — replaces the 480/420/320px max-width each view
- * used to set independently. `pb` leaves room for the bottom tab bar
- * (src/components/layout/BottomTabBar.vue) plus its safe-area inset, so
- * content never sits underneath it on a notched phone. */
+ * used to set independently. */
 .page {
+  width: 100%;
   max-width: var(--kapa-layout-page-max-width);
   margin: 0 auto;
-  padding: var(--kapa-space-6) var(--kapa-space-4)
-    calc(var(--kapa-layout-tab-bar-height) + env(safe-area-inset-bottom, 0px) + var(--kapa-space-5));
+  padding: var(--kapa-space-6) var(--kapa-space-4) var(--kapa-space-5);
 }
 
 /* OfflineBanner and AppHeader both add env(safe-area-inset-top) so the

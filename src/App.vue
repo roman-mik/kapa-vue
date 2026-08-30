@@ -11,7 +11,9 @@ const route = useRoute();
 <template>
   <OfflineBanner />
   <AppHeader v-if="route.meta.showHeader" />
-  <router-view />
+  <main class="app-main">
+    <router-view />
+  </main>
   <ToastHost />
   <BottomTabBar v-if="route.meta.showHeader" />
 </template>
