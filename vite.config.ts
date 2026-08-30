@@ -2,6 +2,8 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import vue from '@vitejs/plugin-vue';
 import {
+  BREAKPOINT,
+  LAYOUT,
   MOTION,
   RADIUS,
   SHADOW,
@@ -10,6 +12,7 @@ import {
   TYPE,
   themes,
   toCssVars,
+  toKebabCase,
 } from '@roman-mik/kapa-core/theme';
 import { defineConfig, lazyPlugins, loadEnv, type Plugin } from 'vite-plus';
 import { parseSupabaseEnv } from './src/lib/env-schema.js';
@@ -34,6 +37,10 @@ function generateThemeCss(): string {
     `  --kapa-motion-base: ${MOTION.base}ms;`,
     `  --kapa-motion-slow: ${MOTION.slow}ms;`,
     `  --kapa-motion-ease: ${MOTION.ease};`,
+    ...Object.entries(LAYOUT).map(
+      ([key, value]) => `  --kapa-layout-${toKebabCase(key)}: ${value}px;`
+    ),
+    ...Object.entries(BREAKPOINT).map(([key, value]) => `  --kapa-bp-${key}: ${value}px;`),
   ].join('\n');
 
   const themeBlocks = THEME_IDS.map((id) => {
