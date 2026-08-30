@@ -1,8 +1,9 @@
+import type { Account } from '@roman-mik/kapa-core/horizon';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vite-plus/test';
 import AccountChips from './AccountChips.vue';
 
-const accounts = [
+const accounts: Account[] = [
   {
     id: 'a1',
     space_id: 's1',
