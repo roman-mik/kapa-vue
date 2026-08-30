@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { type Currency, type CurrencyBucket } from '@roman-mik/kapa-core/pocket';
+import { type Currency, type CurrencyBucket, zonedDateKey } from '@roman-mik/kapa-core/pocket';
 import { computed } from 'vue';
 import ObligationForm from '@/components/horizon/ObligationForm.vue';
+import OneOffEventForm from '@/components/horizon/OneOffEventForm.vue';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
@@ -13,12 +14,21 @@ import {
   type ObligationCategory,
   type ObligationMonth,
 } from '@/composables/useObligations';
+import {
+  ONE_OFF_CATEGORY_LABELS,
+  useOneOffEvents,
+  type OneOffCategory,
+} from '@/composables/useOneOffEvents';
 import { useToast } from '@/composables/useToast';
 import { formatMoney } from '@/lib/money';
 import { useSpaceStore } from '@/stores/space';
 
 function categoryLabel(category: string): string {
   return OBLIGATION_CATEGORY_LABELS[category as ObligationCategory] ?? category;
+}
+
+function oneOffCategoryLabel(category: string): string {
+  return ONE_OFF_CATEGORY_LABELS[category as OneOffCategory] ?? category;
 }
 
 const MONTH_LABELS = [
@@ -45,8 +55,20 @@ const space = useSpaceStore();
 const spaceCurrency = computed<Currency>(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
 
 const { obligationsWithMonth, convertibles, month, loading, error, add } = useObligations();
+const {
+  monthOneOffs,
+  convertibles: oneOffConvertibles,
+  loading: oneOffsLoading,
+  error: oneOffsError,
+  add: addOneOff,
+} = useOneOffEvents();
 const { accounts } = useAccounts();
 const { convertedMinor, spaceCurrencyAmount, unconvertible } = useConvertedAmount(convertibles);
+const { convertedMinor: convertedOneOffMinor } = useConvertedAmount(oneOffConvertibles);
+
+const defaultOneOffDate = computed(() =>
+  space.currentSpace ? zonedDateKey(new Date(), space.currentSpace.timezone) : ''
+);
 
 const monthLabel = computed(() => {
   if (!month.value) return '';
@@ -73,6 +95,10 @@ const toast = useToast();
 
 function onSaved(): void {
   toast.success('Obligation added');
+}
+
+function onOneOffSaved(): void {
+  toast.success('One-off added');
 }
 
 function native(obligation: ObligationMonth, amountMinor: number): string {
@@ -164,6 +190,74 @@ function native(obligation: ObligationMonth, amountMinor: number): string {
           </ul>
         </li>
       </ul>
+
+      <h2 class="section-title">One-off events</h2>
+
+      <OneOffEventForm
+        :accounts="accounts.filter((a) => !a.archived)"
+        :space-currency="spaceCurrency"
+        :default-date="defaultOneOffDate"
+        :save="addOneOff"
+        @saved="onOneOffSaved"
+      />
+
+      <template v-if="oneOffsLoading && !monthOneOffs.length">
+        <SkeletonBlock height="42px" />
+      </template>
+
+      <p v-else-if="oneOffsError" role="alert" class="error">{{ oneOffsError }}</p>
+
+      <EmptyState
+        v-else-if="!monthOneOffs.length"
+        title="No one-off events yet"
+        message="Add a dated gift, refund, or one-time cost for this month."
+      />
+
+      <ul v-else class="list">
+        <li v-for="event in monthOneOffs" :key="event.id" class="row">
+          <div class="row-info">
+            <span class="row-name">{{ event.name }}</span>
+            <span class="badges">
+              <span class="badge">{{ oneOffCategoryLabel(event.category) }}</span>
+              <span class="badge" :class="event.direction === 'in' ? 'badge-in' : 'badge-out'">
+                {{ event.direction === 'in' ? 'In' : 'Out' }}
+              </span>
+              <span class="badge">{{ prettyDate(event.date) }}</span>
+            </span>
+          </div>
+
+          <span class="row-total">
+            <span class="native" :class="event.direction === 'in' ? 'amount-in' : 'amount-out'">
+              {{ event.direction === 'in' ? '+' : '−'
+              }}{{ formatMoney(event.amount_minor, event.currency as Currency) }}
+            </span>
+            <span
+              v-if="
+                convertedOneOffMinor({
+                  id: event.id,
+                  currency: event.currency as Currency,
+                  amountMinor: event.amount_minor,
+                  asOfDate: event.date,
+                }) !== null
+              "
+              class="converted"
+            >
+              ≈
+              {{
+                formatMoney(
+                  convertedOneOffMinor({
+                    id: event.id,
+                    currency: event.currency as Currency,
+                    amountMinor: event.amount_minor,
+                    asOfDate: event.date,
+                  })!,
+                  spaceCurrency
+                )
+              }}
+            </span>
+          </span>
+        </li>
+      </ul>
     </template>
   </main>
 </template>
@@ -239,6 +333,28 @@ function native(obligation: ObligationMonth, amountMinor: number): string {
   border-radius: var(--kapa-radius-sm);
   background: var(--kapa-neutral-400);
   color: var(--kapa-ink-muted);
+}
+
+.badge-in {
+  background: color-mix(in srgb, var(--kapa-positive) 20%, transparent);
+  color: var(--kapa-positive);
+}
+
+.badge-out {
+  background: color-mix(in srgb, var(--kapa-negative) 20%, transparent);
+  color: var(--kapa-negative);
+}
+
+.amount-in {
+  color: var(--kapa-positive);
+}
+
+.amount-out {
+  color: var(--kapa-negative);
+}
+
+.section-title {
+  margin: var(--kapa-space-6) 0 var(--kapa-space-2);
 }
 
 .row-total {
