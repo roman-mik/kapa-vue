@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
-import { OBLIGATION_CATEGORIES, type SpendCategory } from '@roman-mik/kapa-core/horizon/categories';
-import { computed, ref, watch } from 'vue';
+import { OBLIGATION_CATEGORIES } from '@roman-mik/kapa-core/horizon/categories';
+import { ref, watch } from 'vue';
 import type { Account } from '@roman-mik/kapa-core/horizon';
-import type { NewObligation } from '@/composables/useObligations';
+import {
+  OBLIGATION_CATEGORY_LABELS,
+  type NewObligation,
+  type ObligationCategory,
+} from '@/composables/useObligations';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseField from '@/components/ui/BaseField.vue';
@@ -22,20 +26,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{ saved: [] }>();
 
-const CATEGORY_LABELS: Record<SpendCategory, string> = {
-  housing: 'Housing',
-  utilities: 'Utilities',
-  debt: 'Debt',
-  subscriptions: 'Subscriptions',
-  insurance: 'Insurance',
-  transport: 'Transport',
-  family: 'Family',
-  other: 'Other',
-};
-
 const name = ref('');
 const accountId = ref('');
-const category = ref<SpendCategory>('housing');
+const category = ref<ObligationCategory>('housing');
 const currency = ref<Currency>(props.spaceCurrency);
 const amount = ref('');
 const when = ref<'dayOfMonth' | 'monthEnd'>('dayOfMonth');
@@ -130,7 +123,7 @@ async function onSubmit(): Promise<void> {
         <BaseField label="Category" v-slot="{ id }">
           <BaseSelect :id="id" v-model="category">
             <option v-for="c in OBLIGATION_CATEGORIES" :key="c" :value="c">
-              {{ CATEGORY_LABELS[c] }}
+              {{ OBLIGATION_CATEGORY_LABELS[c] }}
             </option>
           </BaseSelect>
         </BaseField>

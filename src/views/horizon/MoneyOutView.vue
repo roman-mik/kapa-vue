@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { OBLIGATION_CATEGORIES, type SpendCategory } from '@roman-mik/kapa-core/horizon/categories';
 import { type Currency, type CurrencyBucket } from '@roman-mik/kapa-core/pocket';
 import { computed } from 'vue';
 import ObligationForm from '@/components/horizon/ObligationForm.vue';
@@ -8,21 +7,19 @@ import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useAccounts } from '@/composables/useAccounts';
 import { useConvertedAmount } from '@/composables/useConvertedAmount';
-import { useObligations, type ObligationMonth } from '@/composables/useObligations';
+import {
+  OBLIGATION_CATEGORY_LABELS,
+  useObligations,
+  type ObligationCategory,
+  type ObligationMonth,
+} from '@/composables/useObligations';
 import { useToast } from '@/composables/useToast';
 import { formatMoney } from '@/lib/money';
 import { useSpaceStore } from '@/stores/space';
 
-const CATEGORY_LABELS: Record<SpendCategory, string> = {
-  housing: 'Housing',
-  utilities: 'Utilities',
-  debt: 'Debt',
-  subscriptions: 'Subscriptions',
-  insurance: 'Insurance',
-  transport: 'Transport',
-  family: 'Family',
-  other: 'Other',
-};
+function categoryLabel(category: string): string {
+  return OBLIGATION_CATEGORY_LABELS[category as ObligationCategory] ?? category;
+}
 
 const MONTH_LABELS = [
   'Jan',
@@ -124,7 +121,7 @@ function native(obligation: ObligationMonth, amountMinor: number): string {
           <div class="row-info">
             <span class="row-name">{{ obligation.name }}</span>
             <span class="badges">
-              <span class="badge">{{ CATEGORY_LABELS[obligation.category] }}</span>
+              <span class="badge">{{ categoryLabel(obligation.category) }}</span>
             </span>
           </div>
 

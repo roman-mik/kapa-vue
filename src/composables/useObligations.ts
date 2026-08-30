@@ -5,6 +5,7 @@ import {
   monthBounds,
   type ScheduleCalendar,
 } from '@roman-mik/kapa-core/horizon/schedule';
+import { OBLIGATION_CATEGORIES } from '@roman-mik/kapa-core/horizon/categories';
 import {
   createObligation,
   createObligationSchedule,
@@ -14,11 +15,30 @@ import {
   obligationScheduleRule,
   type ObligationWithSchedules,
 } from '@roman-mik/kapa-core/horizon';
-import type { SpendCategory } from '@roman-mik/kapa-core/horizon/categories';
 import { currentMonth, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
+
+/**
+ * The eight categories an obligation can have — the full `spend_category`
+ * set minus the windfall pair (`gift`/`bonus`), which obligations reject via
+ * a DB check constraint (they're recurring commitments, not one-offs). The
+ * DB row type still carries the full enum (`SpendCategory`), so callers
+ * narrow to this when they index the label map.
+ */
+export type ObligationCategory = (typeof OBLIGATION_CATEGORIES)[number];
+
+export const OBLIGATION_CATEGORY_LABELS: Record<ObligationCategory, string> = {
+  housing: 'Housing',
+  utilities: 'Utilities',
+  debt: 'Debt',
+  subscriptions: 'Subscriptions',
+  insurance: 'Insurance',
+  transport: 'Transport',
+  family: 'Family',
+  other: 'Other',
+};
 
 /**
  * Fields the create-only obligation form collects. Obligations are fixed
@@ -27,7 +47,7 @@ import { useSpaceStore } from '@/stores/space';
  */
 export interface NewObligation {
   name: string;
-  category: SpendCategory;
+  category: ObligationCategory;
   currency: Currency;
   accountId: string;
   /** 'YYYY-MM-DD' — the obligation's start date. */
