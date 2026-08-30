@@ -27,6 +27,9 @@ const monthLabel = computed(() => {
 
 <style scoped>
 .app-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   align-items: baseline;
   justify-content: space-between;

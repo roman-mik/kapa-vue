@@ -25,7 +25,9 @@ const { toasts, dismiss } = useToast();
   position: fixed;
   left: 0;
   right: 0;
-  bottom: calc(var(--kapa-space-7) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(
+    var(--kapa-layout-tab-bar-height) + env(safe-area-inset-bottom, 0px) + var(--kapa-space-3)
+  );
   display: flex;
   flex-direction: column;
   align-items: center;

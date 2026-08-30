@@ -76,9 +76,23 @@ function dayOfMonth(dateKey: string): string {
   position: relative;
   display: flex;
   align-items: flex-end;
-  gap: 2px;
+  gap: 1px;
   height: 96px;
   padding-top: var(--kapa-space-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.bars::-webkit-scrollbar {
+  display: none;
+}
+
+@media (max-width: 400px) {
+  /* kapa-core BREAKPOINT.sm — narrow phones need taller bars to stay
+   * individually readable once they're only a few px wide. */
+  .bars {
+    height: 112px;
+  }
 }
 
 .reference-line {
@@ -89,7 +103,8 @@ function dayOfMonth(dateKey: string): string {
 }
 
 .bar-col {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 4px;
   height: 100%;
   display: flex;
   align-items: flex-end;
@@ -98,7 +113,7 @@ function dayOfMonth(dateKey: string): string {
 .bar {
   width: 100%;
   min-height: 0;
-  border-radius: 1px;
+  border-radius: 2px 2px 0 0;
   background: var(--kapa-accent);
   transition: height var(--kapa-motion-base) var(--kapa-motion-ease);
 }

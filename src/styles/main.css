@@ -56,6 +56,13 @@ a:not(.btn) {
   text-decoration-color: var(--kapa-accent-300);
 }
 
+a,
+button,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
 small,
 .caption {
   font-size: var(--kapa-text-caption-size);
@@ -71,14 +78,25 @@ textarea {
 
 #app {
   min-height: 100svh;
+  overflow-x: clip;
 }
 
 /* Shared page container — replaces the 480/420/320px max-width each view
  * used to set independently. `pb` leaves room for the bottom tab bar
- * (src/components/layout/BottomTabBar.vue, task A4) so content never sits
- * underneath it. */
+ * (src/components/layout/BottomTabBar.vue) plus its safe-area inset, so
+ * content never sits underneath it on a notched phone. */
 .page {
-  max-width: 480px;
+  max-width: var(--kapa-layout-page-max-width);
   margin: 0 auto;
-  padding: var(--kapa-space-6) var(--kapa-space-4) calc(var(--kapa-space-7) * 2);
+  padding: var(--kapa-space-6) var(--kapa-space-4)
+    calc(var(--kapa-layout-tab-bar-height) + env(safe-area-inset-bottom, 0px) + var(--kapa-space-5));
+}
+
+/* OfflineBanner and AppHeader both add env(safe-area-inset-top) so the
+ * device's notch/status-bar padding isn't lost above whichever renders
+ * first. When both are showing that double-counts the inset, so drop it
+ * from the header (this rule crosses component boundaries, hence global
+ * — a scoped style can't see .offline-banner from inside AppHeader.vue). */
+#app:has(.offline-banner) .app-header {
+  padding-top: var(--kapa-space-3);
 }
