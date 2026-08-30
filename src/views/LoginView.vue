@@ -20,8 +20,8 @@ async function onSubmit(): Promise<void> {
   submitting.value = true;
   try {
     await session.signInWithPassword(email.value, password.value);
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/';
-    await router.replace(redirect);
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : undefined;
+    await router.replace(redirect ?? { name: 'home' });
   } catch (err) {
     error.value = err instanceof Error ? err.message : 'Sign in failed.';
   } finally {

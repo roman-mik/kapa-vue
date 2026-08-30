@@ -6,7 +6,7 @@ import EmptyState from '@/components/ui/EmptyState.vue';
 <template>
   <main class="page">
     <EmptyState title="Page not found" message="That link doesn't lead anywhere in Pocket.">
-      <router-link to="/">
+      <router-link :to="{ name: 'home' }">
         <BaseButton>Back to home</BaseButton>
       </router-link>
     </EmptyState>

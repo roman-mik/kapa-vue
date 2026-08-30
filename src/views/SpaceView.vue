@@ -16,8 +16,8 @@ const joinError = ref<string | null>(null);
 const leavingId = ref<string | null>(null);
 
 async function goToRedirect(): Promise<void> {
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/';
-  await router.replace(redirect);
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : undefined;
+  await router.replace(redirect ?? { name: 'home' });
 }
 
 async function onSelect(spaceId: string): Promise<void> {
