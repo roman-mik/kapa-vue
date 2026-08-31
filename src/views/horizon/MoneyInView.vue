@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { type Currency, type CurrencyBucket } from '@roman-mik/kapa-core/pocket';
 import { formatMonthLabel } from '@roman-mik/kapa-core/horizon';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import IncomeStreamForm from '@/components/horizon/IncomeStreamForm.vue';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
 import { useAccounts } from '@/composables/useAccounts';
 import { useConvertedAmount } from '@/composables/useConvertedAmount';
 import {
@@ -40,7 +41,8 @@ function prettyDate(dateKey: string): string {
 const space = useSpaceStore();
 const spaceCurrency = computed<Currency>(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
 
-const { streamsWithMonth, convertibles, month, loading, error, add } = useIncomeStreams();
+const { streamsWithMonth, convertibles, month, calendar, loading, error, add, update, archive } =
+  useIncomeStreams();
 const { accounts } = useAccounts();
 const { convertedMinor, spaceCurrencyAmount, unconvertible } = useConvertedAmount(convertibles);
 
@@ -77,6 +79,22 @@ function onSaved(): void {
   toast.success('Income added');
 }
 
+const editingId = ref<string | null>(null);
+
+function onEdited(): void {
+  editingId.value = null;
+  toast.success('Income updated');
+}
+
+function onCancelled(): void {
+  editingId.value = null;
+}
+
+function onArchived(): void {
+  editingId.value = null;
+  toast.success('Income stream archived');
+}
+
 function native(stream: IncomeStreamMonth, amountMinor: number): string {
   return formatMoney(amountMinor, stream.currency as Currency);
 }
@@ -108,6 +126,7 @@ function native(stream: IncomeStreamMonth, amountMinor: number): string {
         :accounts="accounts.filter((a) => !a.archived)"
         :space-currency="spaceCurrency"
         :default-start-date="month ? `${month}-01` : ''"
+        :calendar="calendar!"
         :save="add"
         @saved="onSaved"
       />
@@ -119,58 +138,89 @@ function native(stream: IncomeStreamMonth, amountMinor: number): string {
       />
 
       <ul v-else class="list">
-        <li v-for="stream in streamsWithMonth" :key="stream.id" class="row">
-          <div class="row-info">
-            <span class="row-name">{{ stream.name }}</span>
-            <span class="badges">
-              <span class="badge">{{ streamKindLabel(stream.kind) }}</span>
-              <span v-if="CONFIDENCE_LABELS[stream.confidence]" class="badge muted">
-                {{ CONFIDENCE_LABELS[stream.confidence] }}
+        <li
+          v-for="stream in streamsWithMonth"
+          :key="stream.id"
+          class="row"
+          :class="{ editing: editingId === stream.id }"
+        >
+          <template v-if="editingId === stream.id">
+            <IncomeStreamForm
+              class="edit-form"
+              :accounts="accounts.filter((a) => !a.archived)"
+              :space-currency="spaceCurrency"
+              :default-start-date="month ? `${month}-01` : ''"
+              :calendar="calendar!"
+              :initial="stream"
+              :save="add"
+              :update="update"
+              :archive="archive"
+              @saved="onEdited"
+              @cancelled="onCancelled"
+            />
+          </template>
+          <template v-else>
+            <div class="row-info">
+              <span class="row-name">{{ stream.name }}</span>
+              <span class="badges">
+                <span class="badge">{{ streamKindLabel(stream.kind) }}</span>
+                <span v-if="CONFIDENCE_LABELS[stream.confidence]" class="badge muted">
+                  {{ CONFIDENCE_LABELS[stream.confidence] }}
+                </span>
+                <span v-if="RECURRENCE_LABELS[stream.recurrence]" class="badge muted">
+                  {{ RECURRENCE_LABELS[stream.recurrence] }}
+                </span>
               </span>
-              <span v-if="RECURRENCE_LABELS[stream.recurrence]" class="badge muted">
-                {{ RECURRENCE_LABELS[stream.recurrence] }}
-              </span>
-            </span>
-          </div>
+            </div>
 
-          <span class="row-total">
-            <span class="native">{{ native(stream, stream.monthlyMinor) }}</span>
-            <span
-              v-if="
-                convertedMinor({
-                  id: stream.id,
-                  currency: stream.currency as Currency,
-                  amountMinor: stream.monthlyMinor,
-                }) !== null
-              "
-              class="converted"
-            >
-              ≈
-              {{
-                formatMoney(
+            <span class="row-total">
+              <span class="native">{{ native(stream, stream.monthlyMinor) }}</span>
+              <span
+                v-if="
                   convertedMinor({
                     id: stream.id,
                     currency: stream.currency as Currency,
                     amountMinor: stream.monthlyMinor,
-                  })!,
-                  spaceCurrency
-                )
-              }}
-            </span>
-          </span>
-
-          <ul v-if="stream.occurrences.length" class="payments">
-            <li v-for="occurrence in stream.occurrences" :key="occurrence.date" class="payment">
-              <span class="payment-date">
-                {{ prettyDate(occurrence.date) }}
-                <span v-if="occurrence.shifted" class="shifted"
-                  >was {{ prettyDate(occurrence.originalDate!) }}</span
-                >
+                  }) !== null
+                "
+                class="converted"
+              >
+                ≈
+                {{
+                  formatMoney(
+                    convertedMinor({
+                      id: stream.id,
+                      currency: stream.currency as Currency,
+                      amountMinor: stream.monthlyMinor,
+                    })!,
+                    spaceCurrency
+                  )
+                }}
               </span>
-              <span class="payment-amount">{{ native(stream, occurrence.amountMinor) }}</span>
-              <span class="payment-period">{{ occurrence.periodLabel }}</span>
-            </li>
-          </ul>
+            </span>
+
+            <BaseButton
+              variant="ghost"
+              type="button"
+              class="edit-btn"
+              @click="editingId = stream.id"
+            >
+              Edit
+            </BaseButton>
+
+            <ul v-if="stream.occurrences.length" class="payments">
+              <li v-for="occurrence in stream.occurrences" :key="occurrence.date" class="payment">
+                <span class="payment-date">
+                  {{ prettyDate(occurrence.date) }}
+                  <span v-if="occurrence.shifted" class="shifted"
+                    >was {{ prettyDate(occurrence.originalDate!) }}</span
+                  >
+                </span>
+                <span class="payment-amount">{{ native(stream, occurrence.amountMinor) }}</span>
+                <span class="payment-period">{{ occurrence.periodLabel }}</span>
+              </li>
+            </ul>
+          </template>
         </li>
       </ul>
     </template>
@@ -222,6 +272,24 @@ function native(stream: IncomeStreamMonth, amountMinor: number): string {
   background: var(--kapa-surface);
   border: 1px solid var(--kapa-neutral-400);
   border-radius: var(--kapa-radius-md);
+}
+
+.row.editing {
+  align-items: stretch;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.edit-btn {
+  padding: var(--kapa-space-1) var(--kapa-space-3);
+  font-weight: 600;
+  border-radius: var(--kapa-radius-sm);
+}
+
+.edit-form {
+  margin: 0;
+  flex-basis: 100%;
 }
 
 .row-info {

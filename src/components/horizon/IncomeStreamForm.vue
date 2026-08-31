@@ -1,26 +1,55 @@
 <script setup lang="ts">
 import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
+import type { ScheduleCalendar } from '@roman-mik/kapa-core/horizon';
 import { computed, ref, watch } from 'vue';
 import type { Account } from '@roman-mik/kapa-core/horizon/queries';
-import type { NewIncomeStream } from '@/composables/useIncomeStreams';
+import {
+  type IncomeStreamEdit,
+  type IncomeStreamMonth,
+  type NewIncomeStream,
+} from '@/composables/useIncomeStreams';
+import {
+  buildSchedulePreview,
+  schedulesToPaymentRule,
+  type SchedulePreviewItem,
+} from '@/lib/horizon/incomeEditor';
+import { zonedDateKey } from '@roman-mik/kapa-core/pocket';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseCheckbox from '@/components/ui/BaseCheckbox.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
+import SchedulePreview from '@/components/horizon/SchedulePreview.vue';
 import { accountNameSchema, firstIssueMessage, positiveAmountSchema } from '@/lib/validation';
+import { useSpaceStore } from '@/stores/space';
 import { z } from 'zod';
+
+const CONFIDENCE_LABELS = {
+  confirmed: 'Confirmed',
+  expected: 'Expected',
+  uncertain: 'Uncertain',
+} as const;
+
+const RECURRENCE_LABELS = {
+  recurring: 'Recurring',
+  oneOff: 'One-off',
+} as const;
 
 const props = defineProps<{
   accounts: Account[];
   spaceCurrency: Currency;
   /** 'YYYY-MM-DD' — the form's default start date (first of the current month). */
   defaultStartDate: string;
+  calendar: ScheduleCalendar;
+  /** When present the form edits this stream instead of creating one. */
+  initial?: IncomeStreamMonth | null;
   save: (input: NewIncomeStream) => Promise<void>;
+  update?: (input: IncomeStreamEdit) => Promise<void>;
+  archive?: (id: string, updatedAt: string) => Promise<void>;
 }>();
 
-const emit = defineEmits<{ saved: [] }>();
+const emit = defineEmits<{ saved: []; cancelled: [] }>();
 
 const KIND_LABELS = {
   hourly: 'Hourly',
@@ -28,11 +57,16 @@ const KIND_LABELS = {
   variable: 'Variable',
 } as const;
 
+const isEdit = computed(() => !!props.initial);
+
 const kind = ref<NewIncomeStream['kind']>('fixed');
 const name = ref('');
 const accountId = ref('');
 const currency = ref<Currency>(props.spaceCurrency);
 const taxable = ref(false);
+const startDate = ref('');
+const confidence = ref<NewIncomeStream['confidence']>('confirmed');
+const recurrence = ref<NewIncomeStream['recurrence']>('recurring');
 // Fixed / variable fields.
 const amount = ref('');
 const paymentRule = ref<NewIncomeStream['paymentRule']>('dayOfMonth');
@@ -62,6 +96,9 @@ function resetForm(): void {
   accountId.value = props.accounts[0]?.id ?? '';
   currency.value = props.spaceCurrency;
   taxable.value = false;
+  startDate.value = props.defaultStartDate;
+  confidence.value = 'confirmed';
+  recurrence.value = 'recurring';
   kind.value = 'fixed';
   amount.value = '';
   paymentRule.value = 'dayOfMonth';
@@ -72,6 +109,46 @@ function resetForm(): void {
   lagDays.value = '0';
   saveError.value = null;
 }
+
+// Edit mode loads the stream's values into the form (immediate: the form only
+// mounts once the editingId row exists, so the stream is already fetched).
+watch(
+  () => props.initial,
+  (initial) => {
+    if (!initial) {
+      startDate.value = props.defaultStartDate;
+      return;
+    }
+    name.value = initial.name;
+    kind.value = initial.kind;
+    accountId.value = initial.account_id;
+    currency.value = initial.currency as Currency;
+    taxable.value = initial.taxable;
+    startDate.value = initial.start_date;
+    confidence.value = (initial.confidence as NewIncomeStream['confidence']) ?? 'confirmed';
+    recurrence.value = (initial.recurrence as NewIncomeStream['recurrence']) ?? 'recurring';
+    earningPeriod.value =
+      (initial.earning_period_kind as NewIncomeStream['earningPeriodKind']) ?? 'monthly';
+    const exponent = CURRENCY_EXPONENT[initial.currency as Currency] ?? 2;
+    if (initial.kind === 'hourly') {
+      hourlyRate.value =
+        initial.hourly_rate_minor != null ? String(initial.hourly_rate_minor / 10 ** exponent) : '';
+      hoursPerDay.value =
+        initial.hours_per_day_e2 != null ? String(initial.hours_per_day_e2 / 100) : '8';
+      lagDays.value = String(initial.schedules[0]?.lag_days ?? 0);
+    } else {
+      amount.value =
+        initial.fixed_amount_minor != null
+          ? String(initial.fixed_amount_minor / 10 ** exponent)
+          : '';
+    }
+    const rule = schedulesToPaymentRule(initial.schedules);
+    paymentRule.value = rule.paymentRule;
+    payDay.value = String(rule.payDay);
+    saveError.value = null;
+  },
+  { immediate: true }
+);
 
 watch(
   () => props.spaceCurrency,
@@ -85,6 +162,30 @@ watch(
 );
 
 const isHourly = computed(() => kind.value === 'hourly');
+
+// The preview pins its window to today — only genuinely upcoming payments.
+const space = useSpaceStore();
+const fromKey = computed<string | null>(() => {
+  const start = props.initial?.start_date ?? props.defaultStartDate;
+  if (!start) return null;
+  const today = space.currentSpace ? zonedDateKey(new Date(), space.currentSpace.timezone) : '';
+  return today && today > start ? today : start;
+});
+
+const previewItems = computed<SchedulePreviewItem[]>(() => {
+  if (!fromKey.value) return [];
+  return buildSchedulePreview(
+    {
+      kind: kind.value,
+      paymentRule: isHourly.value ? 'dayOfMonth' : paymentRule.value,
+      payDay: isHourly.value ? 15 : Number(payDay.value),
+      earningPeriodKind: isHourly.value ? earningPeriod.value : 'monthly',
+      lagDays: isHourly.value ? Number(lagDays.value) || 0 : 0,
+    },
+    props.calendar,
+    fromKey.value
+  );
+});
 
 async function onSubmit(): Promise<void> {
   saveError.value = null;
@@ -134,27 +235,54 @@ async function onSubmit(): Promise<void> {
     amountMinor = Math.round(parsedAmount.data * 10 ** exponent);
   }
 
+  const input: NewIncomeStream = {
+    name: parsedName.data,
+    kind: kind.value,
+    currency: currency.value,
+    accountId: accountId.value,
+    startDate: startDate.value || props.defaultStartDate,
+    earningPeriodKind: kind.value === 'hourly' ? earningPeriod.value : 'monthly',
+    hourlyRateMinor,
+    hoursPerDayE2,
+    lagDays: kind.value === 'hourly' ? Number(lagDays.value) : 0,
+    amountMinor,
+    paymentRule: kind.value === 'hourly' ? 'dayOfMonth' : paymentRule.value,
+    payDay: kind.value === 'hourly' ? 15 : Number(payDay.value),
+    taxable: taxable.value,
+    confidence: confidence.value,
+    recurrence: recurrence.value,
+  };
+
   saving.value = true;
   try {
-    await props.save({
-      name: parsedName.data,
-      kind: kind.value,
-      currency: currency.value,
-      accountId: accountId.value,
-      startDate: props.defaultStartDate,
-      earningPeriodKind: kind.value === 'hourly' ? earningPeriod.value : 'monthly',
-      hourlyRateMinor,
-      hoursPerDayE2,
-      lagDays: kind.value === 'hourly' ? Number(lagDays.value) : 0,
-      amountMinor,
-      paymentRule: kind.value === 'hourly' ? 'dayOfMonth' : paymentRule.value,
-      payDay: kind.value === 'hourly' ? 15 : Number(payDay.value),
-      taxable: taxable.value,
-    });
+    if (props.initial && props.update) {
+      await props.update({
+        ...input,
+        id: props.initial.id,
+        updatedAt: props.initial.updated_at,
+      });
+    } else {
+      await props.save(input);
+    }
     resetForm();
     emit('saved');
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : "Couldn't add the income stream.";
+    saveError.value = err instanceof Error ? err.message : "Couldn't save the income stream.";
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function onArchive(): Promise<void> {
+  if (!props.initial || !props.archive) return;
+  saveError.value = null;
+  saving.value = true;
+  try {
+    await props.archive(props.initial.id, props.initial.updated_at);
+    resetForm();
+    emit('saved');
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : "Couldn't archive the income stream.";
   } finally {
     saving.value = false;
   }
@@ -163,7 +291,7 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <BaseCard class="form-card">
-    <h2>Add income</h2>
+    <h2>{{ isEdit ? 'Edit income' : 'Add income' }}</h2>
     <form class="form" @submit.prevent="onSubmit">
       <div class="grid">
         <BaseField label="Name" v-slot="{ id }">
@@ -191,6 +319,20 @@ async function onSubmit(): Promise<void> {
         <BaseField label="Currency" v-slot="{ id }">
           <BaseSelect :id="id" v-model="currency">
             <option v-for="c in CURRENCIES" :key="c" :value="c">{{ c }}</option>
+          </BaseSelect>
+        </BaseField>
+      </div>
+
+      <div class="grid">
+        <BaseField label="Start date" v-slot="{ id }">
+          <BaseInput :id="id" v-model="startDate" type="date" />
+        </BaseField>
+
+        <BaseField label="Confidence" v-slot="{ id }">
+          <BaseSelect :id="id" v-model="confidence">
+            <option v-for="(label, value) in CONFIDENCE_LABELS" :key="value" :value="value">
+              {{ label }}
+            </option>
           </BaseSelect>
         </BaseField>
       </div>
@@ -250,10 +392,41 @@ async function onSubmit(): Promise<void> {
         </BaseField>
       </template>
 
-      <BaseCheckbox v-model="taxable" label="Taxable income" />
+      <div class="grid">
+        <BaseField label="Repeats" v-slot="{ id }">
+          <BaseSelect :id="id" v-model="recurrence">
+            <option v-for="(label, value) in RECURRENCE_LABELS" :key="value" :value="value">
+              {{ label }}
+            </option>
+          </BaseSelect>
+        </BaseField>
+
+        <BaseCheckbox v-model="taxable" label="Taxable income" />
+      </div>
+
+      <div v-if="previewItems.length" class="preview-wrap">
+        <span class="preview-label">Payment preview</span>
+        <SchedulePreview :items="previewItems" />
+      </div>
 
       <div class="actions">
-        <BaseButton type="submit" :disabled="saving">
+        <template v-if="isEdit">
+          <BaseButton type="button" variant="danger" :disabled="saving" @click="onArchive">
+            {{ saving ? 'Working…' : 'Archive' }}
+          </BaseButton>
+          <BaseButton
+            type="button"
+            variant="secondary"
+            :disabled="saving"
+            @click="emit('cancelled')"
+          >
+            Cancel
+          </BaseButton>
+          <BaseButton type="submit" :disabled="saving">
+            {{ saving ? 'Saving…' : 'Save changes' }}
+          </BaseButton>
+        </template>
+        <BaseButton v-else type="submit" :disabled="saving">
           {{ saving ? 'Adding…' : 'Add income' }}
         </BaseButton>
       </div>
@@ -283,10 +456,25 @@ async function onSubmit(): Promise<void> {
   gap: var(--kapa-space-3);
 }
 
+.preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kapa-space-2);
+}
+
+.preview-label {
+  font-size: var(--kapa-text-caption-size);
+  font-weight: 600;
+  color: var(--kapa-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--kapa-space-2);
+  margin-top: var(--kapa-space-2);
 }
 
 .error {

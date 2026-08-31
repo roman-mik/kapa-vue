@@ -1,4 +1,5 @@
 import {
+  archiveIncomeStream,
   createIncomeSchedule,
   createIncomeStream,
   deleteIncomeStream,
@@ -6,7 +7,10 @@ import {
   incomeScheduleMathInput,
   incomeStreamMathInput,
   listIncomeStreams,
+  replaceIncomeSchedules,
+  updateIncomeStream,
   type IncomeScheduleInsert,
+  type IncomeStreamUpdate,
   type IncomeStreamWithSchedules,
 } from '@roman-mik/kapa-core/horizon/queries';
 import {
@@ -41,6 +45,18 @@ export interface NewIncomeStream {
   paymentRule: 'dayOfMonth' | 'monthEnd' | 'semiMonthly';
   payDay: number;
   taxable: boolean;
+  confidence: 'confirmed' | 'expected' | 'uncertain';
+  recurrence: 'recurring' | 'oneOff';
+}
+
+/**
+ * The edit form's input: everything NewIncomeStream knows, plus identity —
+ * `updatedAt` is passed through the pessimistic-lock update so a concurrent
+ * edit gets a conflict instead of silent last-write-wins.
+ */
+export interface IncomeStreamEdit extends NewIncomeStream {
+  id: string;
+  updatedAt: string;
 }
 
 /** A stream with its current-month figures, ready for the Money-in list. */
@@ -144,24 +160,13 @@ export function useIncomeStreams() {
       hours_per_day_e2: input.kind === 'hourly' ? input.hoursPerDayE2 : null,
       earning_period_kind: input.earningPeriodKind,
       taxable: input.taxable,
+      confidence: input.confidence,
+      recurrence: input.recurrence,
     });
     try {
       const schedules: IncomeScheduleInsert[] =
         input.kind === 'hourly'
-          ? [
-              // Hourly payment timing comes from the stream's first schedule:
-              // lag days + slippage only, the day-of-month is not used. 15th
-              // is the neutral placeholder.
-              {
-                income_stream_id: id,
-                space_id: spaceId,
-                kind: 'dayOfMonth',
-                day_of_month: 15,
-                slippage_policy: 'nextBusinessDay',
-                covers_period: 'same',
-                lag_days: input.lagDays,
-              },
-            ]
+          ? hourlySchedules(id, spaceId, input.lagDays)
           : fixedSchedules(id, spaceId, input.paymentRule, input.payDay);
       for (const schedule of schedules) {
         await createIncomeSchedule(supabase, schedule);
@@ -173,7 +178,82 @@ export function useIncomeStreams() {
     await refresh();
   }
 
-  return { streamsWithMonth, convertibles, month, loading, error, refresh, add };
+  /**
+   * Save the edit form. Kind switches clear the other kind's amount fields and
+   * replaced schedules make a kind switch safe (e.g. hourly→fixed must drop
+   * the hourly placeholder rule). Conflict (stale `updatedAt`) surfaces as a
+   * thrown error for the form to show.
+   */
+  async function update(input: IncomeStreamEdit): Promise<void> {
+    const spaceId = space.currentSpaceId;
+    if (!spaceId) return;
+    const hourly = input.kind === 'hourly';
+    const patch: IncomeStreamUpdate = {
+      name: input.name,
+      kind: input.kind,
+      currency: input.currency,
+      account_id: input.accountId,
+      start_date: input.startDate,
+      earning_period_kind: input.earningPeriodKind,
+      taxable: input.taxable,
+      confidence: input.confidence,
+      recurrence: input.recurrence,
+      fixed_amount_minor: hourly ? null : input.amountMinor,
+      hourly_rate_minor: hourly ? input.hourlyRateMinor : null,
+      hours_per_day_e2: hourly ? input.hoursPerDayE2 : null,
+    };
+    const outcome = await updateIncomeStream(supabase, input.id, patch, input.updatedAt);
+    if (!outcome.ok) {
+      throw new Error('This income stream was changed elsewhere — refresh and try again.');
+    }
+    const schedules: IncomeScheduleInsert[] = hourly
+      ? hourlySchedules(input.id, spaceId, input.lagDays)
+      : fixedSchedules(input.id, spaceId, input.paymentRule, input.payDay);
+    await replaceIncomeSchedules(supabase, input.id, schedules);
+    await refresh();
+  }
+
+  async function archive(id: string, updatedAt: string): Promise<void> {
+    const outcome = await archiveIncomeStream(supabase, id, updatedAt);
+    if (!outcome.ok) {
+      throw new Error('This income stream was changed elsewhere — refresh and try again.');
+    }
+    await refresh();
+  }
+
+  return {
+    streamsWithMonth,
+    convertibles,
+    month,
+    calendar,
+    loading,
+    error,
+    refresh,
+    add,
+    update,
+    archive,
+  };
+}
+
+function hourlySchedules(
+  incomeStreamId: string,
+  spaceId: string,
+  lagDays: number
+): IncomeScheduleInsert[] {
+  return [
+    // Hourly payment timing comes from the stream's first schedule: lag days +
+    // slippage only, the day-of-month is not used. 15th is the neutral
+    // placeholder.
+    {
+      income_stream_id: incomeStreamId,
+      space_id: spaceId,
+      kind: 'dayOfMonth',
+      day_of_month: 15,
+      slippage_policy: 'nextBusinessDay',
+      covers_period: 'same',
+      lag_days: lagDays,
+    },
+  ];
 }
 
 function fixedSchedules(
