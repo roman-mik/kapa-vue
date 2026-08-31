@@ -3,6 +3,7 @@ import {
   createOneOffEvent,
   deleteOneOffEvent,
   listOneOffEvents,
+  updateOneOffEvent,
   type OneOffDirection,
   type OneOffEvent,
 } from '@roman-mik/kapa-core/horizon/queries';
@@ -43,6 +44,11 @@ export interface NewOneOffEvent {
   date: string;
   amountMinor: number;
   direction: OneOffDirection;
+}
+
+/** The edit form's input: NewOneOffEvent plus identity. No lock (no `updated_at`). */
+export interface OneOffEventEdit extends NewOneOffEvent {
+  id: string;
 }
 
 export function useOneOffEvents() {
@@ -104,7 +110,25 @@ export function useOneOffEvents() {
     await refresh();
   }
 
-  return { monthOneOffs, convertibles, month, loading, error, refresh, add };
+  async function update(input: OneOffEventEdit): Promise<void> {
+    await updateOneOffEvent(supabase, input.id, {
+      name: input.name,
+      category: input.category,
+      currency: input.currency,
+      account_id: input.accountId,
+      amount_minor: input.amountMinor,
+      date: input.date,
+      direction: input.direction,
+    });
+    await refresh();
+  }
+
+  async function remove(id: string): Promise<void> {
+    await deleteOneOffEvent(supabase, id);
+    await refresh();
+  }
+
+  return { monthOneOffs, convertibles, month, loading, error, refresh, add, update, remove };
 }
 
 export { SPEND_CATEGORIES, deleteOneOffEvent };

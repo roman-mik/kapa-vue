@@ -3,10 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import { useSpaceStore } from '@/stores/space';
 import { useOneOffEvents } from './useOneOffEvents';
 
-const { listOneOffEvents, createOneOffEvent } = vi.hoisted(() => ({
-  listOneOffEvents: vi.fn(),
-  createOneOffEvent: vi.fn(),
-}));
+const { listOneOffEvents, createOneOffEvent, updateOneOffEvent, deleteOneOffEvent } = vi.hoisted(
+  () => ({
+    listOneOffEvents: vi.fn(),
+    createOneOffEvent: vi.fn(),
+    updateOneOffEvent: vi.fn(),
+    deleteOneOffEvent: vi.fn(),
+  })
+);
 
 vi.mock('@roman-mik/kapa-core/horizon/queries', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@roman-mik/kapa-core/horizon/queries')>();
@@ -14,6 +18,8 @@ vi.mock('@roman-mik/kapa-core/horizon/queries', async (importOriginal) => {
     ...actual,
     listOneOffEvents,
     createOneOffEvent,
+    updateOneOffEvent,
+    deleteOneOffEvent,
   };
 });
 
@@ -108,5 +114,47 @@ describe('useOneOffEvents', () => {
       direction: 'in',
     });
     expect(monthOneOffs.value).toEqual([]);
+  });
+
+  it('update() patches the event in place and refreshes', async () => {
+    listOneOffEvents.mockResolvedValue([oneOffRow()]);
+    updateOneOffEvent.mockResolvedValue(undefined);
+    const { update, monthOneOffs } = useOneOffEvents();
+    await flush();
+
+    await update({
+      id: 'e1',
+      name: 'Birthday gift',
+      category: 'gift',
+      currency: 'RSD',
+      accountId: 'a1',
+      date: '2026-09-30',
+      amountMinor: 15000,
+      direction: 'in',
+    });
+
+    expect(updateOneOffEvent).toHaveBeenCalledWith(expect.anything(), 'e1', {
+      name: 'Birthday gift',
+      category: 'gift',
+      currency: 'RSD',
+      account_id: 'a1',
+      amount_minor: 15000,
+      date: '2026-09-30',
+      direction: 'in',
+    });
+    expect(monthOneOffs.value).toHaveLength(1);
+  });
+
+  it('remove() hard-deletes the event and refreshes', async () => {
+    listOneOffEvents.mockResolvedValueOnce([oneOffRow()]).mockResolvedValueOnce([]);
+    deleteOneOffEvent.mockResolvedValue(undefined);
+    const { remove, monthOneOffs } = useOneOffEvents();
+    await flush();
+    expect(monthOneOffs.value).toHaveLength(1);
+
+    await remove('e1');
+
+    expect(deleteOneOffEvent).toHaveBeenCalledWith(expect.anything(), 'e1');
+    expect(monthOneOffs.value).toHaveLength(0);
   });
 });
