@@ -8,6 +8,7 @@ import {
 } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
 import AccountChips from '@/components/horizon/AccountChips.vue';
+import ReconcilePanel from '@/components/horizon/ReconcilePanel.vue';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
@@ -37,7 +38,7 @@ const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
 };
 
 const space = useSpaceStore();
-const { accounts, loading, error, add, update, archive } = useAccounts();
+const { accounts, loading, error, refresh, add, update, archive } = useAccounts();
 
 const spaceCurrency = computed<Currency>(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
 
@@ -261,6 +262,8 @@ async function onArchive(accountId: string): Promise<void> {
         </form>
       </BaseCard>
 
+      <ReconcilePanel :accounts="accounts" class="reconcile" @saved="refresh" />
+
       <ul v-if="accounts.length" class="list">
         <li v-for="account in accounts" :key="account.id" class="row">
           <div class="row-info">
@@ -314,6 +317,10 @@ async function onArchive(accountId: string): Promise<void> {
 
 .form-card {
   margin: var(--kapa-space-5) 0;
+}
+
+.reconcile {
+  margin-bottom: var(--kapa-space-5);
 }
 
 .form-card h2 {
