@@ -9,12 +9,18 @@ const {
   createObligation,
   createObligationSchedule,
   deleteObligation,
+  updateObligation,
+  replaceObligationSchedules,
+  archiveObligation,
 } = vi.hoisted(() => ({
   getWorkCalendar: vi.fn(),
   listObligations: vi.fn(),
   createObligation: vi.fn(),
   createObligationSchedule: vi.fn(),
   deleteObligation: vi.fn(),
+  updateObligation: vi.fn(),
+  replaceObligationSchedules: vi.fn(),
+  archiveObligation: vi.fn(),
 }));
 
 vi.mock('@roman-mik/kapa-core/horizon/queries', async (importOriginal) => {
@@ -26,6 +32,9 @@ vi.mock('@roman-mik/kapa-core/horizon/queries', async (importOriginal) => {
     createObligation,
     createObligationSchedule,
     deleteObligation,
+    updateObligation,
+    replaceObligationSchedules,
+    archiveObligation,
   };
 });
 
@@ -209,5 +218,92 @@ describe('useObligations', () => {
       })
     ).rejects.toThrow('no table');
     expect(deleteObligation).toHaveBeenCalledWith(expect.anything(), 'o9');
+  });
+
+  it('exposes the work calendar for the schedule preview (H20)', async () => {
+    listObligations.mockResolvedValue([]);
+    const { calendar } = useObligations();
+    await flush();
+    expect(calendar.value).toEqual({ workingWeekdays: [1, 2, 3, 4, 5], holidays: [] });
+  });
+
+  it('update() patches the obligation and replaces its schedules', async () => {
+    listObligations.mockResolvedValue([]);
+    updateObligation.mockResolvedValue({ ok: true });
+    replaceObligationSchedules.mockResolvedValue(undefined);
+    const { update, obligationsWithMonth } = useObligations();
+    await flush();
+
+    await update({
+      id: 'o1',
+      updatedAt: '2026-08-01T00:00:00Z',
+      name: 'Rent',
+      category: 'housing',
+      currency: 'RSD',
+      accountId: 'a1',
+      startDate: '2026-09-01',
+      amountMinor: 46000,
+      rule: { kind: 'dayOfMonth', dayOfMonth: 5 },
+    });
+
+    expect(updateObligation).toHaveBeenCalledWith(
+      expect.anything(),
+      'o1',
+      {
+        name: 'Rent',
+        category: 'housing',
+        currency: 'RSD',
+        account_id: 'a1',
+        amount_minor: 46000,
+        start_date: '2026-09-01',
+      },
+      '2026-08-01T00:00:00Z'
+    );
+    expect(replaceObligationSchedules).toHaveBeenCalledWith(expect.anything(), 'o1', [
+      {
+        obligation_id: 'o1',
+        space_id: 'sp1',
+        kind: 'dayOfMonth',
+        day_of_month: 5,
+        slippage_policy: 'nextBusinessDay',
+        covers_period: 'same',
+      },
+    ]);
+    expect(obligationsWithMonth.value).toEqual([]);
+  });
+
+  it('update() throws on a stale updatedAt conflict', async () => {
+    listObligations.mockResolvedValue([]);
+    updateObligation.mockResolvedValue({ ok: false, reason: 'conflict' });
+    const { update } = useObligations();
+    await flush();
+
+    await expect(
+      update({
+        id: 'o1',
+        updatedAt: '2026-08-01T00:00:00Z',
+        name: 'Rent',
+        category: 'housing',
+        currency: 'RSD',
+        accountId: 'a1',
+        startDate: '2026-09-01',
+        amountMinor: 46000,
+        rule: { kind: 'monthEnd' },
+      })
+    ).rejects.toThrow('changed elsewhere');
+    expect(replaceObligationSchedules).not.toHaveBeenCalled();
+  });
+
+  it('archive() soft-deletes and throws on conflict', async () => {
+    listObligations.mockResolvedValue([]);
+    archiveObligation.mockResolvedValue({ ok: true });
+    const { archive } = useObligations();
+    await flush();
+
+    await archive('o1', '2026-08-01T00:00:00Z');
+    expect(archiveObligation).toHaveBeenCalledWith(expect.anything(), 'o1', '2026-08-01T00:00:00Z');
+
+    archiveObligation.mockResolvedValue({ ok: false, reason: 'conflict' });
+    await expect(archive('o1', 'stale')).rejects.toThrow('changed elsewhere');
   });
 });

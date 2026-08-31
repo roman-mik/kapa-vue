@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
 import { CHARGE_CADENCES, type ChargeCadence } from '@roman-mik/kapa-core/horizon';
-import type { Account } from '@roman-mik/kapa-core/horizon/queries';
+import type {
+  Account,
+  MutationOutcome,
+  PlannedSpend,
+  PlannedSpendUpdate,
+} from '@roman-mik/kapa-core/horizon/queries';
 import type { Category } from '@roman-mik/kapa-core/core';
 import { ref, watch, computed } from 'vue';
 import type { NewPlannedSpend } from '@/composables/usePlannedSpend';
@@ -24,10 +29,20 @@ const props = defineProps<{
   spaceCurrency: Currency;
   /** 'YYYY-MM-DD' — the form's default start date. */
   defaultStartDate: string;
+  /** When present the form edits this item instead of creating one. */
+  initial?: PlannedSpend | null;
   save: (input: NewPlannedSpend) => Promise<void>;
+  update?: (
+    id: string,
+    patch: PlannedSpendUpdate,
+    expectedUpdatedAt: string
+  ) => Promise<MutationOutcome>;
+  archive?: (id: string, expectedUpdatedAt: string) => Promise<MutationOutcome>;
 }>();
 
-const emit = defineEmits<{ saved: [] }>();
+const emit = defineEmits<{ saved: []; cancelled: []; archived: [] }>();
+
+const isEdit = computed(() => !!props.initial);
 
 const CADENCE_LABELS: Record<ChargeCadence, string> = {
   daily: 'Amount per day',
@@ -62,6 +77,30 @@ function resetForm(): void {
   endDate.value = '';
   saveError.value = null;
 }
+
+// Edit mode loads the item's values into the form (immediate: the form only
+// mounts once the editingId row exists, so the item is already fetched).
+watch(
+  () => props.initial,
+  (initial) => {
+    if (!initial) {
+      startDate.value = props.defaultStartDate;
+      return;
+    }
+    name.value = initial.name;
+    accountId.value = initial.account_id;
+    categoryId.value = initial.category_id ?? '';
+    currency.value = (initial.currency as Currency) ?? props.spaceCurrency;
+    const exponent = CURRENCY_EXPONENT[currency.value] ?? 2;
+    dailyAmount.value = String(initial.daily_amount_minor / 10 ** exponent);
+    chargeCadence.value = (initial.charge_cadence as ChargeCadence) ?? 'daily';
+    cap.value = initial.cap_minor == null ? '' : String(initial.cap_minor / 10 ** exponent);
+    startDate.value = initial.start_date;
+    endDate.value = initial.end_date ?? '';
+    saveError.value = null;
+  },
+  { immediate: true }
+);
 
 watch(
   () => props.spaceCurrency,
@@ -110,25 +149,64 @@ async function onSubmit(): Promise<void> {
     }
   }
   const exponent = CURRENCY_EXPONENT[currency.value];
-  const capExponent = CURRENCY_EXPONENT[currency.value];
+
+  const input: NewPlannedSpend = {
+    name: parsedName.data,
+    categoryId: categoryId.value || null,
+    currency: currency.value,
+    accountId: accountId.value,
+    dailyAmountMinor: Math.round(parsedAmount.data * 10 ** exponent),
+    chargeCadence: chargeCadence.value,
+    capMinor: parsedCap.data == null ? null : Math.round(parsedCap.data * 10 ** exponent),
+    startDate: startDate.value,
+    endDate: endDate.value || null,
+  };
 
   saving.value = true;
   try {
-    await props.save({
-      name: parsedName.data,
-      categoryId: categoryId.value || null,
-      currency: currency.value,
-      accountId: accountId.value,
-      dailyAmountMinor: Math.round(parsedAmount.data * 10 ** exponent),
-      chargeCadence: chargeCadence.value,
-      capMinor: parsedCap.data == null ? null : Math.round(parsedCap.data * 10 ** capExponent),
-      startDate: startDate.value,
-      endDate: endDate.value || null,
-    });
+    if (props.initial && props.update) {
+      const patch: PlannedSpendUpdate = {
+        name: input.name,
+        category_id: input.categoryId,
+        currency: input.currency,
+        account_id: input.accountId,
+        daily_amount_minor: input.dailyAmountMinor,
+        charge_cadence: input.chargeCadence,
+        cap_minor: input.capMinor,
+        start_date: input.startDate,
+        end_date: input.endDate,
+      };
+      const outcome = await props.update(props.initial.id, patch, props.initial.updated_at);
+      if (!outcome.ok) {
+        saveError.value = 'This item was changed elsewhere — refresh and try again.';
+        return;
+      }
+    } else {
+      await props.save(input);
+    }
     resetForm();
     emit('saved');
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : "Couldn't add the planned spend.";
+    saveError.value = err instanceof Error ? err.message : "Couldn't save the planned spend.";
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function onArchive(): Promise<void> {
+  if (!props.initial || !props.archive) return;
+  saveError.value = null;
+  saving.value = true;
+  try {
+    const outcome = await props.archive(props.initial.id, props.initial.updated_at);
+    if (!outcome.ok) {
+      saveError.value = 'This item was changed elsewhere — refresh and try again.';
+      return;
+    }
+    resetForm();
+    emit('archived');
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : "Couldn't archive the planned spend.";
   } finally {
     saving.value = false;
   }
@@ -137,7 +215,7 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <BaseCard class="form-card">
-    <h2>Add planned spend</h2>
+    <h2>{{ isEdit ? 'Edit planned spend' : 'Add planned spend' }}</h2>
     <form class="form" @submit.prevent="onSubmit">
       <div class="grid">
         <BaseField label="Name" v-slot="{ id }">
@@ -209,7 +287,23 @@ async function onSubmit(): Promise<void> {
       </div>
 
       <div class="actions">
-        <BaseButton type="submit" :disabled="saving">
+        <template v-if="isEdit">
+          <BaseButton type="button" variant="danger" :disabled="saving" @click="onArchive">
+            {{ saving ? 'Working…' : 'Archive' }}
+          </BaseButton>
+          <BaseButton
+            type="button"
+            variant="secondary"
+            :disabled="saving"
+            @click="emit('cancelled')"
+          >
+            Cancel
+          </BaseButton>
+          <BaseButton type="submit" :disabled="saving">
+            {{ saving ? 'Saving…' : 'Save changes' }}
+          </BaseButton>
+        </template>
+        <BaseButton v-else type="submit" :disabled="saving">
           {{ saving ? 'Adding…' : 'Add planned spend' }}
         </BaseButton>
       </div>

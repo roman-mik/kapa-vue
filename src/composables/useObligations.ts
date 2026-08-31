@@ -7,12 +7,17 @@ import {
   type ScheduleCalendar,
 } from '@roman-mik/kapa-core/horizon';
 import {
+  archiveObligation,
   createObligation,
   createObligationSchedule,
   deleteObligation,
   getWorkCalendar,
   listObligations,
   obligationScheduleRule,
+  replaceObligationSchedules,
+  updateObligation,
+  type ObligationScheduleInsert,
+  type ObligationUpdate,
   type ObligationWithSchedules,
 } from '@roman-mik/kapa-core/horizon/queries';
 import { currentMonth, type Currency } from '@roman-mik/kapa-core/pocket';
@@ -55,6 +60,16 @@ export interface NewObligation {
   amountMinor: number;
   /** The schedule rule for when it's due. */
   rule: ObligationRule;
+}
+
+/**
+ * The edit form's input: everything NewObligation knows, plus identity —
+ * `updatedAt` passes through the pessimistic-lock update so a concurrent
+ * edit gets a conflict instead of silent last-write-wins.
+ */
+export interface ObligationEdit extends NewObligation {
+  id: string;
+  updatedAt: string;
 }
 
 export type ObligationRule = { kind: 'dayOfMonth'; dayOfMonth: number } | { kind: 'monthEnd' };
@@ -205,5 +220,59 @@ export function useObligations() {
     await refresh();
   }
 
-  return { obligationsWithMonth, convertibles, month, loading, error, refresh, add };
+  /**
+   * Save the edit form. The obligation's own columns patch first, then its
+   * schedule is replaced whole-row (delete-all + insert — no `updated_at` or
+   * unique constraint on schedules). Conflict (stale `updatedAt`) surfaces as
+   * a thrown error for the form to show, mirroring `useIncomeStreams.update`.
+   */
+  async function update(input: ObligationEdit): Promise<void> {
+    const spaceId = space.currentSpaceId;
+    if (!spaceId) return;
+    const patch: ObligationUpdate = {
+      name: input.name,
+      category: input.category,
+      currency: input.currency,
+      account_id: input.accountId,
+      amount_minor: input.amountMinor,
+      start_date: input.startDate,
+    };
+    const outcome = await updateObligation(supabase, input.id, patch, input.updatedAt);
+    if (!outcome.ok) {
+      throw new Error('This obligation was changed elsewhere — refresh and try again.');
+    }
+    const schedules: ObligationScheduleInsert[] = [
+      {
+        obligation_id: input.id,
+        space_id: spaceId,
+        kind: input.rule.kind,
+        day_of_month: input.rule.kind === 'dayOfMonth' ? input.rule.dayOfMonth : null,
+        slippage_policy: 'nextBusinessDay',
+        covers_period: 'same',
+      },
+    ];
+    await replaceObligationSchedules(supabase, input.id, schedules);
+    await refresh();
+  }
+
+  async function archive(id: string, updatedAt: string): Promise<void> {
+    const outcome = await archiveObligation(supabase, id, updatedAt);
+    if (!outcome.ok) {
+      throw new Error('This obligation was changed elsewhere — refresh and try again.');
+    }
+    await refresh();
+  }
+
+  return {
+    obligationsWithMonth,
+    convertibles,
+    month,
+    calendar,
+    loading,
+    error,
+    refresh,
+    add,
+    update,
+    archive,
+  };
 }
