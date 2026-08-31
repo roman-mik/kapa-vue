@@ -49,7 +49,7 @@ const props = defineProps<{
   archive?: (id: string, updatedAt: string) => Promise<void>;
 }>();
 
-const emit = defineEmits<{ saved: []; cancelled: [] }>();
+const emit = defineEmits<{ saved: []; cancelled: []; archived: [] }>();
 
 const KIND_LABELS = {
   hourly: 'Hourly',
@@ -120,7 +120,7 @@ watch(
       return;
     }
     name.value = initial.name;
-    kind.value = initial.kind;
+    kind.value = initial.kind as NewIncomeStream['kind'];
     accountId.value = initial.account_id;
     currency.value = initial.currency as Currency;
     taxable.value = initial.taxable;
@@ -280,7 +280,7 @@ async function onArchive(): Promise<void> {
   try {
     await props.archive(props.initial.id, props.initial.updated_at);
     resetForm();
-    emit('saved');
+    emit('archived');
   } catch (err) {
     saveError.value = err instanceof Error ? err.message : "Couldn't archive the income stream.";
   } finally {

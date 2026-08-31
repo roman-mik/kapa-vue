@@ -292,6 +292,7 @@ function native(obligation: ObligationMonth, amountMinor: number): string {
               :update="updateOneOff"
               :remove="removeOneOff"
               @saved="onOneOffEdited"
+              @removed="onOneOffRemoved"
               @cancelled="onOneOffCancelled"
             />
           </template>

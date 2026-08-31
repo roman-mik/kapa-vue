@@ -33,7 +33,7 @@ const props = defineProps<{
   remove?: (id: string) => Promise<void>;
 }>();
 
-const emit = defineEmits<{ saved: []; cancelled: [] }>();
+const emit = defineEmits<{ saved: []; cancelled: []; removed: [] }>();
 
 const isEdit = computed(() => !!props.initial);
 
@@ -147,7 +147,7 @@ async function onRemove(): Promise<void> {
   try {
     await props.remove(props.initial.id);
     resetForm();
-    emit('saved');
+    emit('removed');
   } catch (err) {
     saveError.value = err instanceof Error ? err.message : "Couldn't delete the one-off event.";
   } finally {

@@ -156,6 +156,7 @@ function native(stream: IncomeStreamMonth, amountMinor: number): string {
               :update="update"
               :archive="archive"
               @saved="onEdited"
+              @archived="onArchived"
               @cancelled="onCancelled"
             />
           </template>
