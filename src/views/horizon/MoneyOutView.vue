@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { type Currency, type CurrencyBucket, zonedDateKey } from '@roman-mik/kapa-core/pocket';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { ChargeCadence } from '@roman-mik/kapa-core/horizon';
 import ObligationForm from '@/components/horizon/ObligationForm.vue';
 import OneOffEventForm from '@/components/horizon/OneOffEventForm.vue';
@@ -8,6 +8,7 @@ import PlannedSpendForm from '@/components/horizon/PlannedSpendForm.vue';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
 import { useAccounts } from '@/composables/useAccounts';
 import { useCategories } from '@/composables/useCategories';
 import { useConvertedAmount } from '@/composables/useConvertedAmount';
@@ -75,6 +76,8 @@ const {
   loading: oneOffsLoading,
   error: oneOffsError,
   add: addOneOff,
+  update: updateOneOff,
+  remove: removeOneOff,
 } = useOneOffEvents();
 const {
   itemsWithMonth: plannedSpendWithMonth,
@@ -137,6 +140,22 @@ function onSaved(): void {
 
 function onOneOffSaved(): void {
   toast.success('One-off added');
+}
+
+const editingOneOffId = ref<string | null>(null);
+
+function onOneOffEdited(): void {
+  editingOneOffId.value = null;
+  toast.success('One-off updated');
+}
+
+function onOneOffRemoved(): void {
+  editingOneOffId.value = null;
+  toast.success('One-off deleted');
+}
+
+function onOneOffCancelled(): void {
+  editingOneOffId.value = null;
 }
 
 function onPlannedSpendSaved(): void {
@@ -256,48 +275,79 @@ function native(obligation: ObligationMonth, amountMinor: number): string {
       />
 
       <ul v-else class="list">
-        <li v-for="event in monthOneOffs" :key="event.id" class="row">
-          <div class="row-info">
-            <span class="row-name">{{ event.name }}</span>
-            <span class="badges">
-              <span class="badge">{{ oneOffCategoryLabel(event.category) }}</span>
-              <span class="badge" :class="event.direction === 'in' ? 'badge-in' : 'badge-out'">
-                {{ event.direction === 'in' ? 'In' : 'Out' }}
+        <li
+          v-for="event in monthOneOffs"
+          :key="event.id"
+          class="row"
+          :class="{ editing: editingOneOffId === event.id }"
+        >
+          <template v-if="editingOneOffId === event.id">
+            <OneOffEventForm
+              class="edit-form"
+              :accounts="accounts.filter((a) => !a.archived)"
+              :space-currency="spaceCurrency"
+              :default-date="defaultOneOffDate"
+              :initial="event"
+              :save="addOneOff"
+              :update="updateOneOff"
+              :remove="removeOneOff"
+              @saved="onOneOffEdited"
+              @removed="onOneOffRemoved"
+              @cancelled="onOneOffCancelled"
+            />
+          </template>
+          <template v-else>
+            <div class="row-info">
+              <span class="row-name">{{ event.name }}</span>
+              <span class="badges">
+                <span class="badge">{{ oneOffCategoryLabel(event.category) }}</span>
+                <span class="badge" :class="event.direction === 'in' ? 'badge-in' : 'badge-out'">
+                  {{ event.direction === 'in' ? 'In' : 'Out' }}
+                </span>
+                <span class="badge">{{ prettyDate(event.date) }}</span>
               </span>
-              <span class="badge">{{ prettyDate(event.date) }}</span>
-            </span>
-          </div>
+            </div>
 
-          <span class="row-total">
-            <span class="native" :class="event.direction === 'in' ? 'amount-in' : 'amount-out'">
-              {{ event.direction === 'in' ? '+' : '−'
-              }}{{ formatMoney(event.amount_minor, event.currency as Currency) }}
-            </span>
-            <span
-              v-if="
-                convertedOneOffMinor({
-                  id: event.id,
-                  currency: event.currency as Currency,
-                  amountMinor: event.amount_minor,
-                  asOfDate: event.date,
-                }) !== null
-              "
-              class="converted"
-            >
-              ≈
-              {{
-                formatMoney(
+            <span class="row-total">
+              <span class="native" :class="event.direction === 'in' ? 'amount-in' : 'amount-out'">
+                {{ event.direction === 'in' ? '+' : '−'
+                }}{{ formatMoney(event.amount_minor, event.currency as Currency) }}
+              </span>
+              <span
+                v-if="
                   convertedOneOffMinor({
                     id: event.id,
                     currency: event.currency as Currency,
                     amountMinor: event.amount_minor,
                     asOfDate: event.date,
-                  })!,
-                  spaceCurrency
-                )
-              }}
+                  }) !== null
+                "
+                class="converted"
+              >
+                ≈
+                {{
+                  formatMoney(
+                    convertedOneOffMinor({
+                      id: event.id,
+                      currency: event.currency as Currency,
+                      amountMinor: event.amount_minor,
+                      asOfDate: event.date,
+                    })!,
+                    spaceCurrency
+                  )
+                }}
+              </span>
             </span>
-          </span>
+
+            <BaseButton
+              variant="ghost"
+              type="button"
+              class="edit-btn"
+              @click="editingOneOffId = event.id"
+            >
+              Edit
+            </BaseButton>
+          </template>
         </li>
       </ul>
 
@@ -412,6 +462,24 @@ function native(obligation: ObligationMonth, amountMinor: number): string {
   background: var(--kapa-surface);
   border: 1px solid var(--kapa-neutral-400);
   border-radius: var(--kapa-radius-md);
+}
+
+.row.editing {
+  align-items: stretch;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+}
+
+.edit-btn {
+  padding: var(--kapa-space-1) var(--kapa-space-3);
+  font-weight: 600;
+  border-radius: var(--kapa-radius-sm);
+}
+
+.edit-form {
+  margin: 0;
+  flex-basis: 100%;
 }
 
 .row-info {

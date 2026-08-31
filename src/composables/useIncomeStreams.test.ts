@@ -9,12 +9,18 @@ const {
   createIncomeStream,
   createIncomeSchedule,
   deleteIncomeStream,
+  updateIncomeStream,
+  replaceIncomeSchedules,
+  archiveIncomeStream,
 } = vi.hoisted(() => ({
   getWorkCalendar: vi.fn(),
   listIncomeStreams: vi.fn(),
   createIncomeStream: vi.fn(),
   createIncomeSchedule: vi.fn(),
   deleteIncomeStream: vi.fn(),
+  updateIncomeStream: vi.fn(),
+  replaceIncomeSchedules: vi.fn(),
+  archiveIncomeStream: vi.fn(),
 }));
 
 vi.mock('@roman-mik/kapa-core/horizon/queries', async (importOriginal) => {
@@ -26,6 +32,9 @@ vi.mock('@roman-mik/kapa-core/horizon/queries', async (importOriginal) => {
     createIncomeStream,
     createIncomeSchedule,
     deleteIncomeStream,
+    updateIncomeStream,
+    replaceIncomeSchedules,
+    archiveIncomeStream,
   };
 });
 
@@ -40,7 +49,7 @@ function streamRow(overrides: Record<string, unknown> = {}): Record<string, unkn
   return {
     account_id: 'a1',
     archived: false,
-    confidence: 'planned',
+    confidence: 'confirmed',
     created_at: '2026-08-01T00:00:00Z',
     currency: 'RSD',
     custom_period_days: null,
@@ -52,7 +61,7 @@ function streamRow(overrides: Record<string, unknown> = {}): Record<string, unkn
     id: 's1',
     kind: 'hourly',
     name: 'Payroll',
-    recurrence: 'monthly',
+    recurrence: 'recurring',
     sort_order: 1,
     space_id: 'sp1',
     start_date: '2026-01-01',
@@ -182,6 +191,8 @@ describe('useIncomeStreams', () => {
       paymentRule: 'semiMonthly',
       payDay: 15,
       taxable: false,
+      confidence: 'confirmed',
+      recurrence: 'recurring',
     });
 
     expect(createIncomeStream).toHaveBeenCalledWith(expect.anything(), {
@@ -196,6 +207,8 @@ describe('useIncomeStreams', () => {
       hours_per_day_e2: null,
       earning_period_kind: 'monthly',
       taxable: false,
+      confidence: 'confirmed',
+      recurrence: 'recurring',
     });
     expect(createIncomeSchedule).toHaveBeenCalledTimes(2);
     expect(createIncomeSchedule).toHaveBeenCalledWith(expect.anything(), {
@@ -241,8 +254,160 @@ describe('useIncomeStreams', () => {
         paymentRule: 'dayOfMonth',
         payDay: 15,
         taxable: true,
+        confidence: 'confirmed',
+        recurrence: 'recurring',
       })
     ).rejects.toThrow('no table');
     expect(deleteIncomeStream).toHaveBeenCalledWith(expect.anything(), 's9');
+  });
+
+  it('update() patches the stream and replaces its schedules', async () => {
+    listIncomeStreams.mockResolvedValue([]);
+    updateIncomeStream.mockResolvedValue({ ok: true, conflict: false });
+    replaceIncomeSchedules.mockResolvedValue(undefined);
+    const { update } = useIncomeStreams();
+    await flush();
+
+    await update({
+      id: 's1',
+      updatedAt: '2026-08-01T00:00:00Z',
+      name: 'Rentals',
+      kind: 'fixed',
+      currency: 'RSD',
+      accountId: 'a1',
+      startDate: '2026-10-01',
+      earningPeriodKind: 'monthly',
+      hourlyRateMinor: null,
+      hoursPerDayE2: null,
+      lagDays: 0,
+      amountMinor: 150000,
+      paymentRule: 'dayOfMonth',
+      payDay: 20,
+      taxable: true,
+      confidence: 'expected',
+      recurrence: 'recurring',
+    });
+
+    expect(updateIncomeStream).toHaveBeenCalledWith(
+      expect.anything(),
+      's1',
+      {
+        name: 'Rentals',
+        kind: 'fixed',
+        currency: 'RSD',
+        account_id: 'a1',
+        start_date: '2026-10-01',
+        earning_period_kind: 'monthly',
+        taxable: true,
+        confidence: 'expected',
+        recurrence: 'recurring',
+        fixed_amount_minor: 150000,
+        hourly_rate_minor: null,
+        hours_per_day_e2: null,
+      },
+      '2026-08-01T00:00:00Z'
+    );
+    expect(replaceIncomeSchedules).toHaveBeenCalledTimes(1);
+    expect(replaceIncomeSchedules).toHaveBeenCalledWith(expect.anything(), 's1', [
+      {
+        income_stream_id: 's1',
+        space_id: 'sp1',
+        kind: 'dayOfMonth',
+        day_of_month: 20,
+        slippage_policy: 'nextBusinessDay',
+        covers_period: 'same',
+        lag_days: null,
+      },
+    ]);
+  });
+
+  it('update() clears the hourly fields when a stream switches to fixed', async () => {
+    listIncomeStreams.mockResolvedValue([]);
+    updateIncomeStream.mockResolvedValue({ ok: true, conflict: false });
+    replaceIncomeSchedules.mockResolvedValue(undefined);
+    const { update } = useIncomeStreams();
+    await flush();
+
+    await update({
+      id: 's1',
+      updatedAt: '2026-08-01T00:00:00Z',
+      name: 'Payroll',
+      kind: 'fixed',
+      currency: 'RSD',
+      accountId: 'a1',
+      startDate: '2026-01-01',
+      earningPeriodKind: 'monthly',
+      hourlyRateMinor: null,
+      hoursPerDayE2: null,
+      lagDays: 0,
+      amountMinor: 50000,
+      paymentRule: 'monthEnd',
+      payDay: 15,
+      taxable: false,
+      confidence: 'confirmed',
+      recurrence: 'recurring',
+    });
+
+    expect(updateIncomeStream).toHaveBeenCalledWith(
+      expect.anything(),
+      's1',
+      expect.objectContaining({
+        kind: 'fixed',
+        fixed_amount_minor: 50000,
+        hourly_rate_minor: null,
+        hours_per_day_e2: null,
+      }),
+      '2026-08-01T00:00:00Z'
+    );
+  });
+
+  it('update() throws on a stale updatedAt conflict', async () => {
+    listIncomeStreams.mockResolvedValue([]);
+    updateIncomeStream.mockResolvedValue({ ok: false, conflict: true });
+    const { update } = useIncomeStreams();
+    await flush();
+
+    await expect(
+      update({
+        id: 's1',
+        updatedAt: '2026-08-01T00:00:00Z',
+        name: 'Rentals',
+        kind: 'fixed',
+        currency: 'RSD',
+        accountId: 'a1',
+        startDate: '2026-09-01',
+        earningPeriodKind: 'monthly',
+        hourlyRateMinor: null,
+        hoursPerDayE2: null,
+        lagDays: 0,
+        amountMinor: 120000,
+        paymentRule: 'dayOfMonth',
+        payDay: 15,
+        taxable: false,
+        confidence: 'confirmed',
+        recurrence: 'recurring',
+      })
+    ).rejects.toThrow('changed elsewhere');
+    expect(replaceIncomeSchedules).not.toHaveBeenCalled();
+  });
+
+  it('archive() flags the stream and refreshes', async () => {
+    listIncomeStreams.mockResolvedValue([{ ...streamRow(), schedules: [scheduleRow()] }]);
+    archiveIncomeStream.mockResolvedValue({ ok: true, conflict: false });
+    const { archive, streamsWithMonth } = useIncomeStreams();
+    await flush();
+
+    expect(streamsWithMonth.value).toHaveLength(1);
+    listIncomeStreams.mockResolvedValue([
+      { ...streamRow({ archived: true }), schedules: [scheduleRow()] },
+    ]);
+    await archive('s1', '2026-08-01T00:00:00Z');
+
+    expect(archiveIncomeStream).toHaveBeenCalledWith(
+      expect.anything(),
+      's1',
+      '2026-08-01T00:00:00Z'
+    );
+    expect(streamsWithMonth.value).toHaveLength(0);
   });
 });

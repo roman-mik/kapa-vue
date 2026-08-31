@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
-import type { Account, OneOffDirection } from '@roman-mik/kapa-core/horizon/queries';
-import { ref, watch } from 'vue';
+import type { Account, OneOffDirection, OneOffEvent } from '@roman-mik/kapa-core/horizon/queries';
+import { computed, ref, watch } from 'vue';
 import {
   ONE_OFF_CATEGORY_LABELS,
   SPEND_CATEGORIES,
   type NewOneOffEvent,
   type OneOffCategory,
+  type OneOffEventEdit,
 } from '@/composables/useOneOffEvents';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
@@ -25,10 +26,16 @@ const props = defineProps<{
   spaceCurrency: Currency;
   /** 'YYYY-MM-DD' — the form's default date (today, in the space's timezone). */
   defaultDate: string;
+  /** When present the form edits this event instead of creating one. */
+  initial?: OneOffEvent | null;
   save: (input: NewOneOffEvent) => Promise<void>;
+  update?: (input: OneOffEventEdit) => Promise<void>;
+  remove?: (id: string) => Promise<void>;
 }>();
 
-const emit = defineEmits<{ saved: [] }>();
+const emit = defineEmits<{ saved: []; cancelled: []; removed: [] }>();
+
+const isEdit = computed(() => !!props.initial);
 
 const name = ref('');
 const accountId = ref('');
@@ -51,6 +58,25 @@ function resetForm(): void {
   date.value = props.defaultDate;
   saveError.value = null;
 }
+
+// Edit mode loads the event's values into the form (the row exists by the time
+// the form mounts, so this can be synchronous).
+watch(
+  () => props.initial,
+  (initial) => {
+    if (!initial) return;
+    name.value = initial.name;
+    accountId.value = initial.account_id;
+    category.value = (initial.category as OneOffCategory) ?? 'other';
+    direction.value = (initial.direction as OneOffDirection) ?? 'out';
+    currency.value = (initial.currency as Currency) ?? props.spaceCurrency;
+    const exponent = CURRENCY_EXPONENT[currency.value] ?? 2;
+    amount.value = String(initial.amount_minor / 10 ** exponent);
+    date.value = initial.date;
+    saveError.value = null;
+  },
+  { immediate: true }
+);
 
 watch(
   () => props.spaceCurrency,
@@ -91,7 +117,7 @@ async function onSubmit(): Promise<void> {
 
   saving.value = true;
   try {
-    await props.save({
+    const input: NewOneOffEvent = {
       name: parsedName.data,
       category: category.value,
       currency: currency.value,
@@ -99,11 +125,31 @@ async function onSubmit(): Promise<void> {
       date: parsedDate.data,
       amountMinor: Math.round(parsedAmount.data * 10 ** exponent),
       direction: direction.value,
-    });
+    };
+    if (props.initial && props.update) {
+      await props.update({ ...input, id: props.initial.id });
+    } else {
+      await props.save(input);
+    }
     resetForm();
     emit('saved');
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : "Couldn't add the one-off event.";
+    saveError.value = err instanceof Error ? err.message : "Couldn't save the one-off event.";
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function onRemove(): Promise<void> {
+  if (!props.initial || !props.remove) return;
+  saveError.value = null;
+  saving.value = true;
+  try {
+    await props.remove(props.initial.id);
+    resetForm();
+    emit('removed');
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : "Couldn't delete the one-off event.";
   } finally {
     saving.value = false;
   }
@@ -112,7 +158,7 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <BaseCard class="form-card">
-    <h2>Add one-off</h2>
+    <h2>{{ isEdit ? 'Edit one-off' : 'Add one-off' }}</h2>
     <form class="form" @submit.prevent="onSubmit">
       <div class="grid">
         <BaseField label="Name" v-slot="{ id }">
@@ -167,7 +213,23 @@ async function onSubmit(): Promise<void> {
       </BaseField>
 
       <div class="actions">
-        <BaseButton type="submit" :disabled="saving">
+        <template v-if="isEdit">
+          <BaseButton type="button" variant="danger" :disabled="saving" @click="onRemove">
+            {{ saving ? 'Working…' : 'Delete' }}
+          </BaseButton>
+          <BaseButton
+            type="button"
+            variant="secondary"
+            :disabled="saving"
+            @click="emit('cancelled')"
+          >
+            Cancel
+          </BaseButton>
+          <BaseButton type="submit" :disabled="saving">
+            {{ saving ? 'Saving…' : 'Save changes' }}
+          </BaseButton>
+        </template>
+        <BaseButton v-else type="submit" :disabled="saving">
           {{ saving ? 'Adding…' : 'Add one-off' }}
         </BaseButton>
       </div>
