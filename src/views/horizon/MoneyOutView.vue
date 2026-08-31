@@ -9,6 +9,7 @@ import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseBadge from '@/components/ui/BaseBadge.vue';
 import { useAccounts } from '@/composables/useAccounts';
 import { useCategories } from '@/composables/useCategories';
 import { useConvertedAmount } from '@/composables/useConvertedAmount';
@@ -455,17 +456,14 @@ const loadingInitial = computed(() => loading.value && !obligationsWithMonth.val
                 <div class="row-info">
                   <span class="row-name">{{ row.name }}</span>
                   <span class="badges">
-                    <span
+                    <BaseBadge
                       v-if="row.kind === 'oneOff'"
-                      class="badge"
-                      :class="row.direction === 'in' ? 'badge-in' : 'badge-out'"
+                      :variant="row.direction === 'in' ? 'in' : 'out'"
                     >
                       {{ row.direction === 'in' ? 'In' : 'Out' }}
-                    </span>
-                    <span class="badge">{{ row.categoryLabel }}</span>
-                    <span class="badge">{{
-                      row.dueDate ? formatFullDate(row.dueDate) : row.due
-                    }}</span>
+                    </BaseBadge>
+                    <BaseBadge>{{ row.categoryLabel }}</BaseBadge>
+                    <BaseBadge>{{ row.dueDate ? formatFullDate(row.dueDate) : row.due }}</BaseBadge>
                   </span>
                 </div>
 
@@ -617,30 +615,6 @@ const loadingInitial = computed(() => loading.value && !obligationsWithMonth.val
 .row-name {
   font-weight: 600;
   color: var(--kapa-ink);
-}
-
-.badges {
-  display: flex;
-  gap: var(--kapa-space-1);
-}
-
-.badge {
-  font-size: var(--kapa-text-caption-size);
-  font-weight: 600;
-  padding: 0 var(--kapa-space-2);
-  border-radius: var(--kapa-radius-sm);
-  background: var(--kapa-neutral-400);
-  color: var(--kapa-ink-muted);
-}
-
-.badge-in {
-  background: color-mix(in srgb, var(--kapa-positive) 20%, transparent);
-  color: var(--kapa-positive);
-}
-
-.badge-out {
-  background: color-mix(in srgb, var(--kapa-negative) 20%, transparent);
-  color: var(--kapa-negative);
 }
 
 .amount-in {

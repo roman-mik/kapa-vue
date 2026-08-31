@@ -110,6 +110,13 @@ textarea {
   padding: var(--kapa-space-6) var(--kapa-space-4) var(--kapa-space-5);
 }
 
+/* Shared row of badges — used by MoneyInView/MoneyOutView to lay out a run
+ * of BaseBadge pills. Shared so the wrapper isn't re-declared per view. */
+.badges {
+  display: flex;
+  gap: var(--kapa-space-1);
+}
+
 /* OfflineBanner and AppHeader both add env(safe-area-inset-top) so the
  * device's notch/status-bar padding isn't lost above whichever renders
  * first. When both are showing that double-counts the inset, so drop it

@@ -7,6 +7,7 @@ import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseBadge from '@/components/ui/BaseBadge.vue';
 import { useAccounts } from '@/composables/useAccounts';
 import { useConvertedAmount } from '@/composables/useConvertedAmount';
 import {
@@ -53,6 +54,13 @@ const RECURRENCE_LABELS: Record<string, string> = {
   recurring: 'Recurring',
   oneOff: 'One-off',
 };
+
+function confidenceVariant(confidence: string): 'confirmed' | 'expected' | 'uncertain' | 'neutral' {
+  if (confidence === 'confirmed' || confidence === 'expected' || confidence === 'uncertain') {
+    return confidence;
+  }
+  return 'neutral';
+}
 
 const toast = useToast();
 
@@ -145,13 +153,16 @@ function native(stream: IncomeStreamMonth, amountMinor: number): string {
             <div class="row-info">
               <span class="row-name">{{ stream.name }}</span>
               <span class="badges">
-                <span class="badge">{{ streamKindLabel(stream.kind) }}</span>
-                <span v-if="CONFIDENCE_LABELS[stream.confidence]" class="badge muted">
+                <BaseBadge>{{ streamKindLabel(stream.kind) }}</BaseBadge>
+                <BaseBadge
+                  v-if="CONFIDENCE_LABELS[stream.confidence]"
+                  :variant="confidenceVariant(stream.confidence)"
+                >
                   {{ CONFIDENCE_LABELS[stream.confidence] }}
-                </span>
-                <span v-if="RECURRENCE_LABELS[stream.recurrence]" class="badge muted">
+                </BaseBadge>
+                <BaseBadge v-if="RECURRENCE_LABELS[stream.recurrence]">
                   {{ RECURRENCE_LABELS[stream.recurrence] }}
-                </span>
+                </BaseBadge>
               </span>
             </div>
 
@@ -284,25 +295,6 @@ function native(stream: IncomeStreamMonth, amountMinor: number): string {
 .row-name {
   font-weight: 600;
   color: var(--kapa-ink);
-}
-
-.badges {
-  display: flex;
-  gap: var(--kapa-space-1);
-}
-
-.badge {
-  font-size: var(--kapa-text-caption-size);
-  font-weight: 600;
-  padding: 0 var(--kapa-space-2);
-  border-radius: var(--kapa-radius-sm);
-  background: var(--kapa-neutral-400);
-  color: var(--kapa-ink-muted);
-}
-
-.badge.muted {
-  background: transparent;
-  color: var(--kapa-ink-muted);
 }
 
 .row-total {
