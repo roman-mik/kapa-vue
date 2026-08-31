@@ -1,6 +1,7 @@
 import type { LedgerEvent, NegativeDayWarning } from '@roman-mik/kapa-core/horizon';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it } from 'vite-plus/test';
+import { formatFullDate } from '@/lib/date';
 import NegativeDayBanner from './NegativeDayBanner.vue';
 
 function fakeEvent(overrides: Partial<LedgerEvent> = {}): LedgerEvent {
@@ -40,7 +41,7 @@ describe('NegativeDayBanner', () => {
   it('renders the shortfall and the shift-payment fix suggestion', () => {
     const wrapper = mount(NegativeDayBanner, { props: { warnings: [shiftWarning] } });
     const text = wrapper.text();
-    expect(text).toContain('2026-09-02');
+    expect(text).toContain(formatFullDate('2026-09-02'));
     expect(text).toContain('Shift the Rent payment');
   });
 

@@ -18,6 +18,7 @@ import { usePlannedSpend } from '@/composables/usePlannedSpend';
 import { useToast } from '@/composables/useToast';
 import { buildMoneyOutBuckets, type MoneyOutRow } from '@/lib/horizon/moneyOut';
 import { formatMoney } from '@/lib/money';
+import { formatFullDate } from '@/lib/date';
 import { useSpaceStore } from '@/stores/space';
 
 const CADENCE_LABELS: Record<string, string> = {
@@ -462,7 +463,9 @@ const loadingInitial = computed(() => loading.value && !obligationsWithMonth.val
                       {{ row.direction === 'in' ? 'In' : 'Out' }}
                     </span>
                     <span class="badge">{{ row.categoryLabel }}</span>
-                    <span class="badge">{{ row.due }}</span>
+                    <span class="badge">{{
+                      row.dueDate ? formatFullDate(row.dueDate) : row.due
+                    }}</span>
                   </span>
                 </div>
 

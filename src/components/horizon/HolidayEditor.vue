@@ -6,6 +6,7 @@ import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import { categoryNameSchema, expenseDateSchema, firstIssueMessage } from '@/lib/validation';
+import { formatFullDate } from '@/lib/date';
 import { useSpaceStore } from '@/stores/space';
 
 const props = defineProps<{
@@ -71,7 +72,7 @@ async function onRemove(id: string): Promise<void> {
       <li v-for="holiday in holidays" :key="holiday.id" class="row">
         <div class="info">
           <span class="name">{{ holiday.name }}</span>
-          <span class="date">{{ holiday.date }}</span>
+          <span class="date">{{ formatFullDate(holiday.date) }}</span>
         </div>
         <BaseButton
           variant="ghost"

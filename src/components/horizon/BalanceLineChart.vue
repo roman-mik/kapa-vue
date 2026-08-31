@@ -6,6 +6,7 @@ import EventGlyph from './EventGlyph.vue';
 import { balanceDomain, balanceScaleY } from '@/lib/balanceScale';
 import { EVENT_GLYPHS } from '@/lib/eventGlyphs';
 import { formatMoney } from '@/lib/money';
+import { formatFullDate } from '@/lib/date';
 
 const props = defineProps<{
   days: ProjectionDay[];
@@ -115,7 +116,7 @@ const markers = computed<Marker[]>(() =>
         y: scaleY(e.balanceAfterMinor),
         shape: EVENT_GLYPHS[e.kind].shape,
         kind: e.kind,
-        tooltip: `${e.label}: ${formatMoney(e.amountMinor, props.currency)} on ${e.date}`,
+        tooltip: `${e.label}: ${formatMoney(e.amountMinor, props.currency)} on ${formatFullDate(e.date)}`,
         positive: e.amountMinor >= 0,
       };
     })

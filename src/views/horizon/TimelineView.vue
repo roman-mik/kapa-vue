@@ -13,6 +13,7 @@ import {
   type RangeMonths,
 } from '@/composables/useHorizonTimeline';
 import { formatMoney } from '@/lib/money';
+import { formatFullDate } from '@/lib/date';
 
 const { loading, error, rangeMonths, reportingCurrency, days, events, metrics, warnings, dismiss } =
   useHorizonTimeline();
@@ -108,7 +109,7 @@ function setRange(months: RangeMonths): void {
               <td>{{ month.month }}</td>
               <td>{{ formatMoney(month.endBalanceMinor, reportingCurrency) }}</td>
               <td>{{ formatMoney(month.minBalanceMinor, reportingCurrency) }}</td>
-              <td>{{ month.minBalanceDate }}</td>
+              <td>{{ formatFullDate(month.minBalanceDate) }}</td>
             </tr>
           </tbody>
         </table>
@@ -133,7 +134,7 @@ function setRange(months: RangeMonths): void {
           </thead>
           <tbody>
             <tr v-for="event in events" :key="`${event.date}-${event.sourceId}-${event.kind}`">
-              <td>{{ event.date }}</td>
+              <td>{{ formatFullDate(event.date) }}</td>
               <td>{{ event.kind }}</td>
               <td>{{ event.label }}</td>
               <td :class="`tone-${eventAmountTone(event.amountMinor)}`">

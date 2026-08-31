@@ -10,6 +10,7 @@ import StatBlock from '@/components/ui/StatBlock.vue';
 import { useAccounts } from '@/composables/useAccounts';
 import { useHorizonToday } from '@/composables/useHorizonToday';
 import { formatMoney } from '@/lib/money';
+import { formatFullDate } from '@/lib/date';
 
 const { accounts } = useAccounts();
 const {
@@ -73,7 +74,7 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
           <li v-for="event in nextEvents" :key="`${event.date}-${event.sourceId}`" class="row">
             <div class="row-info">
               <span class="row-name">{{ event.label }}</span>
-              <span class="note">{{ event.date }}</span>
+              <span class="note">{{ formatFullDate(event.date) }}</span>
             </div>
             <span class="amount" :class="`tone-${eventAmountTone(event.amountMinor)}`">
               {{ formatMoney(event.amountMinor, reportingCurrency) }}

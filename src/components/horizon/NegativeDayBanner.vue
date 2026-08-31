@@ -5,6 +5,7 @@ import { ref } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import { formatMoney } from '@/lib/money';
+import { formatFullDate } from '@/lib/date';
 
 const props = defineProps<{
   warnings: NegativeDayWarning[];
@@ -34,7 +35,7 @@ function submitDismiss(warning: NegativeDayWarning): void {
   <div v-if="props.warnings.length > 0" class="warnings" role="alert">
     <div v-for="warning in props.warnings" :key="warning.date" class="warning">
       <p class="message">
-        <strong>{{ warning.date }}</strong> goes
+        <strong>{{ formatFullDate(warning.date) }}</strong> goes
         {{ formatMoney(-warning.shortfallMinor, warning.currency as Currency) }} negative.
         {{ fixLabel(warning) }}.
       </p>

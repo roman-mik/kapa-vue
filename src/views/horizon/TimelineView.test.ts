@@ -5,6 +5,7 @@ import { ref } from 'vue';
 import BalanceLineChart from '@/components/horizon/BalanceLineChart.vue';
 import WaterfallChart from '@/components/horizon/WaterfallChart.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import { formatFullDate } from '@/lib/date';
 import TimelineView from './TimelineView.vue';
 
 const { useHorizonTimeline } = vi.hoisted(() => ({ useHorizonTimeline: vi.fn() }));
@@ -94,7 +95,7 @@ describe('TimelineView', () => {
 
     const row = wrapper.find('.month-table tbody tr');
     expect(row.text()).toContain('2026-09');
-    expect(row.text()).toContain('2026-09-02');
+    expect(row.text()).toContain(formatFullDate('2026-09-02'));
   });
 
   it('renders the event-detail table from the raw event ledger', () => {

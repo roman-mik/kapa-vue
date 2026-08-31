@@ -1,34 +1,15 @@
 <script setup lang="ts">
 import type { SchedulePreviewItem } from '@/lib/horizon/incomeEditor';
+import { formatFullDate } from '@/lib/date';
 
 const props = defineProps<{ items: SchedulePreviewItem[] }>();
-
-const MONTH_LABELS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
-function prettyDate(dateKey: string): string {
-  const [, month, day] = dateKey.split('-');
-  return `${MONTH_LABELS[Number(month) - 1]} ${Number(day)}`;
-}
 </script>
 
 <template>
   <ol v-if="props.items.length" class="preview" data-testid="schedule-preview">
     <li v-for="item in props.items" :key="item.date" class="date">
-      <span class="date-key">{{ prettyDate(item.date) }}</span>
-      <span v-if="item.shifted" class="shifted">was {{ prettyDate(item.originalDate!) }}</span>
+      <span class="date-key">{{ formatFullDate(item.date) }}</span>
+      <span v-if="item.shifted" class="shifted">{{ formatFullDate(item.originalDate!) }}</span>
       <span v-if="item.label" class="label">{{ item.label }}</span>
     </li>
   </ol>
@@ -60,6 +41,7 @@ function prettyDate(dateKey: string): string {
 
 .shifted {
   color: var(--kapa-ink-muted);
+  text-decoration: line-through;
 }
 
 .label {

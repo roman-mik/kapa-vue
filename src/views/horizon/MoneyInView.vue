@@ -16,27 +16,8 @@ import {
 } from '@/composables/useIncomeStreams';
 import { useToast } from '@/composables/useToast';
 import { formatMoney } from '@/lib/money';
+import { formatFullDate } from '@/lib/date';
 import { useSpaceStore } from '@/stores/space';
-
-const MONTH_LABELS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
-
-function prettyDate(dateKey: string): string {
-  const [, month, day] = dateKey.split('-');
-  return `${MONTH_LABELS[Number(month) - 1]} ${Number(day)}`;
-}
 
 const space = useSpaceStore();
 const spaceCurrency = computed<Currency>(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
@@ -212,10 +193,10 @@ function native(stream: IncomeStreamMonth, amountMinor: number): string {
             <ul v-if="stream.occurrences.length" class="payments">
               <li v-for="occurrence in stream.occurrences" :key="occurrence.date" class="payment">
                 <span class="payment-date">
-                  {{ prettyDate(occurrence.date) }}
-                  <span v-if="occurrence.shifted" class="shifted"
-                    >was {{ prettyDate(occurrence.originalDate!) }}</span
-                  >
+                  {{ formatFullDate(occurrence.date) }}
+                  <span v-if="occurrence.shifted" class="shifted">{{
+                    formatFullDate(occurrence.originalDate!)
+                  }}</span>
                 </span>
                 <span class="payment-amount">{{ native(stream, occurrence.amountMinor) }}</span>
                 <span class="payment-period">{{ occurrence.periodLabel }}</span>
@@ -366,6 +347,7 @@ function native(stream: IncomeStreamMonth, amountMinor: number): string {
 
 .shifted {
   color: var(--kapa-ink-muted);
+  text-decoration: line-through;
 }
 
 .payment-amount {
