@@ -1,19 +1,30 @@
 <script setup lang="ts">
-import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
+import {
+  CURRENCIES,
+  CURRENCY_EXPONENT,
+  zonedDateKey,
+  type Currency,
+} from '@roman-mik/kapa-core/pocket';
+import { type ScheduleCalendar } from '@roman-mik/kapa-core/horizon';
 import { OBLIGATION_CATEGORIES } from '@roman-mik/kapa-core/horizon';
-import { ref, watch } from 'vue';
-import type { Account } from '@roman-mik/kapa-core/horizon/queries';
+import { computed, ref, watch } from 'vue';
+import type { Account, ObligationWithSchedules } from '@roman-mik/kapa-core/horizon/queries';
 import {
   OBLIGATION_CATEGORY_LABELS,
   type NewObligation,
   type ObligationCategory,
+  type ObligationEdit,
 } from '@/composables/useObligations';
+import { obligationPreviewDates, schedulesToObligationRule } from '@/lib/horizon/obligationEditor';
+import type { SchedulePreviewItem } from '@/lib/horizon/incomeEditor';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
+import SchedulePreview from '@/components/horizon/SchedulePreview.vue';
 import { accountNameSchema, firstIssueMessage, positiveAmountSchema } from '@/lib/validation';
+import { useSpaceStore } from '@/stores/space';
 import { z } from 'zod';
 
 const props = defineProps<{
@@ -21,10 +32,17 @@ const props = defineProps<{
   spaceCurrency: Currency;
   /** 'YYYY-MM-DD' — the form's default start date. */
   defaultStartDate: string;
+  calendar: ScheduleCalendar;
+  /** When present the form edits this obligation instead of creating one. */
+  initial?: ObligationWithSchedules | null;
   save: (input: NewObligation) => Promise<void>;
+  update?: (input: ObligationEdit) => Promise<void>;
+  archive?: (id: string, updatedAt: string) => Promise<void>;
 }>();
 
-const emit = defineEmits<{ saved: [] }>();
+const emit = defineEmits<{ saved: []; cancelled: []; archived: [] }>();
+
+const isEdit = computed(() => !!props.initial);
 
 const name = ref('');
 const accountId = ref('');
@@ -33,6 +51,7 @@ const currency = ref<Currency>(props.spaceCurrency);
 const amount = ref('');
 const when = ref<'dayOfMonth' | 'monthEnd'>('dayOfMonth');
 const dueDay = ref('1');
+const startDate = ref(props.defaultStartDate);
 
 const saving = ref(false);
 const saveError = ref<string | null>(null);
@@ -51,8 +70,34 @@ function resetForm(): void {
   amount.value = '';
   when.value = 'dayOfMonth';
   dueDay.value = '1';
+  startDate.value = props.defaultStartDate;
   saveError.value = null;
 }
+
+// Edit mode loads the obligation's values into the form (immediate: the form
+// only mounts once the editingId row exists, so the obligation is already
+// fetched). The schedule round-trips onto the When/Due-day fields.
+watch(
+  () => props.initial,
+  (initial) => {
+    if (!initial) {
+      startDate.value = props.defaultStartDate;
+      return;
+    }
+    name.value = initial.name;
+    accountId.value = initial.account_id;
+    category.value = (initial.category as ObligationCategory) ?? 'housing';
+    currency.value = (initial.currency as Currency) ?? props.spaceCurrency;
+    const exponent = CURRENCY_EXPONENT[currency.value] ?? 2;
+    amount.value = String(initial.amount_minor / 10 ** exponent);
+    startDate.value = initial.start_date;
+    const rule = schedulesToObligationRule(initial.schedules);
+    when.value = rule.when;
+    dueDay.value = String(rule.dueDay);
+    saveError.value = null;
+  },
+  { immediate: true }
+);
 
 watch(
   () => props.spaceCurrency,
@@ -64,6 +109,24 @@ watch(
     if (!accountId.value && accounts.length) accountId.value = accounts[0].id;
   }
 );
+
+// The preview pins its window to today — only genuinely upcoming payments.
+const space = useSpaceStore();
+const fromKey = computed<string | null>(() => {
+  const start = props.initial?.start_date ?? props.defaultStartDate;
+  if (!start) return null;
+  const today = space.currentSpace ? zonedDateKey(new Date(), space.currentSpace.timezone) : '';
+  return today && today > start ? today : start;
+});
+
+const previewItems = computed<SchedulePreviewItem[]>(() => {
+  if (!fromKey.value) return [];
+  return obligationPreviewDates(
+    { when: when.value, dueDay: Number(dueDay.value) || 1 },
+    props.calendar,
+    fromKey.value
+  );
+});
 
 async function onSubmit(): Promise<void> {
   saveError.value = null;
@@ -89,22 +152,47 @@ async function onSubmit(): Promise<void> {
   }
   const exponent = CURRENCY_EXPONENT[currency.value];
 
+  const input: NewObligation = {
+    name: parsedName.data,
+    category: category.value,
+    currency: currency.value,
+    accountId: accountId.value,
+    startDate: startDate.value || props.defaultStartDate,
+    amountMinor: Math.round(parsedAmount.data * 10 ** exponent),
+    rule:
+      when.value === 'monthEnd' ? { kind: 'monthEnd' } : { kind: 'dayOfMonth', dayOfMonth: due },
+  };
+
   saving.value = true;
   try {
-    await props.save({
-      name: parsedName.data,
-      category: category.value,
-      currency: currency.value,
-      accountId: accountId.value,
-      startDate: props.defaultStartDate,
-      amountMinor: Math.round(parsedAmount.data * 10 ** exponent),
-      rule:
-        when.value === 'monthEnd' ? { kind: 'monthEnd' } : { kind: 'dayOfMonth', dayOfMonth: due },
-    });
+    if (props.initial && props.update) {
+      await props.update({
+        ...input,
+        id: props.initial.id,
+        updatedAt: props.initial.updated_at,
+      });
+    } else {
+      await props.save(input);
+    }
     resetForm();
     emit('saved');
   } catch (err) {
-    saveError.value = err instanceof Error ? err.message : "Couldn't add the obligation.";
+    saveError.value = err instanceof Error ? err.message : "Couldn't save the obligation.";
+  } finally {
+    saving.value = false;
+  }
+}
+
+async function onArchive(): Promise<void> {
+  if (!props.initial || !props.archive) return;
+  saveError.value = null;
+  saving.value = true;
+  try {
+    await props.archive(props.initial.id, props.initial.updated_at);
+    resetForm();
+    emit('archived');
+  } catch (err) {
+    saveError.value = err instanceof Error ? err.message : "Couldn't archive the obligation.";
   } finally {
     saving.value = false;
   }
@@ -113,7 +201,7 @@ async function onSubmit(): Promise<void> {
 
 <template>
   <BaseCard class="form-card">
-    <h2>Add obligation</h2>
+    <h2>{{ isEdit ? 'Edit obligation' : 'Add obligation' }}</h2>
     <form class="form" @submit.prevent="onSubmit">
       <div class="grid">
         <BaseField label="Name" v-slot="{ id }">
@@ -167,8 +255,35 @@ async function onSubmit(): Promise<void> {
         <BaseInput :id="id" v-model="dueDay" type="number" min="1" max="31" step="1" />
       </BaseField>
 
+      <div class="grid">
+        <BaseField label="Start date" v-slot="{ id }">
+          <BaseInput :id="id" v-model="startDate" type="date" />
+        </BaseField>
+      </div>
+
+      <div v-if="previewItems.length" class="preview-wrap">
+        <span class="preview-label">Payment preview</span>
+        <SchedulePreview :items="previewItems" />
+      </div>
+
       <div class="actions">
-        <BaseButton type="submit" :disabled="saving">
+        <template v-if="isEdit">
+          <BaseButton type="button" variant="danger" :disabled="saving" @click="onArchive">
+            {{ saving ? 'Working…' : 'Archive' }}
+          </BaseButton>
+          <BaseButton
+            type="button"
+            variant="secondary"
+            :disabled="saving"
+            @click="emit('cancelled')"
+          >
+            Cancel
+          </BaseButton>
+          <BaseButton type="submit" :disabled="saving">
+            {{ saving ? 'Saving…' : 'Save changes' }}
+          </BaseButton>
+        </template>
+        <BaseButton v-else type="submit" :disabled="saving">
           {{ saving ? 'Adding…' : 'Add obligation' }}
         </BaseButton>
       </div>
@@ -196,6 +311,20 @@ async function onSubmit(): Promise<void> {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--kapa-space-3);
+}
+
+.preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kapa-space-2);
+}
+
+.preview-label {
+  font-size: var(--kapa-text-caption-size);
+  font-weight: 600;
+  color: var(--kapa-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .actions {
