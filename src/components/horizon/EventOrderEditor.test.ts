@@ -1,10 +1,11 @@
 import { mount } from '@vue/test-utils';
+import type { EventOrder } from '@roman-mik/kapa-core/horizon/queries';
 import { describe, expect, it } from 'vite-plus/test';
 import EventOrderEditor from './EventOrderEditor.vue';
 
-const DEFAULT_ORDER = 'income,oneOffIn,obligation,plannedSpend,oneOffOut';
+const DEFAULT_ORDER: EventOrder = 'income,oneOffIn,obligation,plannedSpend,oneOffOut';
 
-function mountEditor(order: string = DEFAULT_ORDER) {
+function mountEditor(order: EventOrder = DEFAULT_ORDER) {
   return mount(EventOrderEditor, { props: { modelValue: order } });
 }
 

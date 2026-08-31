@@ -8,6 +8,7 @@ import BaseCard from '@/components/ui/BaseCard.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useHorizonSettings } from '@/composables/useHorizonSettings';
+import type { EventOrder } from '@roman-mik/kapa-core/horizon/queries';
 import type { Currency } from '@roman-mik/kapa-core/pocket';
 
 const {
@@ -25,7 +26,10 @@ const {
 } = useHorizonSettings();
 
 const spendMode = computed(() => settings.value?.spend_mode ?? 'cap');
-const eventOrder = computed(() => settings.value?.event_order);
+const DEFAULT_EVENT_ORDER: EventOrder = 'income,oneOffIn,obligation,plannedSpend,oneOffOut';
+const eventOrder = computed<EventOrder>(
+  () => (settings.value?.event_order as EventOrder) ?? DEFAULT_EVENT_ORDER
+);
 const reportingCurrency = computed<Currency>(
   () => (settings.value?.reporting_currency ?? 'RSD') as Currency
 );
@@ -46,10 +50,7 @@ const reportingCurrency = computed<Currency>(
       <section class="section">
         <BaseCard class="settings-card">
           <h2>Same-day event order</h2>
-          <EventOrderEditor
-            :model-value="eventOrder ?? 'income,oneOffIn,obligation,plannedSpend,oneOffOut'"
-            @update:model-value="saveEventOrder"
-          />
+          <EventOrderEditor :model-value="eventOrder" @update:model-value="saveEventOrder" />
         </BaseCard>
       </section>
 

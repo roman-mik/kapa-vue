@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import BaseCheckbox from '@/components/ui/BaseCheckbox.vue';
 import { computed } from 'vue';
 
 const props = defineProps<{
