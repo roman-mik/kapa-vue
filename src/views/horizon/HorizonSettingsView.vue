@@ -36,7 +36,7 @@ const reportingCurrency = computed<Currency>(
 </script>
 
 <template>
-  <main class="page">
+  <main class="page page--wide">
     <h1>Settings</h1>
 
     <template v-if="loading && !settings">
@@ -112,10 +112,6 @@ const reportingCurrency = computed<Currency>(
 </template>
 
 <style scoped>
-.page {
-  max-width: 44rem;
-}
-
 .error {
   color: var(--kapa-negative);
   margin: 0;
