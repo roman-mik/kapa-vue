@@ -1,7 +1,7 @@
 <script setup lang="ts">
 withDefaults(
   defineProps<{
-    variant?: 'confirmed' | 'expected' | 'uncertain' | 'in' | 'out' | 'neutral';
+    variant?: 'confirmed' | 'expected' | 'uncertain' | 'in' | 'out' | 'neutral' | 'excluded';
   }>(),
   { variant: 'neutral' }
 );
@@ -48,5 +48,10 @@ withDefaults(
 .badge-out {
   background: color-mix(in srgb, var(--kapa-negative) 20%, transparent);
   color: var(--kapa-negative);
+}
+
+.badge-excluded {
+  background: var(--kapa-neutral-200);
+  color: var(--kapa-ink-muted);
 }
 </style>

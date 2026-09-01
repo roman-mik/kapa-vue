@@ -15,7 +15,7 @@ describe('BaseBadge', () => {
   });
 
   it('applies each variant class', () => {
-    const variants = ['confirmed', 'expected', 'uncertain', 'in', 'out'] as const;
+    const variants = ['confirmed', 'expected', 'uncertain', 'in', 'out', 'excluded'] as const;
     for (const variant of variants) {
       const wrapper = mount(BaseBadge, {
         props: { variant },
