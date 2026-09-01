@@ -23,6 +23,7 @@ import { useToast } from '@/composables/useToast';
 import { useSessionStore } from '@/stores/session';
 import { useSpaceStore } from '@/stores/space';
 import { formatMoney } from '@/lib/money';
+import { formatFullDate } from '@/lib/date';
 import { swatchCssVar } from '@/lib/swatch';
 import { toExpenseAmount } from '@/lib/expenseAmount';
 import type { SwatchSlot } from '@roman-mik/kapa-core/theme';
@@ -172,19 +173,6 @@ interface DayGroup {
   unconverted: CurrencyBucket[];
 }
 
-// 'YYYY-MM-DD' parsed and reformatted via an explicit UTC anchor — the key
-// is a calendar date with no attached timezone, so letting the browser's
-// local zone interpret it could shift the displayed day.
-function formatDateHeading(dateKey: string): string {
-  const [year, month, day] = dateKey.split('-').map(Number);
-  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(undefined, {
-    timeZone: 'UTC',
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
-}
-
 const dayGroups = computed<DayGroup[]>(() => {
   const timeZone = space.currentSpace?.timezone;
   if (!timeZone) return [];
@@ -220,7 +208,7 @@ const dayGroups = computed<DayGroup[]>(() => {
             ? 'Today'
             : label === 'yesterday'
               ? 'Yesterday'
-              : formatDateHeading(dateKey),
+              : formatFullDate(dateKey),
         rows: dayRows,
         currency: spaceCurrency.value,
         total: dayTotal?.amountMinor ?? 0,

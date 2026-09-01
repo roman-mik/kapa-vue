@@ -1,4 +1,4 @@
-import { CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
+import { CURRENCY_EXPONENT, type Currency, type FxRate } from '@roman-mik/kapa-core/pocket';
 
 // The exponent (decimal places) comes from kapa-core so it can never drift
 // from the DB's currency check constraint. The Intl.NumberFormat call itself
@@ -13,4 +13,14 @@ export function formatMoney(amountMinor: number, currency: Currency): string {
     minimumFractionDigits: exponent,
     maximumFractionDigits: exponent,
   }).format(amount);
+}
+
+// The rate itself, not the money it prices — `€1.015 @ 117,2` names the
+// snapshot rate beside the native amount rather than implying live FX.
+export function formatRate(rate: FxRate): string {
+  const value = rate.rateE8 / 1e8;
+  return new Intl.NumberFormat(undefined, {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 2,
+  }).format(value);
 }

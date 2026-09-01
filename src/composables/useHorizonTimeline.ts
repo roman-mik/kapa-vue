@@ -17,6 +17,7 @@ import {
 import { zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';
+import { daysUnder, daysUnderPerMonth } from '@/lib/horizon/daysUnder';
 import { useSpaceStore } from '@/stores/space';
 
 export const RANGE_PRESETS = [1, 3, 6, 12] as const;
@@ -96,6 +97,9 @@ export function useHorizonTimeline() {
 
   const warnings = computed(() => allWarnings.value);
 
+  const daysUnderToday = computed(() => daysUnder(days.value));
+  const daysUnderByMonth = computed(() => daysUnderPerMonth(days.value));
+
   async function dismiss(date: string, reason: string): Promise<void> {
     const spaceId = space.currentSpaceId;
     const warning = allWarnings.value.find((w) => w.date === date);
@@ -119,6 +123,8 @@ export function useHorizonTimeline() {
     events,
     metrics,
     warnings,
+    daysUnderToday,
+    daysUnderByMonth,
     dismiss,
   };
 }

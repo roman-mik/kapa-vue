@@ -5,13 +5,20 @@ import { ref } from 'vue';
 import BalanceLineChart from '@/components/horizon/BalanceLineChart.vue';
 import WaterfallChart from '@/components/horizon/WaterfallChart.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import { formatFullMonth } from '@/lib/date';
 import TimelineView from './TimelineView.vue';
 
 const { useHorizonTimeline } = vi.hoisted(() => ({ useHorizonTimeline: vi.fn() }));
+const { useViewport } = vi.hoisted(() => ({ useViewport: vi.fn() }));
 
 vi.mock('@/composables/useHorizonTimeline', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/composables/useHorizonTimeline')>();
   return { ...actual, useHorizonTimeline };
+});
+
+vi.mock('@/composables/useViewport', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/composables/useViewport')>();
+  return { ...actual, useViewport };
 });
 
 function fakeEvent(overrides: Partial<LedgerEvent> = {}): LedgerEvent {
@@ -67,13 +74,19 @@ function baseComposable(overrides: Record<string, unknown> = {}): Record<string,
     events: ref([fakeEvent()]),
     metrics: ref(metrics),
     warnings: ref([]),
+    daysUnderByMonth: ref([{ month: '2026-09', daysUnder: 2 }]),
     dismiss: vi.fn(),
     ...overrides,
   };
 }
 
+function setDesktop(value: boolean): void {
+  useViewport.mockReturnValue({ isDesktop: ref(value) });
+}
+
 describe('TimelineView', () => {
   it('shows skeletons while loading with no data yet', () => {
+    setDesktop(false);
     useHorizonTimeline.mockReturnValue(
       baseComposable({ loading: ref(true), days: ref([]), events: ref([]), metrics: ref(null) })
     );
@@ -83,30 +96,70 @@ describe('TimelineView', () => {
   });
 
   it('shows the error message when the fetch fails', () => {
+    setDesktop(false);
     useHorizonTimeline.mockReturnValue(baseComposable({ error: ref('boom') }));
     const wrapper = mount(TimelineView);
     expect(wrapper.find('[role="alert"]').text()).toBe('boom');
   });
 
-  it('renders one month-summary row per MonthMetric, pairing end balance and minimum together', () => {
+  it('renders one day-by-day month block with the month header summary and event rows', () => {
+    setDesktop(false);
     useHorizonTimeline.mockReturnValue(baseComposable());
     const wrapper = mount(TimelineView);
 
-    const row = wrapper.find('.month-table tbody tr');
-    expect(row.text()).toContain('2026-09');
-    expect(row.text()).toContain('2026-09-02');
+    const month = wrapper.find('.month');
+    expect(month.find('.month-name').text()).toBe(formatFullMonth('2026-09'));
+    expect(month.find('.month-line').text()).toContain('on the 2');
+
+    const row = month.find('.row');
+    expect(row.text()).toContain('Rent');
+    expect(row.text()).toContain('50,000');
   });
 
-  it('renders the event-detail table from the raw event ledger', () => {
+  it('shows the days-under badge on a month that dips below zero', () => {
+    setDesktop(false);
+    useHorizonTimeline.mockReturnValue(baseComposable());
+    const wrapper = mount(TimelineView);
+    expect(wrapper.find('.under-badge').text()).toContain('2');
+  });
+
+  it('marks the global trough day with a lowest-point tag', () => {
+    setDesktop(false);
+    useHorizonTimeline.mockReturnValue(baseComposable());
+    const wrapper = mount(TimelineView);
+    expect(wrapper.find('.row.trough .trough-tag').text()).toBe('lowest point');
+  });
+
+  it('drops the waterfall toggle on a phone viewport, keeping the balance line', () => {
+    setDesktop(false);
     useHorizonTimeline.mockReturnValue(baseComposable());
     const wrapper = mount(TimelineView);
 
-    const row = wrapper.find('.event-table tbody tr');
-    expect(row.text()).toContain('Rent');
-    expect(row.text()).toContain('obligation');
+    expect(wrapper.findComponent(BalanceLineChart).exists()).toBe(true);
+    expect(wrapper.findComponent(WaterfallChart).exists()).toBe(false);
+    expect(wrapper.find('.view-toggle').exists()).toBe(false);
+  });
+
+  it('shows the right-column month summary and the waterfall toggle on desktop', async () => {
+    setDesktop(true);
+    useHorizonTimeline.mockReturnValue(baseComposable());
+    const wrapper = mount(TimelineView);
+
+    // Waterfall toggle appears on desktop.
+    expect(wrapper.find('.view-toggle').exists()).toBe(true);
+    const waterfallButton = wrapper.findAll('button').find((b) => b.text() === 'Waterfall');
+    await waterfallButton?.trigger('click');
+    expect(wrapper.findComponent(BalanceLineChart).exists()).toBe(false);
+    expect(wrapper.findComponent(WaterfallChart).exists()).toBe(true);
+
+    // Compact month-summary table sits in the right column.
+    const summary = wrapper.find('.page-side .month-table');
+    expect(summary.exists()).toBe(true);
+    expect(summary.text()).toContain(formatFullMonth('2026-09'));
   });
 
   it("passes warnings through to NegativeDayBanner and wires its dismiss emit to the composable's dismiss", async () => {
+    setDesktop(false);
     const dismiss = vi.fn();
     useHorizonTimeline.mockReturnValue(
       baseComposable({
@@ -123,23 +176,11 @@ describe('TimelineView', () => {
     );
     const wrapper = mount(TimelineView);
 
+    const quiet = wrapper.findAll('button').find((b) => b.text() === "It's fine");
+    await quiet!.trigger('click');
     await wrapper.find('input').setValue('will top up before then');
     await wrapper.find('form').trigger('submit');
 
     expect(dismiss).toHaveBeenCalledWith('2026-09-02', 'will top up before then');
-  });
-
-  it('switches between the balance-line and waterfall charts', async () => {
-    useHorizonTimeline.mockReturnValue(baseComposable());
-    const wrapper = mount(TimelineView);
-
-    expect(wrapper.findComponent(BalanceLineChart).exists()).toBe(true);
-    expect(wrapper.findComponent(WaterfallChart).exists()).toBe(false);
-
-    const waterfallButton = wrapper.findAll('button').find((b) => b.text() === 'Waterfall');
-    await waterfallButton?.trigger('click');
-
-    expect(wrapper.findComponent(BalanceLineChart).exists()).toBe(false);
-    expect(wrapper.findComponent(WaterfallChart).exists()).toBe(true);
   });
 });

@@ -110,6 +110,59 @@ textarea {
   padding: var(--kapa-space-6) var(--kapa-space-4) var(--kapa-space-5);
 }
 
+/* Widened desktop page — opt-in per view. No effect below the lg (760px)
+ * breakpoint; the base .page stays the single mechanism otherwise. */
+.page--wide {
+  max-width: 1240px;
+}
+
+/* Two-column desktop layout — main column + narrow right "side" column.
+ * The columns are direct children of .page--with-rail per view markup; the
+ * grid collapses to one column below lg (760px). */
+.page--with-rail {
+  max-width: 1240px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: var(--kapa-space-5);
+  align-items: start;
+  width: 100%;
+}
+
+@media (max-width: 760px) {
+  .page--with-rail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Shared row of badges — used by MoneyInView/MoneyOutView to lay out a run
+ * of BaseBadge pills. Shared so the wrapper isn't re-declared per view. */
+.badges {
+  display: flex;
+  gap: var(--kapa-space-1);
+}
+
+/* Bottom tab-bar shell shared by Pocket's BottomTabBar and Horizon's
+ * HorizonTabBar. Sticky at the end of #app's flex column (not fixed) so the
+ * bar tracks the visual viewport while a mobile browser's address bar
+ * animates — see the fuller note in BottomTabBar.vue. */
+.tabbar-shell {
+  position: sticky;
+  bottom: 0;
+  z-index: 40;
+  flex-shrink: 0;
+}
+
+/* Shared 5-column tab-bar grid with the safe-area bottom allowance. Each bar
+ * overrides tab-button styling locally; this is just the bar's own frame. */
+.tabbar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  min-height: var(--kapa-layout-tab-bar-height);
+  background: var(--kapa-surface);
+  border-top: 1px solid var(--kapa-neutral-400);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* OfflineBanner and AppHeader both add env(safe-area-inset-top) so the
  * device's notch/status-bar padding isn't lost above whichever renders
  * first. When both are showing that double-counts the inset, so drop it

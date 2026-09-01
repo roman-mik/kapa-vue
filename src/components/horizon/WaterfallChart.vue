@@ -6,6 +6,7 @@ import EventGlyph from './EventGlyph.vue';
 import { balanceDomain, balanceScaleY } from '@/lib/balanceScale';
 import { EVENT_GLYPHS } from '@/lib/eventGlyphs';
 import { formatMoney } from '@/lib/money';
+import { formatFullDate } from '@/lib/date';
 
 const props = defineProps<{
   events: LedgerEvent[];
@@ -138,7 +139,7 @@ const bars = computed<Bar[]>(() =>
       shape: EVENT_GLYPHS[b.kind].shape,
       kind: b.kind,
       positive: b.amountMinor >= 0,
-      tooltip: `${b.label}: ${formatMoney(b.amountMinor, props.currency)} on ${b.date}`,
+      tooltip: `${b.label}: ${formatMoney(b.amountMinor, props.currency)} on ${formatFullDate(b.date)}`,
       amountText: formatMoney(b.amountMinor, props.currency),
     };
   })

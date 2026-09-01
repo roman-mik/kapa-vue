@@ -1,28 +1,56 @@
 <script setup lang="ts">
 import HorizonRail from '@/components/horizon/HorizonRail.vue';
-import TodayView from '@/views/horizon/TodayView.vue';
+import HorizonTabBar from '@/components/horizon/HorizonTabBar.vue';
+import EntrySheet from '@/components/horizon/EntrySheet.vue';
 import { useViewport } from '@/composables/useViewport';
+import { useEntrySheet } from '@/composables/useEntrySheet';
 
-// The mobile/desktop split is the point of H1: on a narrow viewport the
-// only reachable Horizon screen is Today; on desktop the full rail appears.
+// The mobile/desktop split is the point of H1: on a desktop the full rail
+// appears; on a narrow viewport the phone bottom tab bar drives navigation.
 // useViewport reacts to the lg breakpoint, so crossing it live swaps the
-// shell without a reload.
+// shell without a reload. Both branches render <router-view> — a phone must
+// reach every /horizon route, not just Today (the pre-redesign bug dropped
+// it in the mobile branch).
 const { isDesktop } = useViewport();
+
+// One <EntrySheet> mounted here (task 11), shared by the phone tab bar's
+// [+] and every Money view's desktop "Add" trigger via useEntrySheet().
+const entrySheet = useEntrySheet();
 </script>
 
 <template>
-  <div v-if="isDesktop" class="shell">
-    <HorizonRail />
-    <main class="content">
-      <router-view />
-    </main>
-  </div>
-  <TodayView v-else />
+  <template v-if="isDesktop">
+    <div class="shell">
+      <HorizonRail />
+      <main class="content">
+        <router-view />
+      </main>
+    </div>
+  </template>
+  <template v-else>
+    <div class="phone-shell">
+      <main class="content">
+        <router-view />
+      </main>
+      <HorizonTabBar />
+    </div>
+  </template>
+  <EntrySheet
+    :open="entrySheet.isOpen.value"
+    :default-side="entrySheet.defaultSide.value"
+    @close="entrySheet.close()"
+  />
 </template>
 
 <style scoped>
 .shell {
   display: flex;
+  min-height: 100dvh;
+}
+
+.phone-shell {
+  display: flex;
+  flex-direction: column;
   min-height: 100dvh;
 }
 

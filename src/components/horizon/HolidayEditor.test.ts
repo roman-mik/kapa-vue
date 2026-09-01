@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
+import { formatFullDate } from '@/lib/date';
 import HolidayEditor from './HolidayEditor.vue';
 
 function fakeHoliday(overrides: Record<string, unknown> = {}) {
@@ -42,15 +43,12 @@ describe('HolidayEditor', () => {
   it('renders the existing holidays with a remove button', async () => {
     const { wrapper } = await mountEditor();
     expect(wrapper.text()).toContain("New Year's Day");
-    expect(wrapper.text()).toContain('2026-09-01');
+    expect(wrapper.text()).toContain(formatFullDate('2026-09-01'));
   });
 
-  it('emits remove for a holiday when its Remove button is clicked', async () => {
+  it('emits remove for a holiday when its remove control is clicked', async () => {
     const { wrapper, remove } = await mountEditor();
-    await wrapper
-      .findAll('button')
-      .find((b) => b.text() === 'Remove')!
-      .trigger('click');
+    await wrapper.find('[aria-label="Remove holiday"]').trigger('click');
     await flushPromises();
     expect(remove).toHaveBeenCalledWith('h1');
   });
