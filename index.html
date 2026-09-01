@@ -40,6 +40,13 @@
         var stored = localStorage.getItem('kapa-theme');
         var theme = ids.indexOf(stored) !== -1 ? stored : ids[0];
         document.documentElement.setAttribute('data-theme', theme);
+
+        // Night is a separate, local-only stopgap (src/lib/nightMode.ts) —
+        // not one of the ids above — so it gets its own attribute and its
+        // own pre-paint read to avoid the same flash-of-wrong-theme.
+        if (localStorage.getItem('kapa-night-mode') === 'true') {
+          document.documentElement.setAttribute('data-night', 'true');
+        }
       })();
     </script>
   </head>
