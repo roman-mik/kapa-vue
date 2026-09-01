@@ -17,6 +17,7 @@ import { getCap } from '@roman-mik/kapa-core/pocket/queries';
 import { zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';
+import { daysUnder } from '@/lib/horizon/daysUnder';
 import { useSpaceStore } from '@/stores/space';
 
 const DEFAULT_HORIZON_DAYS = 90;
@@ -44,6 +45,7 @@ export function useHorizonToday() {
   const monthMin = ref<MonthMin | null>(null);
   const nextEvents = ref<LedgerEvent[]>([]);
   const allWarnings = ref<NegativeDayWarning[]>([]);
+  const daysUnderCount = ref(0);
 
   async function refresh(): Promise<void> {
     const currentSpace = space.currentSpace;
@@ -52,6 +54,7 @@ export function useHorizonToday() {
       monthMin.value = null;
       nextEvents.value = [];
       allWarnings.value = [];
+      daysUnderCount.value = 0;
       capMinor.value = null;
       return;
     }
@@ -88,6 +91,7 @@ export function useHorizonToday() {
         : null;
 
       nextEvents.value = projection.value.events.filter((e) => e.date >= todayKey).slice(0, 3);
+      daysUnderCount.value = daysUnder(projection.value.days);
 
       allWarnings.value = computeNegativeDayWarnings(
         projection.value.days,
@@ -132,6 +136,7 @@ export function useHorizonToday() {
     monthMin,
     nextEvents,
     warnings,
+    daysUnderCount,
     dismiss,
   };
 }
