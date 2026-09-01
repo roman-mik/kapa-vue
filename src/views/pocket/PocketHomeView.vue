@@ -9,15 +9,18 @@ import BaseCard from '@/components/ui/BaseCard.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import CapProgressCard from '@/components/pocket/CapProgressCard.vue';
+import CategoryShareBar from '@/components/pocket/CategoryShareBar.vue';
 import DailySpendChart from '@/components/pocket/DailySpendChart.vue';
 import ExpenseRowMenu from '@/components/pocket/ExpenseRowMenu.vue';
 import type { RowMenuAction } from '@/components/pocket/expenseRowMenu';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
+import { usePocketEntrySheet } from '@/composables/usePocketEntrySheet';
 import { usePocketHome } from '@/composables/usePocketHome';
 import { useConvertedExpenses } from '@/composables/useConvertedExpenses';
 import { useCategories } from '@/composables/useCategories';
 import { useExpenses } from '@/composables/useExpenses';
 import { useToast } from '@/composables/useToast';
+import { categorySharePct } from '@/lib/categoryShare';
 import { formatMoney } from '@/lib/money';
 import { swatchCssVar } from '@/lib/swatch';
 
@@ -27,7 +30,8 @@ const todayExpenses = computed(() => summary.value?.todayExpenses ?? []);
 const { isForeign, convertedMinor } = useConvertedExpenses(todayExpenses, rates);
 const router = useRouter();
 const toast = useToast();
-const { duplicate, remove } = useExpenses();
+const entrySheet = usePocketEntrySheet();
+const { remove } = useExpenses();
 
 function categoryName(categoryId: string | null): string {
   if (categoryId === null) return 'Uncategorized';
@@ -47,10 +51,6 @@ const capMinor = computed(() =>
   summary.value ? summary.value.spent + summary.value.remaining : 0
 );
 
-function categorySharePct(spent: number): number {
-  return capMinor.value > 0 ? Math.min((spent / capMinor.value) * 100, 100) : 0;
-}
-
 const rowMenuActions: RowMenuAction[] = [
   { id: 'edit', label: 'Edit', kind: 'action' },
   { id: 'duplicate', label: 'Duplicate', kind: 'action' },
@@ -61,7 +61,7 @@ function onRowMenuSelect(row: ExpenseView, id: string): void {
   if (id === 'edit') {
     router.push({ name: 'pocket-edit', params: { id: row.id } });
   } else if (id === 'duplicate') {
-    void onDuplicate(row);
+    onDuplicate(row);
   }
 }
 
@@ -69,14 +69,15 @@ function onRowMenuConfirm(row: ExpenseView, id: string): void {
   if (id === 'delete') void onDelete(row);
 }
 
-async function onDuplicate(row: ExpenseView): Promise<void> {
-  try {
-    await duplicate(row);
-    toast.success('Expense duplicated');
-  } catch (err) {
-    toast.error(err instanceof Error ? err.message : "Couldn't duplicate that expense.");
-  }
-  await refresh();
+function onDuplicate(row: ExpenseView): void {
+  entrySheet.open({
+    prefill: {
+      amountMinor: row.amount_minor ?? 0,
+      currency: (row.currency ?? 'RSD') as Currency,
+      categoryId: row.category_id,
+      note: row.note,
+    },
+  });
 }
 
 async function onDelete(row: ExpenseView): Promise<void> {
@@ -198,8 +199,8 @@ async function onDelete(row: ExpenseView): Promise<void> {
                 <span>{{ categoryName(row.categoryId) }}</span>
                 <span class="money-amount">{{ formatMoney(row.spent, summary.currency) }}</span>
               </div>
-              <div class="mini-bar">
-                <div class="mini-bar-fill" :style="{ width: `${categorySharePct(row.spent)}%` }" />
+              <div class="bar-wrap">
+                <CategoryShareBar :percent="categorySharePct(row.spent, capMinor)" />
               </div>
             </li>
           </ul>
@@ -259,18 +260,8 @@ async function onDelete(row: ExpenseView): Promise<void> {
   font-size: var(--kapa-text-caption-size);
 }
 
-.mini-bar {
+.bar-wrap {
   margin-top: var(--kapa-space-1);
-  height: 6px;
-  border-radius: 999px;
-  background: var(--kapa-neutral-300);
-  overflow: hidden;
-}
-
-.mini-bar-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--kapa-accent);
 }
 
 .today-list {
