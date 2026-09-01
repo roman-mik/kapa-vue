@@ -9,7 +9,7 @@ const tabs = [
 </script>
 
 <template>
-  <div class="shell">
+  <div class="tabbar-shell">
     <nav class="tabbar">
       <router-link
         v-for="tab in tabs"
@@ -93,26 +93,9 @@ const tabs = [
 </template>
 
 <style scoped>
-/* sticky, not fixed, and a real flex item (see #app/.app-main in
- * main.css) — fixed positioning lags the visual viewport on mobile
- * browsers while the address bar is animating, leaving a gap under the
- * bar; sticky at the end of a full-height column doesn't. */
-.shell {
-  position: sticky;
-  bottom: 0;
-  z-index: 40;
-  flex-shrink: 0;
-}
-
-.tabbar {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  min-height: var(--kapa-layout-tab-bar-height);
-  background: var(--kapa-surface);
-  border-top: 1px solid var(--kapa-neutral-400);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-}
-
+/* The sticky shell and the 5-column grid (`.tabbar-shell` / `.tabbar`) live
+ * in main.css, shared with HorizonTabBar. What's local here is the button
+ * anatomy: glyph + label stacking, the circular Add, and the active tint. */
 .tab {
   display: flex;
   flex-direction: column;

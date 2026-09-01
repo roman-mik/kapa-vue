@@ -141,6 +141,28 @@ textarea {
   gap: var(--kapa-space-1);
 }
 
+/* Bottom tab-bar shell shared by Pocket's BottomTabBar and Horizon's
+ * HorizonTabBar. Sticky at the end of #app's flex column (not fixed) so the
+ * bar tracks the visual viewport while a mobile browser's address bar
+ * animates — see the fuller note in BottomTabBar.vue. */
+.tabbar-shell {
+  position: sticky;
+  bottom: 0;
+  z-index: 40;
+  flex-shrink: 0;
+}
+
+/* Shared 5-column tab-bar grid with the safe-area bottom allowance. Each bar
+ * overrides tab-button styling locally; this is just the bar's own frame. */
+.tabbar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  min-height: var(--kapa-layout-tab-bar-height);
+  background: var(--kapa-surface);
+  border-top: 1px solid var(--kapa-neutral-400);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* OfflineBanner and AppHeader both add env(safe-area-inset-top) so the
  * device's notch/status-bar padding isn't lost above whichever renders
  * first. When both are showing that double-counts the inset, so drop it
