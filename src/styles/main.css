@@ -1,5 +1,62 @@
 @import './theme-vars.css';
 
+/* Night — hand-authored dark-theme stopgap (src/lib/nightMode.ts). Not part
+ * of theme-vars.css (generated from @roman-mik/kapa-core/theme, which has no
+ * 'night' id yet) and not a `[data-theme="..."]` value — a separate
+ * `[data-night="true"]` attribute so it layers on top of whichever of
+ * sand/moss is active rather than replacing it. Mirrors every custom
+ * property theme-vars.css's sand/moss blocks define, so any component
+ * reading a --kapa-* token gets a value either way. Warm dark-neutral by
+ * design (not near-black) — retire once kapa-core ships a real Night
+ * definition and this can become a normal `[data-theme="night"]` block. */
+[data-night='true'] {
+  color-scheme: dark;
+  --kapa-bg: #211b15;
+  --kapa-surface: #2c2419;
+  --kapa-ink: #f3e9d6;
+  --kapa-ink-muted: #cbbc9f;
+  --kapa-ink-subtle: #9c8b70;
+  --kapa-neutral-100: #1c1712;
+  --kapa-neutral-200: #241d16;
+  --kapa-neutral-300: #362c21;
+  --kapa-neutral-400: #4c3f2d;
+  --kapa-neutral-500: #6c5c46;
+  --kapa-neutral-600: #8d7b60;
+  --kapa-neutral-700: #ab9880;
+  --kapa-neutral-800: #cabaa0;
+  --kapa-neutral-900: #ece0c9;
+  --kapa-accent: #d9834f;
+  --kapa-accent-100: #2c1b10;
+  --kapa-accent-200: #3f2716;
+  --kapa-accent-300: #59371e;
+  --kapa-accent-400: #7a4b29;
+  --kapa-accent-500: #a06238;
+  --kapa-accent-600: #c67c48;
+  --kapa-accent-700: #dd9865;
+  --kapa-accent-800: #eebb92;
+  --kapa-accent-900: #f8d9bc;
+  --kapa-positive: #9db97e;
+  --kapa-positive-100: #1e2814;
+  --kapa-positive-200: #283519;
+  --kapa-positive-300: #384a22;
+  --kapa-positive-400: #4d632e;
+  --kapa-positive-500: #6d8449;
+  --kapa-positive-600: #8da868;
+  --kapa-positive-700: #aec78c;
+  --kapa-positive-800: #cfe0b3;
+  --kapa-positive-900: #e9f2d9;
+  --kapa-negative: #dd7767;
+  --kapa-white: #ffffff;
+  --kapa-swatch-1: #d9825f;
+  --kapa-swatch-2: #dba64a;
+  --kapa-swatch-3: #a3b262;
+  --kapa-swatch-4: #6bab86;
+  --kapa-swatch-5: #5aa0af;
+  --kapa-swatch-6: #6f92c4;
+  --kapa-swatch-7: #a186c4;
+  --kapa-swatch-8: #c081a8;
+}
+
 :root {
   color-scheme: light;
   --font-body: 'Figtree', system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -161,6 +218,18 @@ textarea {
   background: var(--kapa-surface);
   border-top: 1px solid var(--kapa-neutral-400);
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Shared bold/tabular money figure — replaces each view's own `.amount`/
+ * `.negative` weight-and-figure rule. `--negative` is a colour-only add-on;
+ * combine both classes for a negative amount. */
+.money-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.money-amount--negative {
+  color: var(--kapa-negative);
 }
 
 /* OfflineBanner and AppHeader both add env(safe-area-inset-top) so the

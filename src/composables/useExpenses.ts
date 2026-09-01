@@ -7,6 +7,7 @@ import type {
 import {
   addExpense,
   deleteExpense,
+  getExpense,
   listExpensesInRange,
   updateExpense,
 } from '@roman-mik/kapa-core/pocket/queries';
@@ -91,5 +92,15 @@ export function useExpenses() {
     return outcome;
   }
 
-  return { expenses, loading, error, refresh, add, update, remove };
+  // Deep-link Edit can target an expense outside the current month window
+  // (e.g. after a month rollover) — falls back to a direct fetch only when
+  // the already-loaded month-scoped list doesn't have it, rather than
+  // widening `refresh()`'s range for every caller.
+  async function getById(expenseId: string): Promise<ExpenseView | null> {
+    const cached = expenses.value.find((e) => e.id === expenseId);
+    if (cached) return cached;
+    return getExpense(supabase, expenseId);
+  }
+
+  return { expenses, loading, error, refresh, add, update, remove, getById };
 }

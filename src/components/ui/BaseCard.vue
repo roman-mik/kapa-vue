@@ -16,6 +16,7 @@ withDefaults(
 <style scoped>
 .card {
   background: var(--kapa-surface);
+  border: 1px solid var(--kapa-neutral-400);
   border-radius: var(--kapa-radius-md);
   box-shadow: var(--kapa-shadow-sm);
 }
