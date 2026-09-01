@@ -4,12 +4,7 @@
 // /pocket/edit/:id is bookmarkable/shareable on its own, rendering the same
 // ExpenseEntryForm inside a dialog since a direct link has no row to expand
 // into.
-import {
-  CURRENCY_EXPONENT,
-  type Currency,
-  dateKeyStartUtc,
-  zonedDateKey,
-} from '@roman-mik/kapa-core/pocket';
+import { type Currency, dateKeyStartUtc, zonedDateKey } from '@roman-mik/kapa-core/pocket';
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
