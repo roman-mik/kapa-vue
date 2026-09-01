@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import HorizonRail from '@/components/horizon/HorizonRail.vue';
 import HorizonTabBar from '@/components/horizon/HorizonTabBar.vue';
+import EntrySheet from '@/components/horizon/EntrySheet.vue';
 import { useViewport } from '@/composables/useViewport';
+import { useEntrySheet } from '@/composables/useEntrySheet';
 
 // The mobile/desktop split is the point of H1: on a desktop the full rail
 // appears; on a narrow viewport the phone bottom tab bar drives navigation.
@@ -10,6 +12,10 @@ import { useViewport } from '@/composables/useViewport';
 // reach every /horizon route, not just Today (the pre-redesign bug dropped
 // it in the mobile branch).
 const { isDesktop } = useViewport();
+
+// One <EntrySheet> mounted here (task 11), shared by the phone tab bar's
+// [+] and every Money view's desktop "Add" trigger via useEntrySheet().
+const entrySheet = useEntrySheet();
 </script>
 
 <template>
@@ -29,6 +35,11 @@ const { isDesktop } = useViewport();
       <HorizonTabBar />
     </div>
   </template>
+  <EntrySheet
+    :open="entrySheet.isOpen.value"
+    :default-side="entrySheet.defaultSide.value"
+    @close="entrySheet.close()"
+  />
 </template>
 
 <style scoped>

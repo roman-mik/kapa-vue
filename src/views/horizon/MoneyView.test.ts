@@ -4,6 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { ref } from 'vue';
 import { useSpaceStore } from '@/stores/space';
+import { useEntrySheet } from '@/composables/useEntrySheet';
 import MoneyView from './MoneyView.vue';
 import MoneyInView from './MoneyInView.vue';
 import MoneyOutView from './MoneyOutView.vue';
@@ -330,6 +331,22 @@ describe('MoneyView — side derivation and toggle', () => {
 });
 
 describe('MoneyInView', () => {
+  it('shows an "Add" trigger on desktop that opens the entry sheet defaulting to In', async () => {
+    useEntrySheet().close();
+    const wrapper = mount(MoneyInView, { props: { isDesktop: true } });
+    const addButton = wrapper.findAll('button').find((b) => b.text() === 'Add');
+    expect(addButton).toBeTruthy();
+    await addButton!.trigger('click');
+    const sheet = useEntrySheet();
+    expect(sheet.isOpen.value).toBe(true);
+    expect(sheet.defaultSide.value).toBe('in');
+  });
+
+  it('hides the "Add" trigger on phone', () => {
+    const wrapper = mount(MoneyInView, { props: { isDesktop: false } });
+    expect(wrapper.findAll('button').find((b) => b.text() === 'Add')).toBeUndefined();
+  });
+
   it('filters streams by kind', async () => {
     const wrapper = mount(MoneyInView);
     expect(wrapper.text()).toContain('Salary');
@@ -401,6 +418,17 @@ describe('MoneyInView', () => {
 });
 
 describe('MoneyOutView', () => {
+  it('shows an "Add" trigger on desktop that opens the entry sheet defaulting to Out', async () => {
+    useEntrySheet().close();
+    const wrapper = mount(MoneyOutView, { props: { isDesktop: true } });
+    const addButton = wrapper.findAll('button').find((b) => b.text() === 'Add');
+    expect(addButton).toBeTruthy();
+    await addButton!.trigger('click');
+    const sheet = useEntrySheet();
+    expect(sheet.isOpen.value).toBe(true);
+    expect(sheet.defaultSide.value).toBe('out');
+  });
+
   it('filters the merged list by kind', async () => {
     const wrapper = mount(MoneyOutView);
     expect(wrapper.text()).toContain('Rent');

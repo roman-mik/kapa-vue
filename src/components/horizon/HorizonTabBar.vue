@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router';
 import { computed } from 'vue';
+import { useEntrySheet } from '@/composables/useEntrySheet';
 
 // Five tabs per HorizonTabs.dc.html: Today · Timeline · [ + ] · Money ·
 // Settings. Money is a single tab that also highlights on the two desktop
 // money routes; Accounts is deliberately absent from phone nav (reachable via
-// Today's account chips). The centre [ + ] is the circular add button — this
-// task ships it render-only; the entry sheet that opens it lands in task 11.
+// Today's account chips). The centre [ + ] is the circular add button,
+// opening the shared entry sheet mounted once in HorizonLayout.vue.
 const navTabs = [
   { key: 'today', label: 'Today', to: { name: 'horizon-today' } },
   { key: 'timeline', label: 'Timeline', to: { name: 'horizon-timeline' } },
@@ -24,6 +25,15 @@ const activeTab = computed(() => {
   if (MONEY_ROUTES.has(name)) return 'money';
   return navTabs.find((t) => t.to.name === name)?.key ?? null;
 });
+
+const entrySheet = useEntrySheet();
+
+// Default side: infer from ?side= on the phone Money route (for symmetry
+// with the desktop "Add" buttons' route-fixed default), otherwise 'out'.
+function openEntrySheet(): void {
+  const side = route.name === 'horizon-money' && route.query.side === 'in' ? 'in' : 'out';
+  entrySheet.open(side);
+}
 </script>
 
 <template>
@@ -91,7 +101,7 @@ const activeTab = computed(() => {
         </span>
         <span class="label">{{ tab.label }}</span>
       </router-link>
-      <button class="tab add" type="button" aria-label="Add money event">
+      <button class="tab add" type="button" aria-label="Add money event" @click="openEntrySheet">
         <span class="glyph add-glyph"></span>
       </button>
     </nav>

@@ -1,14 +1,7 @@
 <script setup lang="ts">
-import {
-  type Currency,
-  type CurrencyBucket,
-  type FxRate,
-  zonedDateKey,
-} from '@roman-mik/kapa-core/pocket';
+import { type Currency, type CurrencyBucket, type FxRate } from '@roman-mik/kapa-core/pocket';
 import { type ScheduleCalendar } from '@roman-mik/kapa-core/horizon';
 import { computed, ref } from 'vue';
-import ObligationForm from '@/components/horizon/ObligationForm.vue';
-import OneOffEventForm from '@/components/horizon/OneOffEventForm.vue';
 import PlannedSpendForm from '@/components/horizon/PlannedSpendForm.vue';
 import RowEditor, { type RowEditorEntry } from '@/components/horizon/RowEditor.vue';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
@@ -20,6 +13,7 @@ import BaseCard from '@/components/ui/BaseCard.vue';
 import { useAccounts } from '@/composables/useAccounts';
 import { useCategories } from '@/composables/useCategories';
 import { useConvertedAmount } from '@/composables/useConvertedAmount';
+import { useEntrySheet } from '@/composables/useEntrySheet';
 import { OBLIGATION_CATEGORY_LABELS, useObligations } from '@/composables/useObligations';
 import { ONE_OFF_CATEGORY_LABELS, useOneOffEvents } from '@/composables/useOneOffEvents';
 import { usePlannedSpend } from '@/composables/usePlannedSpend';
@@ -47,7 +41,6 @@ const {
   month,
   loading,
   error,
-  add,
   update: updateObligation,
   archive: archiveObligation,
 } = useObligations();
@@ -60,7 +53,6 @@ const {
   convertibles: oneOffConvertibles,
   loading: oneOffsLoading,
   error: oneOffsError,
-  add: addOneOff,
   update: updateOneOff,
   remove: removeOneOff,
 } = useOneOffEvents();
@@ -86,10 +78,6 @@ function categoryName(categoryId: string | null): string {
   if (!categoryId) return 'Uncategorized';
   return categories.value.find((c) => c.id === categoryId)?.name ?? 'Uncategorized';
 }
-
-const defaultOneOffDate = computed(() =>
-  space.currentSpace ? zonedDateKey(new Date(), space.currentSpace.timezone) : ''
-);
 
 const monthLabel = computed(() => (month.value ? formatFullMonth(month.value) : ''));
 
@@ -305,12 +293,7 @@ const byKind = computed(() => {
 });
 
 const toast = useToast();
-
-function onSaved(kind: 'obligation' | 'oneOff' | 'planned'): void {
-  const label =
-    kind === 'obligation' ? 'Obligation' : kind === 'oneOff' ? 'One-off' : 'Planned spend';
-  toast.success(`${label} added`);
-}
+const entrySheet = useEntrySheet();
 
 // --- Obligation edit state ---
 const editingObligationId = ref<string | null>(null);
@@ -399,7 +382,18 @@ function oneOffEntry(row: MoneyOutRow): RowEditorEntry | null {
   <main class="page page--with-rail">
     <div class="page-main">
       <div class="heading-row">
-        <h1>Money</h1>
+        <div class="heading-left">
+          <h1>Money</h1>
+          <BaseButton
+            v-if="props.isDesktop"
+            type="button"
+            variant="secondary"
+            class="add-trigger"
+            @click="entrySheet.open('out')"
+          >
+            Add
+          </BaseButton>
+        </div>
         <span class="hero-amount tone-negative">{{ formatMoney(totalMinor, spaceCurrency) }}</span>
       </div>
 
@@ -427,32 +421,6 @@ function oneOffEntry(row: MoneyOutRow): RowEditorEntry | null {
       <p v-else-if="error" role="alert" class="error">{{ error }}</p>
 
       <template v-else>
-        <ObligationForm
-          :accounts="accounts.filter((a) => !a.archived)"
-          :space-currency="spaceCurrency"
-          :default-start-date="month ? `${month}-01` : ''"
-          :calendar="calendar"
-          :save="add"
-          @saved="onSaved('obligation')"
-        />
-
-        <OneOffEventForm
-          :accounts="accounts.filter((a) => !a.archived)"
-          :space-currency="spaceCurrency"
-          :default-date="defaultOneOffDate"
-          :save="addOneOff"
-          @saved="onSaved('oneOff')"
-        />
-
-        <PlannedSpendForm
-          :accounts="accounts.filter((a) => !a.archived)"
-          :categories="categories"
-          :space-currency="spaceCurrency"
-          :default-start-date="month ? `${month}-01` : ''"
-          :save="addPlannedSpend"
-          @saved="onSaved('planned')"
-        />
-
         <template
           v-if="
             plannedSpendLoading &&
@@ -610,6 +578,12 @@ function oneOffEntry(row: MoneyOutRow): RowEditorEntry | null {
 
 .heading-row h1 {
   margin: 0;
+}
+
+.heading-left {
+  display: flex;
+  align-items: baseline;
+  gap: var(--kapa-space-3);
 }
 
 .hero-amount {

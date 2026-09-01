@@ -11,6 +11,7 @@ import BaseBadge from '@/components/ui/BaseBadge.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import { useAccounts } from '@/composables/useAccounts';
 import { useConvertedAmount } from '@/composables/useConvertedAmount';
+import { useEntrySheet } from '@/composables/useEntrySheet';
 import {
   streamKindLabel,
   useIncomeStreams,
@@ -86,10 +87,7 @@ function confidenceVariant(confidence: string): 'confirmed' | 'expected' | 'unce
 }
 
 const toast = useToast();
-
-function onSaved(): void {
-  toast.success('Income added');
-}
+const entrySheet = useEntrySheet();
 
 const editingId = ref<string | null>(null);
 
@@ -160,7 +158,18 @@ function fxMeta(stream: IncomeStreamMonth): { native: string; rate: string } | n
   <main class="page page--with-rail">
     <div class="page-main">
       <div class="heading-row">
-        <h1>Money</h1>
+        <div class="heading-left">
+          <h1>Money</h1>
+          <BaseButton
+            v-if="props.isDesktop"
+            type="button"
+            variant="secondary"
+            class="add-trigger"
+            @click="entrySheet.open('in')"
+          >
+            Add
+          </BaseButton>
+        </div>
         <span class="hero-amount tone-positive">{{ formatMoney(totalMinor, spaceCurrency) }}</span>
       </div>
 
@@ -188,15 +197,6 @@ function fxMeta(stream: IncomeStreamMonth): { native: string; rate: string } | n
       <p v-else-if="error" role="alert" class="error">{{ error }}</p>
 
       <template v-else>
-        <IncomeStreamForm
-          :accounts="accounts.filter((a) => !a.archived)"
-          :space-currency="spaceCurrency"
-          :default-start-date="month ? `${month}-01` : ''"
-          :calendar="calendar!"
-          :save="add"
-          @saved="onSaved"
-        />
-
         <EmptyState
           v-if="!filtered.length"
           title="No income streams"
@@ -303,6 +303,12 @@ function fxMeta(stream: IncomeStreamMonth): { native: string; rate: string } | n
 
 .heading-row h1 {
   margin: 0;
+}
+
+.heading-left {
+  display: flex;
+  align-items: baseline;
+  gap: var(--kapa-space-3);
 }
 
 .hero-amount {

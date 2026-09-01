@@ -26,15 +26,16 @@ function mockViewport(matches: boolean): void {
 }
 
 // The shell is gate-only; stub the router primitives, the app switcher (which
-// needs a live router's useRoute), and both nav shells (which fetch real data
-// via composables) so the layout mounts without a real session, router wiring,
-// or backend.
+// needs a live router's useRoute), both nav shells, and the entry sheet
+// (which fetch real data via composables / need an active Pinia) so the
+// layout mounts without a real session, router wiring, or backend.
 const stubs = {
   RouterLink: { template: '<a><slot /></a>' },
   RouterView: { template: '<div class="router-view-stub" />' },
   AppSwitcher: { template: '<div class="app-switcher-stub" />' },
   HorizonRail: { template: '<div class="rail-stub" aria-label="Horizon" />' },
   HorizonTabBar: { template: '<div class="tabbar-stub" aria-label="Horizon" />' },
+  EntrySheet: { template: '<div class="entry-sheet-stub" />' },
 };
 
 describe('HorizonLayout mobile/desktop gate', () => {

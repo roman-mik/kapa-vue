@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { createRouter, createWebHistory } from 'vue-router';
 import { describe, expect, it } from 'vite-plus/test';
+import { useEntrySheet } from '@/composables/useEntrySheet';
 import HorizonTabBar from './HorizonTabBar.vue';
 
 // Router so router-link resolves and the component's useRoute() reads a real
@@ -53,5 +54,27 @@ describe('HorizonTabBar', () => {
     const wrapper = await mountBar('horizon-timeline');
     expect(wrapper.find('.tab.timeline').classes()).toContain('active');
     expect(wrapper.find('.tab.money').classes()).not.toContain('active');
+  });
+
+  it('opens the entry sheet defaulting to "out" from a non-money route', async () => {
+    useEntrySheet().close();
+    const wrapper = await mountBar('horizon-today');
+    await wrapper.find('.tab.add').trigger('click');
+    const sheet = useEntrySheet();
+    expect(sheet.isOpen.value).toBe(true);
+    expect(sheet.defaultSide.value).toBe('out');
+  });
+
+  it('opens the entry sheet defaulting to "in" from /horizon/money?side=in', async () => {
+    useEntrySheet().close();
+    const router = makeRouter();
+    await router.push({ name: 'horizon-money', query: { side: 'in' } });
+    await router.isReady();
+    const wrapper = mount(HorizonTabBar, { global: { plugins: [router] } });
+    await flushPromises();
+    await wrapper.find('.tab.add').trigger('click');
+    const sheet = useEntrySheet();
+    expect(sheet.isOpen.value).toBe(true);
+    expect(sheet.defaultSide.value).toBe('in');
   });
 });
