@@ -14,6 +14,33 @@ export function formatFullDate(dateKey: string): string {
   });
 }
 
+/**
+ * Weekday and day only (`Tue 2`) — the form for a date that already sits under
+ * a month heading, so repeating the month would be redundant. Same UTC anchor
+ * as `formatFullDate`. Assembled weekday-first explicitly, since
+ * `toLocaleDateString` default ordering can place the day before the weekday
+ * on some locales.
+ */
+export function formatDay(dateKey: string): string {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const utc = new Date(Date.UTC(year, month - 1, day));
+  const weekday = utc.toLocaleDateString(undefined, { timeZone: 'UTC', weekday: 'short' });
+  return `${weekday} ${day}`;
+}
+
+/**
+ * Full month name for a 'YYYY-MM' key (`2026-09` -> `September`), for month
+ * headers. `formatMonthLabel` (kapa-core) gives the short `Sep`; the timeline
+ * header wants the full word.
+ */
+export function formatFullMonth(monthKey: string): string {
+  const [year, month] = monthKey.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString(undefined, {
+    timeZone: 'UTC',
+    month: 'long',
+  });
+}
+
 export interface SlippedDateParts {
   /** The effective (post-slippage) date. */
   slip: string;

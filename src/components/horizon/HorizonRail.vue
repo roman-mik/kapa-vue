@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { Currency } from '@roman-mik/kapa-core/pocket';
 import { computed } from 'vue';
-import AppSwitcher from '@/components/layout/AppSwitcher.vue';
 import { useAccounts } from '@/composables/useAccounts';
 import { useConvertedAmount, type Convertible } from '@/composables/useConvertedAmount';
 import { useIncomeStreams } from '@/composables/useIncomeStreams';
