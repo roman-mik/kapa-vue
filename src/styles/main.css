@@ -163,6 +163,18 @@ textarea {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Shared bold/tabular money figure — replaces each view's own `.amount`/
+ * `.negative` weight-and-figure rule. `--negative` is a colour-only add-on;
+ * combine both classes for a negative amount. */
+.money-amount {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.money-amount--negative {
+  color: var(--kapa-negative);
+}
+
 /* OfflineBanner and AppHeader both add env(safe-area-inset-top) so the
  * device's notch/status-bar padding isn't lost above whichever renders
  * first. When both are showing that double-counts the inset, so drop it

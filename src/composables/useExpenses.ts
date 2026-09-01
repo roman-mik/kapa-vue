@@ -91,5 +91,18 @@ export function useExpenses() {
     return outcome;
   }
 
-  return { expenses, loading, error, refresh, add, update, remove };
+  // Interim behavior: writes immediately with today's date (spentAt omitted
+  // from `add()` defaults to now). A later pass will replace this call site
+  // with a push to a prefilled Add sheet instead of a direct write —
+  // duplicate()'s data contract (amount/currency/category/note) won't change.
+  async function duplicate(row: ExpenseView): Promise<void> {
+    await add({
+      amountMinor: row.amount_minor ?? 0,
+      currency: row.currency ?? 'RSD',
+      categoryId: row.category_id,
+      note: row.note,
+    });
+  }
+
+  return { expenses, loading, error, refresh, add, update, remove, duplicate };
 }

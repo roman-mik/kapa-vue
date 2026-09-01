@@ -104,4 +104,32 @@ describe('useExpenses', () => {
     expect(outcome).toEqual(CONFLICT);
     expect(listExpensesInRange).toHaveBeenCalledTimes(2);
   });
+
+  it('duplicate() carries amount/currency/category/note through add() with no spent_at, and refreshes', async () => {
+    const { duplicate } = useExpenses();
+    await flush();
+    addExpense.mockResolvedValue(undefined);
+
+    await duplicate({
+      id: 'e1',
+      amount_minor: 500,
+      currency: 'RSD',
+      category_id: 'cat-1',
+      note: 'coffee',
+    } as never);
+
+    expect(addExpense).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        amount_minor: 500,
+        currency: 'RSD',
+        category_id: 'cat-1',
+        note: 'coffee',
+      })
+    );
+    const payload = addExpense.mock.calls[0][1];
+    expect(payload).not.toHaveProperty('spent_at');
+    // once for init, once after duplicate()'s own add()
+    expect(listExpensesInRange).toHaveBeenCalledTimes(2);
+  });
 });

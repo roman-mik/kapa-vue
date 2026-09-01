@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { SWATCH_SLOTS, type SwatchSlot } from '@roman-mik/kapa-core/theme';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import ConfirmButton from '@/components/ui/ConfirmButton.vue';
@@ -131,79 +132,89 @@ async function onRestore(id: string): Promise<void> {
           :key="category.id"
           :class="{ archived: category.archived }"
         >
-          <template v-if="renamingId === category.id">
-            <div class="rename">
-              <BaseInput
-                v-model="renameValue"
-                type="text"
-                maxlength="60"
-                @keyup.enter="confirmRename(category.id)"
-              />
-              <p v-if="renameError" role="alert" class="error">{{ renameError }}</p>
-            </div>
-            <BaseButton variant="secondary" @click="confirmRename(category.id)">Save</BaseButton>
-            <BaseButton variant="ghost" @click="renamingId = null">Cancel</BaseButton>
-          </template>
-          <template v-else>
-            <button
-              type="button"
-              class="swatch-dot"
-              :class="{ 'swatch-dot--empty': !category.color }"
-              :style="
-                category.color
-                  ? { background: swatchCssVar(category.color as SwatchSlot) }
-                  : undefined
-              "
-              :aria-label="
-                category.color ? `Change colour (current: ${category.color})` : 'Choose a colour'
-              "
-              :disabled="busyId === category.id"
-              @click="toggleColorPicker(category.id)"
-            />
-            <span class="name">{{ category.name }}</span>
-            <span v-if="category.archived" class="badge">Archived</span>
-            <template v-if="!category.archived">
-              <BaseButton
-                variant="ghost"
-                :disabled="busyId === category.id"
-                @click="startRename(category.id, category.name)"
+          <BaseCard padding="sm">
+            <div class="row-content">
+              <template v-if="renamingId === category.id">
+                <div class="rename">
+                  <BaseInput
+                    v-model="renameValue"
+                    type="text"
+                    maxlength="60"
+                    @keyup.enter="confirmRename(category.id)"
+                  />
+                  <p v-if="renameError" role="alert" class="error">{{ renameError }}</p>
+                </div>
+                <BaseButton variant="secondary" @click="confirmRename(category.id)"
+                  >Save</BaseButton
+                >
+                <BaseButton variant="ghost" @click="renamingId = null">Cancel</BaseButton>
+              </template>
+              <template v-else>
+                <button
+                  type="button"
+                  class="swatch-dot"
+                  :class="{ 'swatch-dot--empty': !category.color }"
+                  :style="
+                    category.color
+                      ? { background: swatchCssVar(category.color as SwatchSlot) }
+                      : undefined
+                  "
+                  :aria-label="
+                    category.color
+                      ? `Change colour (current: ${category.color})`
+                      : 'Choose a colour'
+                  "
+                  :disabled="busyId === category.id"
+                  @click="toggleColorPicker(category.id)"
+                />
+                <span class="name">{{ category.name }}</span>
+                <span v-if="category.archived" class="badge">Archived</span>
+                <template v-if="!category.archived">
+                  <BaseButton
+                    variant="ghost"
+                    :disabled="busyId === category.id"
+                    @click="startRename(category.id, category.name)"
+                  >
+                    Rename
+                  </BaseButton>
+                  <ConfirmButton
+                    label="Archive"
+                    confirm-label="Really archive?"
+                    :disabled="busyId === category.id"
+                    @confirm="onArchive(category.id)"
+                  />
+                </template>
+                <BaseButton
+                  v-else
+                  variant="ghost"
+                  :disabled="busyId === category.id"
+                  @click="onRestore(category.id)"
+                >
+                  Restore
+                </BaseButton>
+              </template>
+              <div
+                v-if="pickingColorId === category.id"
+                class="swatch-row"
+                role="radiogroup"
+                :aria-label="`Colour for ${category.name}`"
               >
-                Rename
-              </BaseButton>
-              <ConfirmButton
-                label="Archive"
-                confirm-label="Really archive?"
-                :disabled="busyId === category.id"
-                @confirm="onArchive(category.id)"
-              />
-            </template>
-            <BaseButton
-              v-else
-              variant="ghost"
-              :disabled="busyId === category.id"
-              @click="onRestore(category.id)"
-            >
-              Restore
-            </BaseButton>
-          </template>
-          <div
-            v-if="pickingColorId === category.id"
-            class="swatch-row"
-            role="radiogroup"
-            :aria-label="`Colour for ${category.name}`"
-          >
-            <button
-              v-for="slot in SWATCH_SLOTS"
-              :key="slot"
-              type="button"
-              class="swatch-dot swatch-choice"
-              :style="{ background: swatchCssVar(slot) }"
-              :aria-pressed="category.color === slot"
-              :aria-label="slot"
-              @click="onPickColor(category.id, slot)"
-            />
-            <BaseButton variant="ghost" @click="onPickColor(category.id, null)">None</BaseButton>
-          </div>
+                <button
+                  v-for="slot in SWATCH_SLOTS"
+                  :key="slot"
+                  type="button"
+                  class="swatch-dot swatch-choice"
+                  :style="{ background: swatchCssVar(slot) }"
+                  :aria-pressed="category.color === slot"
+                  :aria-label="slot"
+                  @click="onPickColor(category.id, slot)"
+                />
+                <BaseButton variant="ghost" @click="onPickColor(category.id, null)"
+                  >None</BaseButton
+                >
+              </div>
+            </div>
+          </BaseCard>
         </li>
       </ul>
 
@@ -230,15 +241,11 @@ async function onRestore(id: string): Promise<void> {
   gap: var(--kapa-space-2);
 }
 
-.list li {
+.row-content {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--kapa-space-2);
-  padding: var(--kapa-space-2) var(--kapa-space-3);
-  border-radius: var(--kapa-radius-sm);
-  border: 1px solid var(--kapa-neutral-400);
-  background: var(--kapa-surface);
 }
 
 .swatch-dot {

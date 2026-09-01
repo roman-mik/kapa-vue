@@ -9,10 +9,13 @@ import {
 } from '@roman-mik/kapa-core/pocket';
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 import { computed, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import BaseButton from '@/components/ui/BaseButton.vue';
-import ConfirmButton from '@/components/ui/ConfirmButton.vue';
+import BaseCard from '@/components/ui/BaseCard.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import ExpenseRowMenu from '@/components/pocket/ExpenseRowMenu.vue';
+import type { RowMenuAction } from '@/components/pocket/expenseRowMenu';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useConvertedExpenses } from '@/composables/useConvertedExpenses';
@@ -28,7 +31,8 @@ import { swatchCssVar } from '@/lib/swatch';
 import { toExpenseAmount } from '@/lib/expenseAmount';
 import type { SwatchSlot } from '@roman-mik/kapa-core/theme';
 
-const { expenses, loading, error, remove } = useExpenses();
+const { expenses, loading, error, remove, duplicate } = useExpenses();
+const router = useRouter();
 const {
   summary,
   refresh: refreshSummary,
@@ -46,7 +50,6 @@ const space = useSpaceStore();
 const toast = useToast();
 const session = useSessionStore();
 
-const busyId = ref<string | null>(null);
 const rowError = ref<string | null>(null);
 
 // 'all' shows everything; '' is the uncategorized bucket; anything else is a
@@ -124,12 +127,38 @@ function attribution(userId: string | null): string {
   );
 }
 
+const rowMenuActions: RowMenuAction[] = [
+  { id: 'edit', label: 'Edit', kind: 'action' },
+  { id: 'duplicate', label: 'Duplicate', kind: 'action' },
+  { id: 'delete', label: 'Delete', kind: 'confirm', confirmLabel: 'Really delete?' },
+];
+
+function onRowMenuSelect(row: ExpenseView, id: string): void {
+  if (id === 'edit') {
+    router.push({ name: 'pocket-edit', params: { id: row.id } });
+  } else if (id === 'duplicate') {
+    void onDuplicate(row);
+  }
+}
+
+function onRowMenuConfirm(row: ExpenseView, id: string): void {
+  if (id === 'delete') void onDelete(row.id!);
+}
+
+async function onDuplicate(row: ExpenseView): Promise<void> {
+  try {
+    await duplicate(row);
+    toast.success('Expense duplicated');
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : "Couldn't duplicate that expense.");
+  }
+}
+
 async function onDelete(id: string): Promise<void> {
   // Delete is scoped to the row's `updated_at` as this list last read it; a
   // conflict means another member changed or removed it first. useExpenses
   // already refreshed the list either way — only the message differs.
   const expectedUpdatedAt = expenses.value.find((e) => e.id === id)?.updated_at ?? '';
-  busyId.value = id;
   rowError.value = null;
   try {
     const outcome = await remove(id, expectedUpdatedAt);
@@ -143,8 +172,6 @@ async function onDelete(id: string): Promise<void> {
   } catch (err) {
     rowError.value = err instanceof Error ? err.message : "Couldn't delete that expense.";
     toast.error(rowError.value);
-  } finally {
-    busyId.value = null;
   }
   // Refresh the breakdown bar separately: a refresh failure after a
   // successful delete is not a delete failure, so it must not surface as
@@ -239,7 +266,7 @@ const dayGroups = computed<DayGroup[]>(() => {
         <li v-for="b in breakdown" :key="b.categoryId ?? 'uncategorized'">
           <span class="dot" :style="{ background: b.swatch }" />
           <span class="name">{{ b.name }}</span>
-          <span class="amount">{{ formatMoney(b.spent, summary!.currency) }}</span>
+          <span class="breakdown-amount">{{ formatMoney(b.spent, summary!.currency) }}</span>
         </li>
       </ul>
       <UnconvertedNote
@@ -317,38 +344,37 @@ const dayGroups = computed<DayGroup[]>(() => {
 
         <ul class="list">
           <li v-for="row in group.rows" :key="row.id ?? ''">
-            <div class="main">
-              <span class="amount">{{
-                formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)
-              }}</span>
-              <span v-if="convertedMinor(row) !== null" class="converted">
-                ≈ {{ formatMoney(convertedMinor(row)!, spaceCurrency) }}
-              </span>
-              <span v-else-if="ratesError" class="unconvertible" :title="ratesError">
-                rates unavailable
-              </span>
-              <span
-                v-else-if="!ratesLoading && isForeign(row)"
-                class="unconvertible"
-                title="No fx rate for this pair"
-              >
-                no fx rate
-              </span>
-              <span class="category">{{ row.category_name ?? 'Uncategorized' }}</span>
-              <span class="attribution">{{ attribution(row.user_id) }}</span>
-            </div>
-            <p v-if="row.note" class="note">{{ row.note }}</p>
-            <div class="actions">
-              <router-link :to="{ name: 'pocket-edit', params: { id: row.id } }">
-                <BaseButton variant="ghost">Edit</BaseButton>
-              </router-link>
-              <ConfirmButton
-                label="Delete"
-                confirm-label="Really delete?"
-                :disabled="busyId === row.id"
-                @confirm="onDelete(row.id!)"
-              />
-            </div>
+            <BaseCard padding="sm">
+              <div class="row-head">
+                <div class="main">
+                  <span class="money-amount">{{
+                    formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)
+                  }}</span>
+                  <span v-if="convertedMinor(row) !== null" class="converted">
+                    ≈ {{ formatMoney(convertedMinor(row)!, spaceCurrency) }}
+                  </span>
+                  <span v-else-if="ratesError" class="unconvertible" :title="ratesError">
+                    rates unavailable
+                  </span>
+                  <span
+                    v-else-if="!ratesLoading && isForeign(row)"
+                    class="unconvertible"
+                    title="No fx rate for this pair"
+                  >
+                    no fx rate
+                  </span>
+                  <span class="category">{{ row.category_name ?? 'Uncategorized' }}</span>
+                  <span class="attribution">{{ attribution(row.user_id) }}</span>
+                </div>
+                <ExpenseRowMenu
+                  :actions="rowMenuActions"
+                  :trigger-label="`Actions for ${formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)}`"
+                  @select="onRowMenuSelect(row, $event)"
+                  @confirm="onRowMenuConfirm(row, $event)"
+                />
+              </div>
+              <p v-if="row.note" class="note">{{ row.note }}</p>
+            </BaseCard>
           </li>
         </ul>
       </section>
@@ -421,7 +447,7 @@ const dayGroups = computed<DayGroup[]>(() => {
   border: 1px dashed currentColor;
 }
 
-.amount {
+.breakdown-amount {
   color: var(--kapa-ink-subtle);
 }
 
@@ -467,21 +493,18 @@ const dayGroups = computed<DayGroup[]>(() => {
   gap: var(--kapa-space-3);
 }
 
-.list li {
-  padding: var(--kapa-space-3);
-  border-radius: var(--kapa-radius-sm);
-  border: 1px solid var(--kapa-neutral-400);
-  background: var(--kapa-surface);
+.row-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--kapa-space-2);
 }
 
 .main {
   display: flex;
   align-items: baseline;
+  flex-wrap: wrap;
   gap: var(--kapa-space-2);
-}
-
-.amount {
-  font-weight: 600;
 }
 
 .converted {
@@ -517,12 +540,6 @@ const dayGroups = computed<DayGroup[]>(() => {
   margin: var(--kapa-space-1) 0 0;
   color: var(--kapa-ink-muted);
   font-size: var(--kapa-text-caption-size);
-}
-
-.actions {
-  display: flex;
-  gap: var(--kapa-space-2);
-  margin-top: var(--kapa-space-2);
 }
 
 .error {
