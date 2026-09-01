@@ -26,6 +26,10 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
   return amountMinor >= 0 ? 'positive' : 'negative';
 }
 
+function onDismiss(dates: string[], reason: string): void {
+  for (const date of dates) dismiss(date, reason);
+}
+
 function setRange(months: RangeMonths): void {
   rangeMonths.value = months;
 }
@@ -76,7 +80,7 @@ function setRange(months: RangeMonths): void {
         </div>
       </div>
 
-      <NegativeDayBanner :warnings="warnings" @dismiss="dismiss" />
+      <NegativeDayBanner :warnings="warnings" @dismiss="onDismiss" />
 
       <BaseCard>
         <BalanceLineChart

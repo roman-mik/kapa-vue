@@ -124,6 +124,8 @@ describe('TimelineView', () => {
     );
     const wrapper = mount(TimelineView);
 
+    const quiet = wrapper.findAll('button').find((b) => b.text() === "It's fine");
+    await quiet!.trigger('click');
     await wrapper.find('input').setValue('will top up before then');
     await wrapper.find('form').trigger('submit');
 

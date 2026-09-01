@@ -29,6 +29,10 @@ const {
 const initialLoading = computed(() => loading.value && monthMin.value === null);
 const endBalanceTone = computed(() => (endBalanceMinor.value < 0 ? 'negative' : 'default'));
 
+function onDismiss(dates: string[], reason: string): void {
+  for (const date of dates) dismiss(date, reason);
+}
+
 function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
   return amountMinor >= 0 ? 'positive' : 'negative';
 }
@@ -60,7 +64,7 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
         />
       </BaseCard>
 
-      <NegativeDayBanner :warnings="warnings" @dismiss="dismiss" />
+      <NegativeDayBanner :warnings="warnings" @dismiss="onDismiss" />
 
       <section class="section">
         <h2>Accounts</h2>
