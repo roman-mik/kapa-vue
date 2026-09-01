@@ -18,14 +18,10 @@ import { zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';
 import { daysUnder } from '@/lib/horizon/daysUnder';
+import { globalTrough, type Trough } from '@/lib/horizon/trough';
 import { useSpaceStore } from '@/stores/space';
 
 const DEFAULT_HORIZON_DAYS = 90;
-
-export interface MonthMin {
-  minBalanceMinor: number;
-  minBalanceDate: string;
-}
 
 /**
  * The single fetch behind Horizon's Today screen. One `projectionForRange`
@@ -42,7 +38,9 @@ export function useHorizonToday() {
   const spendMode = ref<SpendMode>('cap');
   const capMinor = ref<number | null>(null);
   const endBalanceMinor = ref(0);
-  const monthMin = ref<MonthMin | null>(null);
+  const trough = ref<Trough | null>(null);
+  const balanceToday = ref<number | null>(null);
+  const monthEnd = ref<{ month: string; balanceMinor: number } | null>(null);
   const nextEvents = ref<LedgerEvent[]>([]);
   const allWarnings = ref<NegativeDayWarning[]>([]);
   const daysUnderCount = ref(0);
@@ -51,7 +49,9 @@ export function useHorizonToday() {
     const currentSpace = space.currentSpace;
     if (!currentSpace) {
       endBalanceMinor.value = 0;
-      monthMin.value = null;
+      trough.value = null;
+      balanceToday.value = null;
+      monthEnd.value = null;
       nextEvents.value = [];
       allWarnings.value = [];
       daysUnderCount.value = 0;
@@ -82,12 +82,11 @@ export function useHorizonToday() {
 
       const metrics = computeMetrics(projection.value.days);
       endBalanceMinor.value = metrics.endBalanceMinor;
+      trough.value = globalTrough(projection.value.days);
+      balanceToday.value = projection.value.days[0]?.balanceMinor ?? null;
       const currentMonth = metrics.months[0] ?? null;
-      monthMin.value = currentMonth
-        ? {
-            minBalanceMinor: currentMonth.minBalanceMinor,
-            minBalanceDate: currentMonth.minBalanceDate,
-          }
+      monthEnd.value = currentMonth
+        ? { month: currentMonth.month, balanceMinor: currentMonth.endBalanceMinor }
         : null;
 
       nextEvents.value = projection.value.events.filter((e) => e.date >= todayKey).slice(0, 3);
@@ -133,7 +132,9 @@ export function useHorizonToday() {
     spendMode,
     capMinor,
     endBalanceMinor,
-    monthMin,
+    trough,
+    balanceToday,
+    monthEnd,
     nextEvents,
     warnings,
     daysUnderCount,
