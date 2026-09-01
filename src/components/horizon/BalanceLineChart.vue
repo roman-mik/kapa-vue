@@ -5,6 +5,7 @@ import { computed } from 'vue';
 import EventGlyph from './EventGlyph.vue';
 import { balanceDomain, balanceScaleY } from '@/lib/balanceScale';
 import { EVENT_GLYPHS } from '@/lib/eventGlyphs';
+import { globalTrough } from '@/lib/horizon/trough';
 import { formatMoney } from '@/lib/money';
 import { formatFullDate } from '@/lib/date';
 
@@ -84,6 +85,8 @@ const segments = computed<Segment[]>(() => {
   return segs;
 });
 
+const NEGATIVE_STROKE_WIDTH = 3.5;
+const NEUTRAL_STROKE_WIDTH = 2;
 const hasNegativeDay = computed(() => props.days.some((d) => d.balanceMinor < 0));
 const zeroY = computed(() => scaleY(0));
 const bandHeight = computed(() => PADDING.top + chartHeight - zeroY.value);
@@ -92,6 +95,48 @@ const dayIndexByDate = computed(() => {
   const map = new Map<string, number>();
   props.days.forEach((d, i) => map.set(d.date, i));
   return map;
+});
+
+// The projection-wide low point, paired with its formatted amount. This is the
+// same `globalTrough` the Today hero and the timeline list use, so the chart and
+// the list can never disagree about where the trough is. Null when there is no
+// trough to point at (fewer than 2 days or every day non-negative).
+const hasTrough = computed(() => {
+  if (props.days.length < 2) return false;
+  const trough = globalTrough(props.days);
+  return trough !== null && trough.minBalanceMinor < 0;
+});
+
+const CALL_TICK = 10;
+const CALL_PILL_W = 108;
+const CALL_PILL_H = 20;
+
+const troughCallout = computed<{
+  x: number;
+  y: number;
+  tickY: number;
+  label: string;
+} | null>(() => {
+  if (!hasTrough.value) return null;
+  const trough = globalTrough(props.days)!;
+  const index = dayIndexByDate.value.get(trough.minBalanceDate);
+  if (index === undefined) return null;
+
+  const x = scaleX(index);
+  const y = scaleY(trough.minBalanceMinor);
+  // Clamp the pill inside the plot so it never straddles the plot edge or the
+  // marker column at the presets; drop it below the trough point (the artboard
+  // places it under the line).
+  const pillX = Math.min(
+    Math.max(x - CALL_PILL_W / 2, PADDING.left),
+    PADDING.left + chartWidth - CALL_PILL_W
+  );
+  return {
+    x: pillX,
+    y,
+    tickY: y + CALL_TICK,
+    label: `low ${formatMoney(trough.minBalanceMinor, props.currency)}`,
+  };
 });
 
 interface Marker {
@@ -169,8 +214,35 @@ const summaryText = computed(() => {
         class="balance-line"
         :class="{ negative: segment.negative }"
         :d="segment.path"
+        :stroke-width="segment.negative ? NEGATIVE_STROKE_WIDTH : NEUTRAL_STROKE_WIDTH"
         fill="none"
       />
+
+      <g v-if="troughCallout" class="trough-callout">
+        <line
+          class="trough-tick"
+          :x1="troughCallout.x + CALL_PILL_W / 2"
+          :y1="troughCallout.y"
+          :x2="troughCallout.x + CALL_PILL_W / 2"
+          :y2="troughCallout.tickY"
+        />
+        <rect
+          class="trough-pill"
+          :x="troughCallout.x"
+          :y="troughCallout.tickY"
+          :width="CALL_PILL_W"
+          :height="CALL_PILL_H"
+          rx="10"
+        />
+        <text
+          class="trough-label"
+          :x="troughCallout.x + CALL_PILL_W / 2"
+          :y="troughCallout.tickY + CALL_PILL_H / 2"
+          text-anchor="middle"
+        >
+          {{ troughCallout.label }}
+        </text>
+      </g>
 
       <g
         v-for="marker in markers"
@@ -217,11 +289,31 @@ svg {
 
 .balance-line {
   stroke: var(--kapa-accent);
-  stroke-width: 2;
 }
 
+/* Underwater runs are drawn both heavier (bound inline from the script, so the
+   weight is deterministic and testable) AND dashed — the weight and the dash
+   both survive colorblind/grayscale viewing, so the distinction never rests on
+   the stroke colour alone. */
 .balance-line.negative {
+  stroke: var(--kapa-negative);
   stroke-dasharray: 6, 3;
+}
+
+.trough-tick {
+  stroke: var(--kapa-negative);
+  stroke-width: 1.5;
+}
+
+.trough-pill {
+  fill: var(--kapa-negative);
+}
+
+.trough-label {
+  fill: #fff;
+  font-size: var(--kapa-text-caption-size);
+  font-weight: 700;
+  dominant-baseline: central;
 }
 
 .marker {
