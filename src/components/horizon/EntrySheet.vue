@@ -51,7 +51,7 @@ type Chip = 'recurring' | 'category' | 'planned' | 'date' | 'account' | 'confide
 
 const side = ref<'in' | 'out'>(props.defaultSide);
 const amount = ref('');
-const currency = ref<Currency>(space.currentSpace?.currency ?? 'RSD');
+const currency = ref<Currency>((space.currentSpace?.currency as Currency) ?? 'RSD');
 const name = ref('');
 const accountId = ref('');
 const recurring = ref(false);
@@ -80,7 +80,7 @@ function resetTransient(): void {
 function resetAll(): void {
   resetTransient();
   side.value = props.defaultSide;
-  currency.value = space.currentSpace?.currency ?? 'RSD';
+  currency.value = (space.currentSpace?.currency as Currency) ?? 'RSD';
   accountId.value = accounts.value[0]?.id ?? '';
   recurring.value = false;
   planned.value = false;

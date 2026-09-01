@@ -129,7 +129,7 @@ const troughCallout = computed<{
   // places it under the line).
   const pillX = Math.min(
     Math.max(x - CALL_PILL_W / 2, PADDING.left),
-    PADDING.left + chartWidth - CALL_PILL_W
+    PADDING.left + chartWidth.value - CALL_PILL_W
   );
   return {
     x: pillX,
