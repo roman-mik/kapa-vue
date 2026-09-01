@@ -3,18 +3,22 @@ import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
 import { useExpenses } from './useExpenses';
 
-const { listExpensesInRange, addExpense, updateExpense, deleteExpense } = vi.hoisted(() => ({
-  listExpensesInRange: vi.fn(),
-  addExpense: vi.fn(),
-  updateExpense: vi.fn(),
-  deleteExpense: vi.fn(),
-}));
+const { listExpensesInRange, addExpense, updateExpense, deleteExpense, getExpense } = vi.hoisted(
+  () => ({
+    listExpensesInRange: vi.fn(),
+    addExpense: vi.fn(),
+    updateExpense: vi.fn(),
+    deleteExpense: vi.fn(),
+    getExpense: vi.fn(),
+  })
+);
 
 vi.mock('@roman-mik/kapa-core/pocket/queries', () => ({
   listExpensesInRange,
   addExpense,
   updateExpense,
   deleteExpense,
+  getExpense,
 }));
 
 function flush(): Promise<void> {
@@ -105,31 +109,24 @@ describe('useExpenses', () => {
     expect(listExpensesInRange).toHaveBeenCalledTimes(2);
   });
 
-  it('duplicate() carries amount/currency/category/note through add() with no spent_at, and refreshes', async () => {
-    const { duplicate } = useExpenses();
+  it('getById() returns the already-loaded row without an extra fetch', async () => {
+    const { getById } = useExpenses();
     await flush();
-    addExpense.mockResolvedValue(undefined);
 
-    await duplicate({
-      id: 'e1',
-      amount_minor: 500,
-      currency: 'RSD',
-      category_id: 'cat-1',
-      note: 'coffee',
-    } as never);
+    const result = await getById('e1');
 
-    expect(addExpense).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        amount_minor: 500,
-        currency: 'RSD',
-        category_id: 'cat-1',
-        note: 'coffee',
-      })
-    );
-    const payload = addExpense.mock.calls[0][1];
-    expect(payload).not.toHaveProperty('spent_at');
-    // once for init, once after duplicate()'s own add()
-    expect(listExpensesInRange).toHaveBeenCalledTimes(2);
+    expect(result).toEqual({ id: 'e1', updated_at: '2026-08-28T10:00:00Z' });
+    expect(getExpense).not.toHaveBeenCalled();
+  });
+
+  it('getById() falls back to a direct fetch when the row is outside the loaded month window', async () => {
+    const { getById } = useExpenses();
+    await flush();
+    getExpense.mockResolvedValue({ id: 'e2', updated_at: '2026-07-15T10:00:00Z' });
+
+    const result = await getById('e2');
+
+    expect(getExpense).toHaveBeenCalledWith(expect.anything(), 'e2');
+    expect(result).toEqual({ id: 'e2', updated_at: '2026-07-15T10:00:00Z' });
   });
 });

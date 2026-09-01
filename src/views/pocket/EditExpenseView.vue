@@ -1,75 +1,50 @@
 <script setup lang="ts">
-import {
-  convertToCurrency,
-  CURRENCIES,
-  CURRENCY_EXPONENT,
-  dateKeyStartUtc,
-  type Currency,
-  remainingAfter,
-  zonedDateKey,
-} from '@roman-mik/kapa-core/pocket';
-import { getExpense, type ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
+// Thin deep-link wrapper: normal editing happens in-place on History's row
+// (see HistoryView.vue's expandedId state); this route exists only so
+// /pocket/edit/:id is bookmarkable/shareable on its own, rendering the same
+// ExpenseEntryForm inside a dialog since a direct link has no row to expand
+// into.
+import { type Currency, dateKeyStartUtc, zonedDateKey } from '@roman-mik/kapa-core/pocket';
+import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 import { computed, onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import BaseButton from '@/components/ui/BaseButton.vue';
-import BaseField from '@/components/ui/BaseField.vue';
-import BaseInput from '@/components/ui/BaseInput.vue';
-import BaseSelect from '@/components/ui/BaseSelect.vue';
+import BaseSheet from '@/components/ui/BaseSheet.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
-import { useCategories } from '@/composables/useCategories';
+import ExpenseEntryForm, {
+  type ExpenseDraftPayload,
+} from '@/components/pocket/ExpenseEntryForm.vue';
+import type { EntryPreviewExclusion } from '@/composables/usePocketEntryPreview';
 import { useExpenses } from '@/composables/useExpenses';
 import { usePocketHome } from '@/composables/usePocketHome';
 import { useToast } from '@/composables/useToast';
-import { formatMoney } from '@/lib/money';
-import { supabase } from '@/lib/supabase';
-import { expenseDateSchema, firstIssueMessage, positiveAmountSchema } from '@/lib/validation';
 import { useSpaceStore } from '@/stores/space';
 
 const route = useRoute();
 const router = useRouter();
 const space = useSpaceStore();
-const { categories } = useCategories({ includeArchived: true });
-const { update } = useExpenses();
+const { update, getById } = useExpenses();
 const { summary, rates } = usePocketHome();
 const toast = useToast();
 
-const timeZone = space.currentSpace?.timezone ?? 'UTC';
+const timeZone = computed(() => space.currentSpace?.timezone ?? 'UTC');
 const expenseId = computed(() => route.params.id as string);
-
-// Editing is capped at today: rates are fetched `onOrBefore` today, so the
-// "left after this" conversion is always covered. Also drives the native
-// date input's `max` so the picker can't open future months.
-const todayKey = computed(() => zonedDateKey(new Date(), timeZone));
 
 const original = ref<ExpenseView | null>(null);
 const loading = ref(true);
 const loadError = ref<string | null>(null);
-
-const amount = ref('');
-const currency = ref<Currency>('RSD');
-const categoryId = ref<string>('');
-const note = ref('');
-const spentAtKey = ref('');
 const submitting = ref(false);
 const submitError = ref<string | null>(null);
 
 async function load(): Promise<void> {
   loading.value = true;
+  loadError.value = null;
   try {
-    const expense = await getExpense(supabase, expenseId.value);
+    const expense = await getById(expenseId.value);
     if (!expense) {
       loadError.value = 'This expense no longer exists.';
       return;
     }
     original.value = expense;
-    const exponent = CURRENCY_EXPONENT[(expense.currency ?? 'RSD') as Currency];
-    amount.value = String((expense.amount_minor ?? 0) / 10 ** exponent);
-    currency.value = (expense.currency ?? 'RSD') as Currency;
-    categoryId.value = expense.category_id ?? '';
-    note.value = expense.note ?? '';
-    spentAtKey.value = expense.spent_at
-      ? zonedDateKey(new Date(expense.spent_at), timeZone)
-      : zonedDateKey(new Date(), timeZone);
   } catch (err) {
     loadError.value = err instanceof Error ? err.message : "Couldn't load this expense.";
   } finally {
@@ -79,63 +54,36 @@ async function load(): Promise<void> {
 
 onMounted(load);
 
-const exponent = computed(() => CURRENCY_EXPONENT[currency.value]);
+function dateKeyOf(expense: ExpenseView): string {
+  return expense.spent_at
+    ? zonedDateKey(new Date(expense.spent_at), timeZone.value)
+    : zonedDateKey(new Date(), timeZone.value);
+}
 
-// "Left after this" previews the edit as a replacement of the expense's
-// current contribution, not an additional charge on top of it — the
-// original amount is converted back into the space currency (as of its own
-// date) and added back to `remaining` before the proposed new amount is
-// subtracted. Null whenever a conversion has no covering fx rate, or the
-// cap/summary hasn't loaded, rather than showing a misleading number.
-const leftAfterThis = computed<number | null>(() => {
+const initialValues = computed<ExpenseDraftPayload | undefined>(() => {
   const expense = original.value;
-  const home = summary.value;
-  if (!expense || !home) return null;
-
-  const value = Number(amount.value);
-  if (!Number.isFinite(value) || value < 0) return null;
-  const proposedAmountMinor = Math.round(value * 10 ** exponent.value);
-
-  const originalAsOfDate = expense.spent_at
-    ? zonedDateKey(new Date(expense.spent_at), space.currentSpace?.timezone ?? 'UTC')
-    : zonedDateKey(new Date(), space.currentSpace?.timezone ?? 'UTC');
-  const originalContribution = convertToCurrency(
-    expense.amount_minor ?? 0,
-    (expense.currency ?? 'RSD') as Currency,
-    home.currency,
-    originalAsOfDate,
-    rates.value
-  );
-  if (originalContribution === undefined) return null;
-
-  // The proposed amount converts as of the newly selected date (not today),
-  // so a backdate or forward-date is previewed at the right rate. The picker
-  // defaults to today and is capped at today, so `spentAtKey` always parses
-  // and — with rates fetched `onOrBefore` today — always has a covering rate.
-  const newContribution = convertToCurrency(
-    proposedAmountMinor,
-    currency.value,
-    home.currency,
-    spentAtKey.value || todayKey.value,
-    rates.value
-  );
-  if (newContribution === undefined) return null;
-
-  return remainingAfter(home.remaining + originalContribution, newContribution);
+  if (!expense) return undefined;
+  return {
+    amountMinor: expense.amount_minor ?? 0,
+    currency: (expense.currency ?? 'RSD') as Currency,
+    categoryId: expense.category_id,
+    note: expense.note,
+    date: dateKeyOf(expense),
+  };
 });
 
-async function onSubmit(): Promise<void> {
+const excludeFromPreview = computed<EntryPreviewExclusion | null>(() => {
+  const expense = original.value;
+  if (!expense) return null;
+  return {
+    amountMinor: expense.amount_minor ?? 0,
+    currency: (expense.currency ?? 'RSD') as Currency,
+    date: dateKeyOf(expense),
+  };
+});
+
+async function onSubmit(payload: ExpenseDraftPayload): Promise<void> {
   submitError.value = null;
-  const parsed = positiveAmountSchema.safeParse(amount.value);
-  if (!parsed.success) {
-    submitError.value = firstIssueMessage(parsed) ?? 'Enter a valid amount.';
-    return;
-  }
-  const parsedDate = expenseDateSchema.safeParse(spentAtKey.value);
-  if (!parsedDate.success) {
-    submitError.value = firstIssueMessage(parsedDate) ?? 'Pick a valid date.';
-    return;
-  }
   submitting.value = true;
   try {
     // The write is scoped to the `updated_at` this screen loaded — if another
@@ -145,11 +93,11 @@ async function onSubmit(): Promise<void> {
     const outcome = await update(
       expenseId.value,
       {
-        amount_minor: Math.round(parsed.data * 10 ** exponent.value),
-        currency: currency.value,
-        category_id: categoryId.value || null,
-        note: note.value.trim() || null,
-        spent_at: dateKeyStartUtc(spentAtKey.value, timeZone).toISOString(),
+        amount_minor: payload.amountMinor,
+        currency: payload.currency,
+        category_id: payload.categoryId,
+        note: payload.note,
+        spent_at: dateKeyStartUtc(payload.date, timeZone.value).toISOString(),
       },
       original.value?.updated_at ?? ''
     );
@@ -169,12 +117,14 @@ async function onSubmit(): Promise<void> {
     submitting.value = false;
   }
 }
+
+function onClose(): void {
+  router.push({ name: 'pocket-history' });
+}
 </script>
 
 <template>
   <main class="page">
-    <h1>Edit expense</h1>
-
     <template v-if="loading">
       <SkeletonBlock height="42px" />
       <SkeletonBlock height="42px" />
@@ -182,69 +132,25 @@ async function onSubmit(): Promise<void> {
 
     <p v-else-if="loadError" role="alert" class="error">{{ loadError }}</p>
 
-    <form v-else class="form" @submit.prevent="onSubmit">
-      <BaseField label="Amount" v-slot="{ id }">
-        <BaseInput
-          :id="id"
-          v-model="amount"
-          type="number"
-          min="0"
-          :step="exponent > 0 ? '0.01' : '1'"
-          required
-        />
-      </BaseField>
-
-      <BaseField label="Date" v-slot="{ id }">
-        <BaseInput :id="id" v-model="spentAtKey" type="date" :max="todayKey" />
-      </BaseField>
-
-      <BaseField label="Currency" v-slot="{ id }">
-        <BaseSelect :id="id" v-model="currency">
-          <option v-for="c in CURRENCIES" :key="c" :value="c">{{ c }}</option>
-        </BaseSelect>
-      </BaseField>
-
-      <BaseField label="Category" v-slot="{ id }">
-        <BaseSelect :id="id" v-model="categoryId">
-          <option value="">Uncategorized</option>
-          <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-        </BaseSelect>
-      </BaseField>
-
-      <BaseField label="Note" v-slot="{ id }">
-        <BaseInput :id="id" v-model="note" type="text" />
-      </BaseField>
-
-      <p v-if="leftAfterThis !== null" class="hint" :class="{ negative: leftAfterThis < 0 }">
-        {{ formatMoney(leftAfterThis, summary!.currency) }} left after this.
-      </p>
-
-      <p v-if="submitError" role="alert" class="error">{{ submitError }}</p>
-      <BaseButton type="submit" block :disabled="submitting">
-        {{ submitting ? 'Saving…' : 'Save' }}
-      </BaseButton>
-    </form>
+    <BaseSheet v-else :open="true" labelled-by="pocket-edit-title" @close="onClose">
+      <h2 id="pocket-edit-title">Edit expense</h2>
+      <ExpenseEntryForm
+        :key="`${expenseId}-${original?.updated_at ?? ''}`"
+        mode="edit"
+        :initial-values="initialValues"
+        :exclude-from-preview="excludeFromPreview"
+        :summary="summary"
+        :rates="rates"
+        :submitting="submitting"
+        :submit-error="submitError"
+        @submit="onSubmit"
+        @cancel="onClose"
+      />
+    </BaseSheet>
   </main>
 </template>
 
 <style scoped>
-.form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kapa-space-4);
-}
-
-.hint {
-  margin: 0;
-  color: var(--kapa-ink-muted);
-  font-size: var(--kapa-text-caption-size);
-}
-
-.hint.negative {
-  color: var(--kapa-negative);
-  font-weight: 600;
-}
-
 .error {
   color: var(--kapa-negative);
   margin: 0;
