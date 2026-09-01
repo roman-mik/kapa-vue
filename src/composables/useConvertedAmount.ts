@@ -51,6 +51,8 @@ export function useConvertedAmount(items: Ref<Convertible[]>) {
 
   const timeZone = computed(() => space.currentSpace?.timezone);
 
+  // Re-fetches the rate snapshot only — this is what FxSnapshotPanel's
+  // Refresh button re-triggers, not useAccounts' balance fetch.
   async function refresh(): Promise<void> {
     const currentSpace = space.currentSpace;
     if (!currentSpace) {
@@ -143,6 +145,7 @@ export function useConvertedAmount(items: Ref<Convertible[]>) {
     rates,
     loading,
     error,
+    refresh,
     isForeign,
     rateFor,
     fxAsOf,

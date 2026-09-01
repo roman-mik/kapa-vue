@@ -12,6 +12,7 @@ import {
 } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
 import AccountChips from '@/components/horizon/AccountChips.vue';
+import FxSnapshotPanel from '@/components/horizon/FxSnapshotPanel.vue';
 import ReconcilePanel from '@/components/horizon/ReconcilePanel.vue';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
@@ -62,7 +63,27 @@ function toConvertible(a: {
   };
 }
 
-const { convertedMinor, spaceCurrencyAmount, unconvertible } = useConvertedAmount(convertibles);
+const {
+  convertedMinor,
+  spaceCurrencyAmount,
+  unconvertible,
+  rateFor,
+  refresh: refreshRates,
+  loading: fxLoading,
+} = useConvertedAmount(convertibles);
+
+// Distinct foreign currencies in use, ascending — FxSnapshotPanel's row set.
+// `rateFor` takes a Convertible; the amount doesn't matter for a rate lookup,
+// only the currency and (defaulted) as-of date, so a zero-amount stand-in works.
+const foreignCurrencies = computed<Currency[]>(() =>
+  [...new Set(accounts.value.map((a) => a.currency as Currency))]
+    .filter((c) => c !== spaceCurrency.value)
+    .sort()
+);
+
+function rateForCurrency(c: Currency) {
+  return rateFor({ id: c, currency: c, amountMinor: 0 });
+}
 
 // The hero total is now conversion-aware (H3): every include_in_total account
 // counts at its space-currency figure, including foreign ones converted via
@@ -341,6 +362,13 @@ async function onArchive(accountId: string): Promise<void> {
 
     <aside class="page-side">
       <ReconcilePanel :accounts="accounts" @saved="refresh" />
+      <FxSnapshotPanel
+        :space-currency="spaceCurrency"
+        :currencies="foreignCurrencies"
+        :rate-for="rateForCurrency"
+        :loading="fxLoading"
+        @refresh="refreshRates"
+      />
     </aside>
   </main>
 </template>
