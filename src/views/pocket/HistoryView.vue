@@ -3,23 +3,28 @@ import {
   attributionLabel,
   type Currency,
   type CurrencyBucket,
+  dateKeyStartUtc,
   dayLabel,
   dayTotals,
   zonedDateKey,
 } from '@roman-mik/kapa-core/pocket';
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 import { computed, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
+import ExpenseEntryForm, {
+  type ExpenseDraftPayload,
+} from '@/components/pocket/ExpenseEntryForm.vue';
 import ExpenseRowMenu from '@/components/pocket/ExpenseRowMenu.vue';
 import type { RowMenuAction } from '@/components/pocket/expenseRowMenu';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import { useCategories } from '@/composables/useCategories';
 import { useConvertedExpenses } from '@/composables/useConvertedExpenses';
 import { useExpenses } from '@/composables/useExpenses';
+import type { EntryPreviewExclusion } from '@/composables/usePocketEntryPreview';
+import { usePocketEntrySheet } from '@/composables/usePocketEntrySheet';
 import { usePocketHome } from '@/composables/usePocketHome';
 import { useSpaceMembers } from '@/composables/useSpaceMembers';
 import { useToast } from '@/composables/useToast';
@@ -31,8 +36,8 @@ import { swatchCssVar } from '@/lib/swatch';
 import { toExpenseAmount } from '@/lib/expenseAmount';
 import type { SwatchSlot } from '@roman-mik/kapa-core/theme';
 
-const { expenses, loading, error, remove, duplicate } = useExpenses();
-const router = useRouter();
+const { expenses, loading, error, remove, update } = useExpenses();
+const entrySheet = usePocketEntrySheet();
 const {
   summary,
   refresh: refreshSummary,
@@ -133,11 +138,18 @@ const rowMenuActions: RowMenuAction[] = [
   { id: 'delete', label: 'Delete', kind: 'confirm', confirmLabel: 'Really delete?' },
 ];
 
+// Edit expands the row in place instead of navigating — only one row at a
+// time, same single-open-at-a-time model as ExpenseRowMenu's own menus.
+const expandedId = ref<string | null>(null);
+const rowSubmitting = ref(false);
+const rowSubmitError = ref<string | null>(null);
+
 function onRowMenuSelect(row: ExpenseView, id: string): void {
   if (id === 'edit') {
-    router.push({ name: 'pocket-edit', params: { id: row.id } });
+    rowSubmitError.value = null;
+    expandedId.value = expandedId.value === row.id ? null : (row.id ?? null);
   } else if (id === 'duplicate') {
-    void onDuplicate(row);
+    onDuplicate(row);
   }
 }
 
@@ -145,12 +157,63 @@ function onRowMenuConfirm(row: ExpenseView, id: string): void {
   if (id === 'delete') void onDelete(row.id!);
 }
 
-async function onDuplicate(row: ExpenseView): Promise<void> {
+function onDuplicate(row: ExpenseView): void {
+  entrySheet.open({
+    prefill: {
+      amountMinor: row.amount_minor ?? 0,
+      currency: (row.currency ?? 'RSD') as Currency,
+      categoryId: row.category_id,
+      note: row.note,
+    },
+  });
+}
+
+function toEntryDraft(row: ExpenseView): ExpenseDraftPayload {
+  const timeZone = space.currentSpace?.timezone ?? 'UTC';
+  return {
+    amountMinor: row.amount_minor ?? 0,
+    currency: (row.currency ?? 'RSD') as Currency,
+    categoryId: row.category_id,
+    note: row.note,
+    date: row.spent_at
+      ? zonedDateKey(new Date(row.spent_at), timeZone)
+      : zonedDateKey(new Date(), timeZone),
+  };
+}
+
+function toExcludeDraft(row: ExpenseView): EntryPreviewExclusion {
+  const draft = toEntryDraft(row);
+  return { amountMinor: draft.amountMinor, currency: draft.currency, date: draft.date };
+}
+
+async function onInlineEditSubmit(row: ExpenseView, payload: ExpenseDraftPayload): Promise<void> {
+  const timeZone = space.currentSpace?.timezone ?? 'UTC';
+  rowSubmitError.value = null;
+  rowSubmitting.value = true;
   try {
-    await duplicate(row);
-    toast.success('Expense duplicated');
+    const outcome = await update(
+      row.id!,
+      {
+        amount_minor: payload.amountMinor,
+        currency: payload.currency,
+        category_id: payload.categoryId,
+        note: payload.note,
+        spent_at: dateKeyStartUtc(payload.date, timeZone).toISOString(),
+      },
+      row.updated_at ?? ''
+    );
+    if (!outcome.ok) {
+      toast.error('This expense was already changed or deleted elsewhere. The list is refreshed.');
+      expandedId.value = null;
+      return;
+    }
+    toast.success('Expense updated');
+    expandedId.value = null;
   } catch (err) {
-    toast.error(err instanceof Error ? err.message : "Couldn't duplicate that expense.");
+    rowSubmitError.value = err instanceof Error ? err.message : "Couldn't save that expense.";
+    toast.error(rowSubmitError.value);
+  } finally {
+    rowSubmitting.value = false;
   }
 }
 
@@ -345,35 +408,49 @@ const dayGroups = computed<DayGroup[]>(() => {
         <ul class="list">
           <li v-for="row in group.rows" :key="row.id ?? ''">
             <BaseCard padding="sm">
-              <div class="row-head">
-                <div class="main">
-                  <span class="money-amount">{{
-                    formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)
-                  }}</span>
-                  <span v-if="convertedMinor(row) !== null" class="converted">
-                    ≈ {{ formatMoney(convertedMinor(row)!, spaceCurrency) }}
-                  </span>
-                  <span v-else-if="ratesError" class="unconvertible" :title="ratesError">
-                    rates unavailable
-                  </span>
-                  <span
-                    v-else-if="!ratesLoading && isForeign(row)"
-                    class="unconvertible"
-                    title="No fx rate for this pair"
-                  >
-                    no fx rate
-                  </span>
-                  <span class="category">{{ row.category_name ?? 'Uncategorized' }}</span>
-                  <span class="attribution">{{ attribution(row.user_id) }}</span>
+              <ExpenseEntryForm
+                v-if="expandedId === row.id"
+                mode="edit"
+                :initial-values="toEntryDraft(row)"
+                :exclude-from-preview="toExcludeDraft(row)"
+                :summary="summary"
+                :rates="rates"
+                :submitting="rowSubmitting"
+                :submit-error="rowSubmitError"
+                @submit="(payload) => onInlineEditSubmit(row, payload)"
+                @cancel="expandedId = null"
+              />
+              <template v-else>
+                <div class="row-head">
+                  <div class="main">
+                    <span class="money-amount">{{
+                      formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)
+                    }}</span>
+                    <span v-if="convertedMinor(row) !== null" class="converted">
+                      ≈ {{ formatMoney(convertedMinor(row)!, spaceCurrency) }}
+                    </span>
+                    <span v-else-if="ratesError" class="unconvertible" :title="ratesError">
+                      rates unavailable
+                    </span>
+                    <span
+                      v-else-if="!ratesLoading && isForeign(row)"
+                      class="unconvertible"
+                      title="No fx rate for this pair"
+                    >
+                      no fx rate
+                    </span>
+                    <span class="category">{{ row.category_name ?? 'Uncategorized' }}</span>
+                    <span class="attribution">{{ attribution(row.user_id) }}</span>
+                  </div>
+                  <ExpenseRowMenu
+                    :actions="rowMenuActions"
+                    :trigger-label="`Actions for ${formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)}`"
+                    @select="onRowMenuSelect(row, $event)"
+                    @confirm="onRowMenuConfirm(row, $event)"
+                  />
                 </div>
-                <ExpenseRowMenu
-                  :actions="rowMenuActions"
-                  :trigger-label="`Actions for ${formatMoney(row.amount_minor ?? 0, (row.currency ?? 'RSD') as Currency)}`"
-                  @select="onRowMenuSelect(row, $event)"
-                  @confirm="onRowMenuConfirm(row, $event)"
-                />
-              </div>
-              <p v-if="row.note" class="note">{{ row.note }}</p>
+                <p v-if="row.note" class="note">{{ row.note }}</p>
+              </template>
             </BaseCard>
           </li>
         </ul>

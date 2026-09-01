@@ -7,6 +7,7 @@ import type {
 import {
   addExpense,
   deleteExpense,
+  getExpense,
   listExpensesInRange,
   updateExpense,
 } from '@roman-mik/kapa-core/pocket/queries';
@@ -91,18 +92,15 @@ export function useExpenses() {
     return outcome;
   }
 
-  // Interim behavior: writes immediately with today's date (spentAt omitted
-  // from `add()` defaults to now). A later pass will replace this call site
-  // with a push to a prefilled Add sheet instead of a direct write —
-  // duplicate()'s data contract (amount/currency/category/note) won't change.
-  async function duplicate(row: ExpenseView): Promise<void> {
-    await add({
-      amountMinor: row.amount_minor ?? 0,
-      currency: row.currency ?? 'RSD',
-      categoryId: row.category_id,
-      note: row.note,
-    });
+  // Deep-link Edit can target an expense outside the current month window
+  // (e.g. after a month rollover) — falls back to a direct fetch only when
+  // the already-loaded month-scoped list doesn't have it, rather than
+  // widening `refresh()`'s range for every caller.
+  async function getById(expenseId: string): Promise<ExpenseView | null> {
+    const cached = expenses.value.find((e) => e.id === expenseId);
+    if (cached) return cached;
+    return getExpense(supabase, expenseId);
   }
 
-  return { expenses, loading, error, refresh, add, update, remove, duplicate };
+  return { expenses, loading, error, refresh, add, update, remove, getById };
 }
