@@ -11,17 +11,25 @@ import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseCheckbox from '@/components/ui/BaseCheckbox.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import BaseSegmentedControl from '@/components/ui/BaseSegmentedControl.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { usePocketHome } from '@/composables/usePocketHome';
+import { useSpendMode } from '@/composables/useSpendMode';
 import { useToast } from '@/composables/useToast';
 import { formatMoney } from '@/lib/money';
 import { firstIssueMessage, nonNegativeAmountSchema, nudgePctSchema } from '@/lib/validation';
 import { useSpaceStore } from '@/stores/space';
 
+const spendModeOptions = [
+  { value: 'cap', label: 'Cap' },
+  { value: 'runRate', label: 'Run rate' },
+];
+
 const space = useSpaceStore();
 const { cap: capApi, summary, loading, error } = usePocketHome();
 const cap = capApi.cap;
 const toast = useToast();
+const { spendMode, error: spendModeError, setMode: setSpendMode } = useSpendMode();
 
 const currency = computed<Currency>(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
 const exponent = computed(() => CURRENCY_EXPONENT[currency.value]);
@@ -56,6 +64,29 @@ const consequence = computed(() => {
   const remainingValue = remaining(proposedCapMinor, spent);
   const daily = safeDaily(remainingValue, summary.value.daysUntilReset);
   return { alreadySpent: spent, safeDaily: daily, safeWeekly: daily * 7 };
+});
+
+// How the *saved* cap is going so far this month — distinct from
+// `consequence` above, which previews a not-yet-saved proposed amount.
+// Framed by spend mode: 'cap' compares to an even daily pace (paceGap),
+// 'runRate' projects the month-end total against the saved cap. No
+// dedicated cap field exists on PocketSummary — `spent + remaining`
+// recovers it, the same recovery CapProgressCard.vue uses.
+const modeConsequence = computed(() => {
+  if (!summary.value) return null;
+  if (spendMode.value === 'runRate') {
+    const capMinor = summary.value.spent + summary.value.remaining;
+    const over = summary.value.projection - capMinor;
+    return {
+      over: over > 0,
+      text: `At today's pace you'll end the month ${formatMoney(Math.abs(over), summary.value.currency)} ${over > 0 ? 'over' : 'under'} your cap.`,
+    };
+  }
+  const gap = summary.value.paceGap;
+  return {
+    over: gap < 0,
+    text: `You're ${formatMoney(Math.abs(gap), summary.value.currency)} ${gap >= 0 ? 'under' : 'over'} an even pace this month.`,
+  };
 });
 
 async function onSubmit(): Promise<void> {
@@ -120,15 +151,19 @@ async function onSubmit(): Promise<void> {
           </li>
           <li>
             <span>Safe to spend per day</span>
-            <span :class="{ negative: consequence.safeDaily < 0 }">{{
-              formatMoney(consequence.safeDaily, currency)
-            }}</span>
+            <span
+              class="money-amount"
+              :class="{ 'money-amount--negative': consequence.safeDaily < 0 }"
+              >{{ formatMoney(consequence.safeDaily, currency) }}</span
+            >
           </li>
           <li>
             <span>Safe to spend per week</span>
-            <span :class="{ negative: consequence.safeWeekly < 0 }">{{
-              formatMoney(consequence.safeWeekly, currency)
-            }}</span>
+            <span
+              class="money-amount"
+              :class="{ 'money-amount--negative': consequence.safeWeekly < 0 }"
+              >{{ formatMoney(consequence.safeWeekly, currency) }}</span
+            >
           </li>
         </ul>
       </BaseCard>
@@ -144,6 +179,29 @@ async function onSubmit(): Promise<void> {
         saving ? 'Saving…' : 'Save'
       }}</BaseButton>
     </form>
+
+    <BaseCard v-if="!loading && !error" padding="sm" class="spend-mode">
+      <h2>Spend mode</h2>
+      <BaseSegmentedControl
+        :model-value="spendMode"
+        :options="spendModeOptions"
+        @update:model-value="(value) => setSpendMode(value as 'cap' | 'runRate')"
+      />
+      <p class="hint">
+        <template v-if="spendMode === 'runRate'">
+          Run rate mode projects this month's total at your current pace.
+        </template>
+        <template v-else> Cap mode compares today's spend to an even daily pace. </template>
+      </p>
+      <p
+        v-if="modeConsequence"
+        class="narrative"
+        :class="{ 'narrative--warn': modeConsequence.over }"
+      >
+        {{ modeConsequence.text }}
+      </p>
+      <p v-if="spendModeError" role="alert" class="error">{{ spendModeError }}</p>
+    </BaseCard>
   </main>
 </template>
 
@@ -174,7 +232,31 @@ async function onSubmit(): Promise<void> {
   justify-content: space-between;
 }
 
-.consequence .negative {
+.spend-mode {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kapa-space-3);
+  margin-top: var(--kapa-space-4);
+}
+
+.spend-mode h2 {
+  margin: 0;
+  font-size: var(--kapa-text-body-size);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--kapa-text-caption-size);
+  color: var(--kapa-ink-muted);
+}
+
+.narrative {
+  margin: 0;
+  font-size: var(--kapa-text-caption-size);
+  color: var(--kapa-ink-muted);
+}
+
+.narrative--warn {
   color: var(--kapa-negative);
   font-weight: 600;
 }
