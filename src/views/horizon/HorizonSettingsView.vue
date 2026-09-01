@@ -8,7 +8,8 @@ import BaseCard from '@/components/ui/BaseCard.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import { useHorizonSettings } from '@/composables/useHorizonSettings';
-import type { EventOrder } from '@roman-mik/kapa-core/horizon/queries';
+import { useSettingsConsequences } from '@/composables/useSettingsConsequences';
+import type { EventOrder, SpendMode } from '@roman-mik/kapa-core/horizon/queries';
 import type { Currency } from '@roman-mik/kapa-core/pocket';
 
 const {
@@ -24,6 +25,23 @@ const {
   addHolidayForSpace,
   removeHoliday,
 } = useHorizonSettings();
+
+const {
+  loading: consequencesLoading,
+  eventOrderSentence,
+  spendModeSentence,
+  refresh: refreshConsequences,
+} = useSettingsConsequences();
+
+async function onSaveEventOrder(order: EventOrder): Promise<void> {
+  await saveEventOrder(order);
+  await refreshConsequences();
+}
+
+async function onSaveSpendMode(mode: SpendMode): Promise<void> {
+  await saveSpendMode(mode);
+  await refreshConsequences();
+}
 
 const spendMode = computed(() => settings.value?.spend_mode ?? 'cap');
 const DEFAULT_EVENT_ORDER: EventOrder = 'income,oneOffIn,obligation,plannedSpend,oneOffOut';
@@ -50,7 +68,9 @@ const reportingCurrency = computed<Currency>(
       <section class="section">
         <BaseCard class="settings-card">
           <h2>Same-day event order</h2>
-          <EventOrderEditor :model-value="eventOrder" @update:model-value="saveEventOrder" />
+          <EventOrderEditor :model-value="eventOrder" @update:model-value="onSaveEventOrder" />
+          <SkeletonBlock v-if="consequencesLoading" height="20px" radius="sm" class="consequence" />
+          <p v-else-if="eventOrderSentence" class="consequence">{{ eventOrderSentence }}</p>
         </BaseCard>
       </section>
 
@@ -67,7 +87,7 @@ const reportingCurrency = computed<Currency>(
               role="radio"
               :aria-checked="spendMode === 'cap'"
               :class="{ active: spendMode === 'cap' }"
-              @click="saveSpendMode('cap')"
+              @click="onSaveSpendMode('cap')"
             >
               Cap
             </button>
@@ -76,7 +96,7 @@ const reportingCurrency = computed<Currency>(
               role="radio"
               :aria-checked="spendMode === 'runRate'"
               :class="{ active: spendMode === 'runRate' }"
-              @click="saveSpendMode('runRate')"
+              @click="onSaveSpendMode('runRate')"
             >
               Run rate
             </button>
@@ -86,6 +106,8 @@ const reportingCurrency = computed<Currency>(
             :cap-minor="capMinor"
             :currency="reportingCurrency"
           />
+          <SkeletonBlock v-if="consequencesLoading" height="20px" radius="sm" class="consequence" />
+          <p v-else-if="spendModeSentence" class="consequence">{{ spendModeSentence }}</p>
         </BaseCard>
       </section>
 
@@ -127,6 +149,12 @@ const reportingCurrency = computed<Currency>(
 
 .hint {
   margin: 0 0 var(--kapa-space-3);
+  color: var(--kapa-ink-muted);
+  font-size: var(--kapa-text-caption-size);
+}
+
+.consequence {
+  margin: var(--kapa-space-3) 0 0;
   color: var(--kapa-ink-muted);
   font-size: var(--kapa-text-caption-size);
 }

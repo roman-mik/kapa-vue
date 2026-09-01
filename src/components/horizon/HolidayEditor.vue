@@ -68,20 +68,21 @@ async function onRemove(id: string): Promise<void> {
 
 <template>
   <div class="holidays">
-    <ul v-if="holidays.length" class="list">
-      <li v-for="holiday in holidays" :key="holiday.id" class="row">
-        <div class="info">
+    <ul v-if="holidays.length" class="chips">
+      <li v-for="holiday in holidays" :key="holiday.id" class="chip">
+        <span class="chip-text">
           <span class="name">{{ holiday.name }}</span>
           <span class="date">{{ formatFullDate(holiday.date) }}</span>
-        </div>
-        <BaseButton
-          variant="ghost"
+        </span>
+        <button
+          type="button"
+          class="chip-remove"
           :disabled="saving"
           aria-label="Remove holiday"
           @click="onRemove(holiday.id)"
         >
-          Remove
-        </BaseButton>
+          ×
+        </button>
       </li>
     </ul>
     <p v-else class="empty">No holidays yet.</p>
@@ -109,28 +110,59 @@ async function onRemove(id: string): Promise<void> {
   gap: var(--kapa-space-4);
 }
 
-.list {
+.chips {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: var(--kapa-space-2);
 }
 
-.row {
+.chip {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: var(--kapa-space-2) var(--kapa-space-3);
+  gap: var(--kapa-space-2);
+  padding: var(--kapa-space-1) var(--kapa-space-1) var(--kapa-space-1) var(--kapa-space-3);
   background: var(--kapa-surface);
   border: 1px solid var(--kapa-neutral-400);
-  border-radius: var(--kapa-radius-md);
+  border-radius: 999px;
 }
 
-.info {
+.chip-text {
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: var(--kapa-space-2);
+}
+
+.chip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--kapa-ink-muted);
+  font-size: 1.25em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chip-remove:hover {
+  background: var(--kapa-neutral-200);
+  color: var(--kapa-ink);
+}
+
+.chip-remove:focus-visible {
+  outline: 2px solid var(--kapa-accent);
+  outline-offset: 2px;
+}
+
+.chip-remove:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .name {

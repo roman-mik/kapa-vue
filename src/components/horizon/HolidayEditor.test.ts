@@ -46,12 +46,9 @@ describe('HolidayEditor', () => {
     expect(wrapper.text()).toContain(formatFullDate('2026-09-01'));
   });
 
-  it('emits remove for a holiday when its Remove button is clicked', async () => {
+  it('emits remove for a holiday when its remove control is clicked', async () => {
     const { wrapper, remove } = await mountEditor();
-    await wrapper
-      .findAll('button')
-      .find((b) => b.text() === 'Remove')!
-      .trigger('click');
+    await wrapper.find('[aria-label="Remove holiday"]').trigger('click');
     await flushPromises();
     expect(remove).toHaveBeenCalledWith('h1');
   });
