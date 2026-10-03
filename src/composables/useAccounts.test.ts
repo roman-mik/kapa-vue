@@ -1,6 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
+import { useSessionStore } from '@/stores/session';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useAccounts } from './useAccounts';
 
 const { listAccounts, createAccount, updateAccount, archiveAccount } = vi.hoisted(() => ({
@@ -24,7 +26,9 @@ function flush(): Promise<void> {
 describe('useAccounts', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    queryCache.clear();
     vi.clearAllMocks();
+    useSessionStore().user = { id: 'u1' } as never;
     const space = useSpaceStore();
     space.spaces = [
       {

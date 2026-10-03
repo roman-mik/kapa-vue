@@ -1,4 +1,4 @@
-import type { CurrencyBucket, FxRate, PocketHomeView } from '@roman-mik/kapa-core/pocket';
+import type { CurrencyBucket, PocketHomeView } from '@roman-mik/kapa-core/pocket';
 import {
   categoryBreakdown,
   completedDays,
@@ -21,10 +21,11 @@ import {
   zonedDateKey,
 } from '@roman-mik/kapa-core/pocket';
 import { listExpensesInRange } from '@roman-mik/kapa-core/pocket/queries';
-import { listFxRates } from '@roman-mik/kapa-core/core';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { supabase } from '@/lib/supabase';
 import { useCap } from '@/composables/useCap';
+import { useFxRates } from '@/composables/useFxRates';
+import { useSpaceQuery } from '@/composables/useSpaceQuery';
 import { useSpaceStore } from '@/stores/space';
 import { toExpenseAmount } from '@/lib/expenseAmount';
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
@@ -57,45 +58,21 @@ export interface PocketSummary {
 export function usePocketHome() {
   const space = useSpaceStore();
   const cap = useCap();
-
-  const expenses = ref<ExpenseView[]>([]);
-  const rates = ref<FxRate[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  async function refresh(): Promise<void> {
-    const currentSpace = space.currentSpace;
-    if (!currentSpace) {
-      expenses.value = [];
-      rates.value = [];
-      return;
-    }
-    loading.value = true;
-    error.value = null;
-    try {
-      const timeZone = currentSpace.timezone;
-      const month = currentMonth(new Date(), timeZone);
-      const { startUtc, endUtc } = monthWindow(month, timeZone);
-      const onOrBefore = zonedDateKey(new Date(), timeZone);
-      const [expenseRows, rateRows] = await Promise.all([
-        listExpensesInRange(supabase, currentSpace.id, startUtc, endUtc),
-        listFxRates(supabase, onOrBefore),
-      ]);
-      expenses.value = expenseRows;
-      rates.value = rateRows.map((r) => ({
-        baseCurrency: r.base_currency as Currency,
-        quoteCurrency: r.quote_currency as Currency,
-        rateE8: r.rate_e8,
-        rateDate: r.rate_date,
-      }));
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Couldn't load this month's data.";
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
+  const month = computed(() =>
+    space.currentSpace ? currentMonth(new Date(), space.currentSpace.timezone) : null
+  );
+  const expenseQuery = useSpaceQuery<ExpenseView[]>({
+    resource: 'pocketExpenses',
+    staleTimeMs: 30_000,
+    params: () => [month.value, space.currentSpace?.timezone],
+    load: ({ spaceId, params }) => {
+      const [month, timezone] = params as [string, string];
+      const { startUtc, endUtc } = monthWindow(month, timezone);
+      return listExpensesInRange(supabase, spaceId, startUtc, endUtc);
+    },
+  });
+  const expenses = computed(() => expenseQuery.data.value ?? []);
+  const fxRates = useFxRates();
 
   const summary = computed<PocketSummary | null>(() => {
     const currentSpace = space.currentSpace;
@@ -115,7 +92,7 @@ export function usePocketHome() {
     const completed = completedDays(D, dl);
 
     const amounts = expenses.value.map(toExpenseAmount);
-    const spentResult = spentTotal(amounts, timeZone, spaceCurrency, rates.value);
+    const spentResult = spentTotal(amounts, timeZone, spaceCurrency, fxRates.rates.value);
     const spent = spentResult.value;
 
     const todayKey = zonedDateKey(new Date(), timeZone);
@@ -149,8 +126,9 @@ export function usePocketHome() {
       projection: projection(spent, elapsed, D),
       spentPct: spentPctValue,
       overspend: overspendValue,
-      categoryBreakdown: categoryBreakdown(amounts, timeZone, spaceCurrency, rates.value).value,
-      dailyTotals: dailyTotals(amounts, month, timeZone, spaceCurrency, rates.value).value,
+      categoryBreakdown: categoryBreakdown(amounts, timeZone, spaceCurrency, fxRates.rates.value)
+        .value,
+      dailyTotals: dailyTotals(amounts, month, timeZone, spaceCurrency, fxRates.rates.value).value,
       dailyCapReference: Math.floor(capMinor / D),
       unconverted: spentResult.unconverted,
       todayExpenses,
@@ -162,11 +140,13 @@ export function usePocketHome() {
   return {
     cap,
     summary,
-    rates,
-    loading: computed(() => loading.value || cap.loading.value),
-    error,
+    rates: fxRates.rates,
+    loading: computed(
+      () => expenseQuery.loading.value || fxRates.loading.value || cap.loading.value
+    ),
+    error: computed(() => expenseQuery.error.value ?? fxRates.error.value ?? cap.error.value),
     refresh: async () => {
-      await Promise.all([refresh(), cap.refresh()]);
+      await Promise.all([expenseQuery.refresh(), fxRates.refresh(), cap.refresh()]);
     },
   };
 }

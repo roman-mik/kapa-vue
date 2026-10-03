@@ -1,6 +1,7 @@
 import type { Session, User } from '@supabase/supabase-js';
 import { defineStore } from 'pinia';
 import { supabase } from '@/lib/supabase';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useSpaceStore } from '@/stores/space';
 
 export const useSessionStore = defineStore('session', {
@@ -21,6 +22,10 @@ export const useSessionStore = defineStore('session', {
       this.ready = true;
 
       supabase.auth.onAuthStateChange((_event, session: Session | null) => {
+        if (this.user?.id !== session?.user.id) {
+          queryCache.clear();
+          useSpaceStore().reset();
+        }
         this.user = session?.user ?? null;
       });
     },
@@ -33,6 +38,7 @@ export const useSessionStore = defineStore('session', {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
       this.user = null;
+      queryCache.clear();
       // Clears the previous user's spaces so a different account signing
       // in on the same device never briefly sees a stale space list.
       useSpaceStore().reset();

@@ -1,9 +1,12 @@
+import { flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { ref } from 'vue';
 import type { FxRate } from '@roman-mik/kapa-core/pocket';
 import type { Convertible } from './useConvertedAmount';
 import { useSpaceStore } from '@/stores/space';
+import { useSessionStore } from '@/stores/session';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useConvertedAmount } from './useConvertedAmount';
 
 const { listFxRates } = vi.hoisted(() => ({ listFxRates: vi.fn() }));
@@ -27,6 +30,8 @@ function account(overrides: Partial<Convertible> = {}): Convertible {
 describe('useConvertedAmount', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    queryCache.clear();
+    useSessionStore().user = { id: 'u1' } as never;
     const space = useSpaceStore();
     space.spaces = [
       {
@@ -61,7 +66,7 @@ describe('useConvertedAmount', () => {
   it('returns the native amount for a same-currency item', async () => {
     const items = ref<Convertible[]>([account({ currency: 'RSD', amountMinor: 500 })]);
     const { convertedMinor, spaceCurrencyAmount, unconvertible } = useConvertedAmount(items);
-    await vi.waitFor(() => expect(listFxRates).toHaveBeenCalled());
+    await flushPromises();
     expect(convertedMinor(items.value[0])).toBeNull();
     expect(spaceCurrencyAmount(items.value[0])).toBe(500);
     expect(unconvertible.value).toHaveLength(0);
@@ -71,7 +76,7 @@ describe('useConvertedAmount', () => {
     listFxRates.mockResolvedValue([]);
     const items = ref<Convertible[]>([account()]);
     const { convertedMinor, spaceCurrencyAmount, unconvertible } = useConvertedAmount(items);
-    await vi.waitFor(() => expect(listFxRates).toHaveBeenCalled());
+    await flushPromises();
     expect(convertedMinor(items.value[0])).toBeNull();
     expect(spaceCurrencyAmount(items.value[0])).toBeNull();
     expect(unconvertible.value).toHaveLength(1);
@@ -80,7 +85,7 @@ describe('useConvertedAmount', () => {
   it('rateFor returns the covering FxRate with its date for a foreign item', async () => {
     const items = ref<Convertible[]>([account()]);
     const { rateFor } = useConvertedAmount(items);
-    await vi.waitFor(() => expect(listFxRates).toHaveBeenCalled());
+    await flushPromises();
     expect(rateFor(items.value[0])).toEqual({
       baseCurrency: 'EUR',
       quoteCurrency: 'RSD',
@@ -92,7 +97,7 @@ describe('useConvertedAmount', () => {
   it('rateFor returns null for a same-currency item', async () => {
     const items = ref<Convertible[]>([account({ currency: 'RSD', amountMinor: 500 })]);
     const { rateFor } = useConvertedAmount(items);
-    await vi.waitFor(() => expect(listFxRates).toHaveBeenCalled());
+    await flushPromises();
     expect(rateFor(items.value[0])).toBeNull();
   });
 
@@ -100,14 +105,14 @@ describe('useConvertedAmount', () => {
     listFxRates.mockResolvedValue([]);
     const items = ref<Convertible[]>([account()]);
     const { rateFor } = useConvertedAmount(items);
-    await vi.waitFor(() => expect(listFxRates).toHaveBeenCalled());
+    await flushPromises();
     expect(rateFor(items.value[0])).toBeNull();
   });
 
   it('fxAsOf surfaces the newest snapshot date and a non-negative age', async () => {
     const items = ref<Convertible[]>([]);
     const { fxAsOf } = useConvertedAmount(items);
-    await vi.waitFor(() => expect(listFxRates).toHaveBeenCalled());
+    await flushPromises();
     const asOf = fxAsOf();
     expect(asOf).not.toBeNull();
     expect(asOf!.date).toBe('2026-08-20');
@@ -118,7 +123,7 @@ describe('useConvertedAmount', () => {
     listFxRates.mockResolvedValue([]);
     const items = ref<Convertible[]>([]);
     const { fxAsOf } = useConvertedAmount(items);
-    await vi.waitFor(() => expect(listFxRates).toHaveBeenCalled());
+    await flushPromises();
     expect(fxAsOf()).toBeNull();
   });
 
@@ -139,7 +144,7 @@ describe('useConvertedAmount', () => {
     ]);
     const items = ref<Convertible[]>([]);
     const { fxAsOf } = useConvertedAmount(items);
-    await vi.waitFor(() => expect(listFxRates).toHaveBeenCalled());
+    await flushPromises();
     expect(fxAsOf()!.date).toBe('2026-08-20');
   });
 });

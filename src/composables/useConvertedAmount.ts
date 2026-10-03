@@ -6,9 +6,8 @@ import {
   type FxRate,
 } from '@roman-mik/kapa-core/pocket';
 import { daysBetween } from '@roman-mik/kapa-core/horizon';
-import { listFxRates } from '@roman-mik/kapa-core/core';
-import { computed, ref, watch, type Ref } from 'vue';
-import { supabase } from '@/lib/supabase';
+import { computed, type Ref } from 'vue';
+import { useFxRates } from '@/composables/useFxRates';
 import { useSpaceStore } from '@/stores/space';
 
 /**
@@ -45,53 +44,23 @@ export function useConvertedAmount(items: Ref<Convertible[]>) {
 
   const spaceCurrency = computed(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
 
-  const rates = ref<FxRate[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
+  const fxRates = useFxRates();
 
   const timeZone = computed(() => space.currentSpace?.timezone);
 
-  // Re-fetches the rate snapshot only — this is what FxSnapshotPanel's
-  // Refresh button re-triggers, not useAccounts' balance fetch.
-  async function refresh(): Promise<void> {
-    const currentSpace = space.currentSpace;
-    if (!currentSpace) {
-      rates.value = [];
-      return;
-    }
-    loading.value = true;
-    error.value = null;
-    try {
-      const onOrBefore = zonedDateKey(new Date(), currentSpace.timezone);
-      const rows = await listFxRates(supabase, onOrBefore);
-      rates.value = rows.map((r) => ({
-        baseCurrency: r.base_currency as Currency,
-        quoteCurrency: r.quote_currency as Currency,
-        rateE8: r.rate_e8,
-        rateDate: r.rate_date,
-      }));
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Couldn't load exchange rates.";
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
-
+  const rates = fxRates.rates;
   const isForeign = (item: Convertible): boolean => item.currency !== spaceCurrency.value;
-
-  /**
-   * The covering `FxRate` for `item` (rate + `rateDate` for display), or null
-   * when the item is already in the space currency or no covering rate exists.
-   * Returns the same stored `FxRate` `convertToCurrency` uses, so a caller can
-   * render the rate and its snapshot date truthfully (`€1.015 @ 117,2`).
-   */
   function rateFor(item: Convertible): FxRate | null {
     const tz = timeZone.value;
-    if (!tz || item.currency === spaceCurrency.value) return null;
-    const asOf = item.asOfDate ?? zonedDateKey(new Date(), tz);
-    return findRate(rates.value, item.currency, spaceCurrency.value, asOf) ?? null;
+    if (!tz || !isForeign(item)) return null;
+    return (
+      findRate(
+        rates.value,
+        item.currency,
+        spaceCurrency.value,
+        item.asOfDate ?? zonedDateKey(new Date(), tz)
+      ) ?? null
+    );
   }
 
   const convertedById = computed<Map<string, number | null>>(() => {
@@ -142,10 +111,10 @@ export function useConvertedAmount(items: Ref<Convertible[]>) {
 
   return {
     spaceCurrency,
-    rates,
-    loading,
-    error,
-    refresh,
+    rates: fxRates.rates,
+    loading: fxRates.loading,
+    error: fxRates.error,
+    refresh: fxRates.refresh,
     isForeign,
     rateFor,
     fxAsOf,

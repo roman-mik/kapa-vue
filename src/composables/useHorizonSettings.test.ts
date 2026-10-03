@@ -1,6 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
+import { useSessionStore } from '@/stores/session';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useHorizonSettings } from './useHorizonSettings';
 
 const {
@@ -77,6 +79,8 @@ function fakeHoliday(overrides: Record<string, unknown> = {}) {
 describe('useHorizonSettings', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    queryCache.clear();
+    useSessionStore().user = { id: 'u1' } as never;
     vi.clearAllMocks();
     const space = useSpaceStore();
     space.spaces = [
@@ -144,6 +148,7 @@ describe('useHorizonSettings', () => {
     const { workingWeekdays, saveWorkCalendar } = useHorizonSettings();
     await flush();
 
+    getWorkCalendar.mockResolvedValue({ workingWeekdays: [1, 2, 3, 4, 5, 6], holidays: [] });
     await saveWorkCalendar([1, 2, 3, 4, 5, 6]);
 
     expect(upsertWorkCalendar).toHaveBeenCalledWith(expect.anything(), 'sp1', [1, 2, 3, 4, 5, 6]);
