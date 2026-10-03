@@ -16,12 +16,12 @@ const CategoriesView = () => import('@/views/pocket/CategoriesView.vue');
 const AddExpenseView = () => import('@/views/pocket/AddExpenseView.vue');
 const EditExpenseView = () => import('@/views/pocket/EditExpenseView.vue');
 const HistoryView = () => import('@/views/pocket/HistoryView.vue');
+const PocketLayout = () => import('@/views/pocket/PocketLayout.vue');
 const HorizonLayout = () => import('@/views/horizon/HorizonLayout.vue');
 const TodayView = () => import('@/views/horizon/TodayView.vue');
 const AccountsView = () => import('@/views/horizon/AccountsView.vue');
 const TimelineView = () => import('@/views/horizon/TimelineView.vue');
-const MoneyInView = () => import('@/views/horizon/MoneyInView.vue');
-const MoneyOutView = () => import('@/views/horizon/MoneyOutView.vue');
+const MoneyView = () => import('@/views/horizon/MoneyView.vue');
 const HorizonSettingsView = () => import('@/views/horizon/HorizonSettingsView.vue');
 
 declare module 'vue-router' {
@@ -41,31 +41,22 @@ const router = createRouter({
     { path: '/', name: 'landing', component: LandingView, meta: { public: true } },
     { path: '/login', name: 'login', component: LoginView },
     { path: '/spaces', name: 'spaces', component: SpaceView },
-    { path: '/pocket', name: 'home', component: PocketHomeView, meta: { showHeader: true } },
-    { path: '/pocket/cap', name: 'pocket-cap', component: CapView, meta: { showHeader: true } },
     {
-      path: '/pocket/categories',
-      name: 'pocket-categories',
-      component: CategoriesView,
-      meta: { showHeader: true },
-    },
-    {
-      path: '/pocket/add',
-      name: 'pocket-add',
-      component: AddExpenseView,
-      meta: { showHeader: true },
-    },
-    {
-      path: '/pocket/history',
-      name: 'pocket-history',
-      component: HistoryView,
-      meta: { showHeader: true },
-    },
-    {
-      path: '/pocket/edit/:id',
-      name: 'pocket-edit',
-      component: EditExpenseView,
-      meta: { showHeader: true },
+      // Pocket is its own app, mirroring Horizon below: PocketLayout renders
+      // the rail/tab-bar gate, so its children don't set showHeader (that
+      // would double-render AppHeader/BottomTabBar on top of the layout's
+      // own chrome). /settings stays outside this subtree deliberately — see
+      // PocketLayout.vue's comment on why the app-switcher still reaches it.
+      path: '/pocket',
+      component: PocketLayout,
+      children: [
+        { path: '', name: 'home', component: PocketHomeView },
+        { path: 'cap', name: 'pocket-cap', component: CapView },
+        { path: 'categories', name: 'pocket-categories', component: CategoriesView },
+        { path: 'add', name: 'pocket-add', component: AddExpenseView },
+        { path: 'history', name: 'pocket-history', component: HistoryView },
+        { path: 'edit/:id', name: 'pocket-edit', component: EditExpenseView },
+      ],
     },
     {
       path: '/settings',
@@ -82,8 +73,9 @@ const router = createRouter({
         { path: '', name: 'horizon-today', component: TodayView },
         { path: 'accounts', name: 'horizon-accounts', component: AccountsView },
         { path: 'timeline', name: 'horizon-timeline', component: TimelineView },
-        { path: 'money-in', name: 'horizon-money-in', component: MoneyInView },
-        { path: 'money-out', name: 'horizon-money-out', component: MoneyOutView },
+        { path: 'money-in', name: 'horizon-money-in', component: MoneyView },
+        { path: 'money-out', name: 'horizon-money-out', component: MoneyView },
+        { path: 'money', name: 'horizon-money', component: MoneyView },
         { path: 'settings', name: 'horizon-settings', component: HorizonSettingsView },
       ],
     },

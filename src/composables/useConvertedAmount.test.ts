@@ -1,3 +1,4 @@
+import { flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { ref } from 'vue';
@@ -65,7 +66,7 @@ describe('useConvertedAmount', () => {
   it('returns the native amount for a same-currency item', async () => {
     const items = ref<Convertible[]>([account({ currency: 'RSD', amountMinor: 500 })]);
     const { convertedMinor, spaceCurrencyAmount, unconvertible } = useConvertedAmount(items);
-    await vi.waitFor(() => expect(listFxRates).toHaveBeenCalled());
+    await flushPromises();
     expect(convertedMinor(items.value[0])).toBeNull();
     expect(spaceCurrencyAmount(items.value[0])).toBe(500);
     expect(unconvertible.value).toHaveLength(0);
@@ -75,9 +76,75 @@ describe('useConvertedAmount', () => {
     listFxRates.mockResolvedValue([]);
     const items = ref<Convertible[]>([account()]);
     const { convertedMinor, spaceCurrencyAmount, unconvertible } = useConvertedAmount(items);
-    await vi.waitFor(() => expect(listFxRates).toHaveBeenCalled());
+    await flushPromises();
     expect(convertedMinor(items.value[0])).toBeNull();
     expect(spaceCurrencyAmount(items.value[0])).toBeNull();
     expect(unconvertible.value).toHaveLength(1);
+  });
+
+  it('rateFor returns the covering FxRate with its date for a foreign item', async () => {
+    const items = ref<Convertible[]>([account()]);
+    const { rateFor } = useConvertedAmount(items);
+    await flushPromises();
+    expect(rateFor(items.value[0])).toEqual({
+      baseCurrency: 'EUR',
+      quoteCurrency: 'RSD',
+      rateE8: 11_723_456_789,
+      rateDate: '2026-08-20',
+    });
+  });
+
+  it('rateFor returns null for a same-currency item', async () => {
+    const items = ref<Convertible[]>([account({ currency: 'RSD', amountMinor: 500 })]);
+    const { rateFor } = useConvertedAmount(items);
+    await flushPromises();
+    expect(rateFor(items.value[0])).toBeNull();
+  });
+
+  it('rateFor returns null when no covering rate exists', async () => {
+    listFxRates.mockResolvedValue([]);
+    const items = ref<Convertible[]>([account()]);
+    const { rateFor } = useConvertedAmount(items);
+    await flushPromises();
+    expect(rateFor(items.value[0])).toBeNull();
+  });
+
+  it('fxAsOf surfaces the newest snapshot date and a non-negative age', async () => {
+    const items = ref<Convertible[]>([]);
+    const { fxAsOf } = useConvertedAmount(items);
+    await flushPromises();
+    const asOf = fxAsOf();
+    expect(asOf).not.toBeNull();
+    expect(asOf!.date).toBe('2026-08-20');
+    expect(asOf!.ageDays).toBeGreaterThanOrEqual(0);
+  });
+
+  it('fxAsOf returns null when no rates are loaded', async () => {
+    listFxRates.mockResolvedValue([]);
+    const items = ref<Convertible[]>([]);
+    const { fxAsOf } = useConvertedAmount(items);
+    await flushPromises();
+    expect(fxAsOf()).toBeNull();
+  });
+
+  it('fxAsOf picks the newest rateDate across the loaded set', async () => {
+    listFxRates.mockResolvedValue([
+      {
+        base_currency: 'EUR',
+        quote_currency: 'RSD',
+        rate_e8: 10_000_000_000,
+        rate_date: '2026-08-10',
+      },
+      {
+        base_currency: 'EUR',
+        quote_currency: 'RSD',
+        rate_e8: 11_723_456_789,
+        rate_date: '2026-08-20',
+      },
+    ]);
+    const items = ref<Convertible[]>([]);
+    const { fxAsOf } = useConvertedAmount(items);
+    await flushPromises();
+    expect(fxAsOf()!.date).toBe('2026-08-20');
   });
 });

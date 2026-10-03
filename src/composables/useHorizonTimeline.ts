@@ -6,6 +6,7 @@ import { useHorizonProjection } from '@/composables/useHorizonProjection';
 import { useHorizonSettingsResource } from '@/composables/useHorizonSettingsResource';
 import { useProjectionDismissals } from '@/composables/useProjectionDismissals';
 import { supabase } from '@/lib/supabase';
+import { daysUnder, daysUnderPerMonth } from '@/lib/horizon/daysUnder';
 import { useSpaceStore } from '@/stores/space';
 
 export const RANGE_PRESETS = [1, 3, 6, 12] as const;
@@ -34,6 +35,9 @@ export function useHorizonTimeline() {
       reportingCurrency.value
     );
   });
+  const daysUnderToday = computed(() => daysUnder(days.value));
+  const daysUnderByMonth = computed(() => daysUnderPerMonth(days.value));
+
   async function dismiss(date: string, reason: string): Promise<void> {
     const invalidate = dismissals.invalidate;
     const spaceId = space.currentSpaceId;
@@ -61,6 +65,8 @@ export function useHorizonTimeline() {
     events,
     metrics,
     warnings,
+    daysUnderToday,
+    daysUnderByMonth,
     dismiss,
   };
 }

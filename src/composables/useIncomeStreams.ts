@@ -22,6 +22,7 @@ import { computed } from 'vue';
 import { useSpaceQuery } from '@/composables/useSpaceQuery';
 import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { supabase } from '@/lib/supabase';
+import { countNonConfirmed } from '@/lib/horizon/confidence';
 import { useSpaceStore } from '@/stores/space';
 
 /**
@@ -124,6 +125,11 @@ export function useIncomeStreams() {
     }))
   );
 
+  // Number of active contributors treated as estimates (not confirmed) in this
+  // projection — for the rail's "N estimates in this projection" surface.
+  // Counts source rows, since `confidence` isn't carried on ledger events.
+  const nonConfirmedCount = computed(() => countNonConfirmed(streams.value));
+
   /**
    * Creates the stream, then its payment schedules. A failure mid-way rolls
    * the orphaned stream back so a half-saved stream never shows in the list.
@@ -210,6 +216,7 @@ export function useIncomeStreams() {
   return {
     streamsWithMonth,
     convertibles,
+    nonConfirmedCount,
     month,
     calendar,
     loading: computed(() => query.loading.value || calendarQuery.loading.value),

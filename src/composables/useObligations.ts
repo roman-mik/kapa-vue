@@ -24,6 +24,7 @@ import { computed } from 'vue';
 import { useSpaceQuery } from '@/composables/useSpaceQuery';
 import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { supabase } from '@/lib/supabase';
+import { countNonConfirmed } from '@/lib/horizon/confidence';
 import { useSpaceStore } from '@/stores/space';
 
 /**
@@ -167,6 +168,10 @@ export function useObligations() {
     }))
   );
 
+  // Number of active obligations treated as estimates (not confirmed) in this
+  // projection — the obligations half of the rail's "N estimates" surface.
+  const nonConfirmedCount = computed(() => countNonConfirmed(obligations.value));
+
   /**
    * Creates the obligation, then its schedule. A failure mid-way rolls the
    * orphaned obligation back so a half-saved obligation never shows in the
@@ -249,6 +254,7 @@ export function useObligations() {
   return {
     obligationsWithMonth,
     convertibles,
+    nonConfirmedCount,
     month,
     calendar,
     loading: computed(() => query.loading.value || calendarQuery.loading.value),

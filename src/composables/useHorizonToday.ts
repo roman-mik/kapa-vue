@@ -7,6 +7,8 @@ import { useHorizonProjection } from '@/composables/useHorizonProjection';
 import { useHorizonSettingsResource } from '@/composables/useHorizonSettingsResource';
 import { useProjectionDismissals } from '@/composables/useProjectionDismissals';
 import { supabase } from '@/lib/supabase';
+import { daysUnder } from '@/lib/horizon/daysUnder';
+import { globalTrough, type Trough } from '@/lib/horizon/trough';
 import { useSpaceStore } from '@/stores/space';
 
 export interface MonthMin {
@@ -51,6 +53,15 @@ export function useHorizonToday() {
       reportingCurrency.value
     );
   });
+  const days = computed(() => projection.data.value?.value.days ?? []);
+  const trough = computed<Trough | null>(() => globalTrough(days.value));
+  const balanceToday = computed(() => days.value[0]?.balanceMinor ?? null);
+  const monthEnd = computed(() => {
+    const month = metrics.value?.months[0];
+    return month ? { month: month.month, balanceMinor: month.endBalanceMinor } : null;
+  });
+  const daysUnderCount = computed(() => daysUnder(days.value));
+
   async function dismiss(date: string, reason: string): Promise<void> {
     const invalidate = dismissals.invalidate;
     const spaceId = space.currentSpaceId;
@@ -89,8 +100,12 @@ export function useHorizonToday() {
     capMinor: computed(() => cap.cap.value?.monthly_cap_minor ?? null),
     endBalanceMinor: computed(() => metrics.value?.endBalanceMinor ?? 0),
     monthMin,
+    trough,
+    balanceToday,
+    monthEnd,
     nextEvents,
     warnings,
+    daysUnderCount,
     dismiss,
   };
 }

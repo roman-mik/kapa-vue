@@ -7,6 +7,7 @@ import type {
 import {
   addExpense,
   deleteExpense,
+  getExpense,
   listExpensesInRange,
   updateExpense,
 } from '@roman-mik/kapa-core/pocket/queries';
@@ -85,6 +86,11 @@ export function useExpenses() {
     return outcome;
   }
 
+  async function getById(expenseId: string): Promise<ExpenseView | null> {
+    const cached = expenses.value.find((expense) => expense.id === expenseId);
+    return cached ?? getExpense(supabase, expenseId);
+  }
+
   return {
     expenses,
     loading: query.loading,
@@ -93,5 +99,6 @@ export function useExpenses() {
     add,
     update,
     remove,
+    getById,
   };
 }

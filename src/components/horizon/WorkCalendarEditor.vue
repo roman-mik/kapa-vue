@@ -53,23 +53,50 @@ function setDay(value: number, on: boolean): void {
 }
 
 .days {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: var(--kapa-space-2);
 }
 
 .day-label {
   display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: var(--kapa-space-1);
-  font-size: var(--kapa-text-body-size);
-  color: var(--kapa-ink);
+  min-height: 44px;
+  padding: var(--kapa-space-2);
+  border: 1px solid var(--kapa-neutral-400);
+  border-radius: var(--kapa-radius-md);
+  font-size: var(--kapa-text-caption-size);
+  font-weight: 600;
+  color: var(--kapa-ink-muted);
   cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.day-label:has(input:checked) {
+  background: var(--kapa-accent-100);
+  color: var(--kapa-accent-700);
+  border-color: var(--kapa-accent-100);
+}
+
+.day-label:has(input:focus-visible) {
+  outline: 2px solid var(--kapa-accent);
+  outline-offset: 2px;
 }
 
 .day-label input {
-  accent-color: var(--kapa-accent);
-  width: 1.1em;
-  height: 1.1em;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+@media (min-width: 480px) {
+  .day-label {
+    flex-direction: row;
+  }
 }
 </style>

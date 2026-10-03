@@ -107,7 +107,7 @@ describe('useHorizonToday', () => {
     vi.useRealTimers();
   });
 
-  it('derives end balance, paired month minimum, next events, cap, and warnings from one projection fetch', async () => {
+  it('derives end balance, global trough, balance today, month end, next events, cap, and warnings from one projection fetch', async () => {
     projectionForRange.mockResolvedValue({
       value: {
         days: [
@@ -125,7 +125,9 @@ describe('useHorizonToday', () => {
       spendMode,
       capMinor,
       endBalanceMinor,
-      monthMin,
+      trough,
+      balanceToday,
+      monthEnd,
       nextEvents,
       warnings,
     } = useHorizonToday();
@@ -141,7 +143,9 @@ describe('useHorizonToday', () => {
     expect(spendMode.value).toBe('cap');
     expect(capMinor.value).toBe(100000);
     expect(endBalanceMinor.value).toBe(-1000);
-    expect(monthMin.value).toEqual({ minBalanceMinor: -1000, minBalanceDate: '2026-09-02' });
+    expect(trough.value).toEqual({ minBalanceMinor: -1000, minBalanceDate: '2026-09-02' });
+    expect(balanceToday.value).toBe(5000);
+    expect(monthEnd.value).toEqual({ month: '2026-09', balanceMinor: -1000 });
     expect(nextEvents.value).toHaveLength(1);
     expect(nextEvents.value[0]).toMatchObject({ label: 'Rent', date: '2026-09-02' });
     expect(warnings.value).toHaveLength(1);

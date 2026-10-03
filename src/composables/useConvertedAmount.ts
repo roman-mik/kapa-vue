@@ -1,4 +1,11 @@
-import { convertToCurrency, zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
+import {
+  convertMinor,
+  findRate,
+  zonedDateKey,
+  type Currency,
+  type FxRate,
+} from '@roman-mik/kapa-core/pocket';
+import { daysBetween } from '@roman-mik/kapa-core/horizon';
 import { computed, type Ref } from 'vue';
 import { useFxRates } from '@/composables/useFxRates';
 import { useSpaceStore } from '@/stores/space';
@@ -41,30 +48,51 @@ export function useConvertedAmount(items: Ref<Convertible[]>) {
 
   const timeZone = computed(() => space.currentSpace?.timezone);
 
+  const rates = fxRates.rates;
+  const isForeign = (item: Convertible): boolean => item.currency !== spaceCurrency.value;
+  function rateFor(item: Convertible): FxRate | null {
+    const tz = timeZone.value;
+    if (!tz || !isForeign(item)) return null;
+    return (
+      findRate(
+        rates.value,
+        item.currency,
+        spaceCurrency.value,
+        item.asOfDate ?? zonedDateKey(new Date(), tz)
+      ) ?? null
+    );
+  }
+
   const convertedById = computed<Map<string, number | null>>(() => {
     const map = new Map<string, number | null>();
-    const tz = timeZone.value;
     for (const item of items.value) {
-      if (item.currency === spaceCurrency.value || !tz) {
+      const rate = rateFor(item);
+      if (!rate) {
         map.set(item.id, null);
         continue;
       }
-      const asOf = item.asOfDate ?? zonedDateKey(new Date(), tz);
-      map.set(
-        item.id,
-        convertToCurrency(
-          item.amountMinor,
-          item.currency,
-          spaceCurrency.value,
-          asOf,
-          fxRates.rates.value
-        ) ?? null
-      );
+      map.set(item.id, convertMinor(item.amountMinor, item.currency, spaceCurrency.value, rate));
     }
     return map;
   });
 
-  const isForeign = (item: Convertible): boolean => item.currency !== spaceCurrency.value;
+  /**
+   * The newest snapshot across all loaded rates, with its age in whole days —
+   * for the "FX as of 29 Aug · 2 days old" surfaces. null when no rates are
+   * loaded. Age is computed from the rate's `rateDate` against today in the
+   * space's zone (UTC-anchored, never negative).
+   */
+  function fxAsOf(): { date: string; ageDays: number } | null {
+    if (rates.value.length === 0) return null;
+    let newest = rates.value[0];
+    for (const rate of rates.value) {
+      if (rate.rateDate > newest.rateDate) newest = rate;
+    }
+    const tz = timeZone.value;
+    const today = tz ? zonedDateKey(new Date(), tz) : zonedDateKey(new Date(), 'UTC');
+    const age = daysBetween(newest.rateDate, today);
+    return { date: newest.rateDate, ageDays: Math.max(0, age) };
+  }
 
   /** The ≈converted figure to show beside a native amount, or null. */
   function convertedMinor(item: Convertible): number | null {
@@ -86,7 +114,10 @@ export function useConvertedAmount(items: Ref<Convertible[]>) {
     rates: fxRates.rates,
     loading: fxRates.loading,
     error: fxRates.error,
+    refresh: fxRates.refresh,
     isForeign,
+    rateFor,
+    fxAsOf,
     convertedMinor,
     spaceCurrencyAmount,
     unconvertible,

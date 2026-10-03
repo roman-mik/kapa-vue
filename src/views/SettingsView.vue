@@ -5,6 +5,7 @@ import { ref, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import BaseCheckbox from '@/components/ui/BaseCheckbox.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import { expensesToCsv } from '@/lib/csv';
@@ -15,9 +16,15 @@ import { useThemeStore } from '@/stores/theme';
 import { useToast } from '@/composables/useToast';
 import { useInstallPrompt } from '@/composables/useInstallPrompt';
 import { useInvite } from '@/composables/useInvite';
+import { useNightMode } from '@/composables/useNightMode';
 import { displayNameSchema, firstIssueMessage, spaceNameSchema } from '@/lib/validation';
 
 const theme = useThemeStore();
+const night = useNightMode();
+const nightEnabled = computed({
+  get: () => night.enabled.value,
+  set: (value) => night.toggle(value),
+});
 const space = useSpaceStore();
 const session = useSessionStore();
 const router = useRouter();
@@ -242,6 +249,10 @@ async function onCopyInvite(): Promise<void> {
           {{ themes[id].name }}
         </button>
       </div>
+      <BaseCheckbox
+        v-model="nightEnabled"
+        label="Night mode (stopgap — doesn't sync across devices yet)"
+      />
     </BaseCard>
 
     <BaseCard v-if="canInstall && !installed" padding="sm" class="section">

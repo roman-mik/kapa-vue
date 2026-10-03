@@ -78,4 +78,33 @@ describe('BalanceLineChart', () => {
     expect(paths.length).toBeGreaterThan(1);
     expect(wrapper.findAll('path.balance-line.negative').length).toBeGreaterThan(0);
   });
+
+  it('draws the underwater stroke heavier than the neutral stroke', () => {
+    const wrapper = mount(BalanceLineChart, { props: { days, events: [], currency: 'RSD' } });
+    const neutral = wrapper.find('path.balance-line:not(.negative)');
+    const negative = wrapper.find('path.balance-line.negative');
+    expect(parseFloat(negative.attributes('stroke-width') ?? '0')).toBeGreaterThan(
+      parseFloat(neutral.attributes('stroke-width') ?? '0')
+    );
+  });
+
+  it('returns no trough callout while every day stays non-negative', () => {
+    const positiveDays: ProjectionDay[] = [
+      { date: '2026-09-01', balanceMinor: 100, events: [] },
+      { date: '2026-09-02', balanceMinor: 200, events: [] },
+    ];
+    const wrapper = mount(BalanceLineChart, {
+      props: { days: positiveDays, events: [], currency: 'RSD' },
+    });
+    expect(wrapper.find('.trough-callout').exists()).toBe(false);
+  });
+
+  it('labels the trough with the low amount when a day goes negative', () => {
+    const wrapper = mount(BalanceLineChart, { props: { days, events: [], currency: 'RSD' } });
+    const callout = wrapper.find('.trough-callout');
+    expect(callout.exists()).toBe(true);
+    expect(callout.find('.trough-pill').exists()).toBe(true);
+    expect(callout.find('.trough-label').text()).toContain('low');
+    expect(callout.text()).toContain('49');
+  });
 });

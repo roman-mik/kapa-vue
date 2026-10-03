@@ -5,6 +5,7 @@ import '@fontsource/caprasimo';
 import { createPinia } from 'pinia';
 import { createApp } from 'vue';
 import App from './App.vue';
+import { applyNightMode, readNightMode } from './lib/nightMode';
 import router from './router';
 import { useSessionStore } from './stores/session';
 import { useThemeStore } from './stores/theme';
@@ -18,6 +19,7 @@ const app = createApp(App);
 app.use(createPinia());
 
 useThemeStore().init();
+applyNightMode(readNightMode());
 
 // Awaited before the router starts navigating, so its first guard sees the
 // restored session (or its absence) instead of an in-flight unknown. The

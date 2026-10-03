@@ -3,6 +3,7 @@ import { useRoute } from 'vue-router';
 import AppHeader from '@/components/layout/AppHeader.vue';
 import BottomTabBar from '@/components/layout/BottomTabBar.vue';
 import OfflineBanner from '@/components/layout/OfflineBanner.vue';
+import PocketEntrySheet from '@/components/pocket/PocketEntrySheet.vue';
 import ToastHost from '@/components/ui/ToastHost.vue';
 
 const route = useRoute();
@@ -15,5 +16,6 @@ const route = useRoute();
     <router-view />
   </main>
   <ToastHost />
+  <PocketEntrySheet />
   <BottomTabBar v-if="route.meta.showHeader" />
 </template>

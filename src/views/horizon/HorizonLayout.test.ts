@@ -25,15 +25,17 @@ function mockViewport(matches: boolean): void {
   );
 }
 
-// The shell is gate-only; stub the router primitives, the app switcher
-// (which needs a live router's useRoute), and TodayView (which fetches real
-// data via composables) so the layout and rail mount without a real
-// session, router wiring, or backend.
+// The shell is gate-only; stub the router primitives, the app switcher (which
+// needs a live router's useRoute), both nav shells, and the entry sheet
+// (which fetch real data via composables / need an active Pinia) so the
+// layout mounts without a real session, router wiring, or backend.
 const stubs = {
   RouterLink: { template: '<a><slot /></a>' },
   RouterView: { template: '<div class="router-view-stub" />' },
   AppSwitcher: { template: '<div class="app-switcher-stub" />' },
-  TodayView: { template: '<div class="today-view-stub" />' },
+  HorizonRail: { template: '<div class="rail-stub" aria-label="Horizon" />' },
+  HorizonTabBar: { template: '<div class="tabbar-stub" aria-label="Horizon" />' },
+  EntrySheet: { template: '<div class="entry-sheet-stub" />' },
 };
 
 describe('HorizonLayout mobile/desktop gate', () => {
@@ -46,16 +48,19 @@ describe('HorizonLayout mobile/desktop gate', () => {
     const wrapper = mount(HorizonLayout, { global: { stubs } });
     expect(wrapper.find('[aria-label="Horizon"]').exists()).toBe(true);
     expect(wrapper.find('.shell').exists()).toBe(true);
-    expect(wrapper.text()).toContain('Timeline');
+    expect(wrapper.find('.rail-stub').exists()).toBe(true);
+    expect(wrapper.find('.tabbar-stub').exists()).toBe(false);
   });
 
-  it('shows only Today on a narrow viewport', () => {
+  it('shows the router view and tab bar on a narrow viewport', () => {
     mockViewport(false);
     const wrapper = mount(HorizonLayout, { global: { stubs } });
 
-    expect(wrapper.find('[aria-label="Horizon"]').exists()).toBe(false);
+    expect(wrapper.find('[aria-label="Horizon"]').exists()).toBe(true);
     expect(wrapper.find('.shell').exists()).toBe(false);
-    expect(wrapper.find('.today-view-stub').exists()).toBe(true);
+    expect(wrapper.find('.router-view-stub').exists()).toBe(true);
+    expect(wrapper.find('.tabbar-stub').exists()).toBe(true);
+    expect(wrapper.find('.rail-stub').exists()).toBe(false);
   });
 });
 
