@@ -76,6 +76,8 @@ export function useHorizonToday() {
     await invalidate();
   }
   return {
+    conversionIssues: computed(() => projection.data.value?.unconverted ?? []),
+    isPartial: computed(() => !!projection.data.value?.unconverted.length),
     loading: computed(
       () =>
         projection.loading.value ||

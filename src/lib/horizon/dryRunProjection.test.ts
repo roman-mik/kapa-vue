@@ -33,6 +33,30 @@ function baseInput(range: { from: string; to: string }): ProjectionInput {
 }
 
 describe('spliceDraft + diffEffect', () => {
+  it('reports missing FX introduced by a draft instead of treating zero delta as complete', () => {
+    const base = baseInput({ from: TODAY, to: '2026-09-10' });
+    const changed = spliceDraft(base, {
+      kind: 'oneOff',
+      value: {
+        name: 'Trip',
+        category: 'other',
+        currency: 'EUR',
+        accountId: 'acc-1',
+        date: TODAY,
+        amountMinor: 20000,
+        direction: 'out',
+      },
+    });
+    expect(diffEffect(base, changed).unconverted).toEqual([
+      { currency: 'EUR', amountMinor: 20000 },
+    ]);
+  });
+  it('retains missing FX for an existing account', () => {
+    const base = baseInput({ from: TODAY, to: '2026-09-10' });
+    base.accounts[0]!.currency = 'EUR';
+    expect(diffEffect(base, base).unconverted).toEqual([{ currency: 'EUR', amountMinor: 100000 }]);
+  });
+
   it('a same-day one-off out lowers todayDeltaMinor by exactly its amount', () => {
     const baseline = baseInput({ from: TODAY, to: '2026-09-10' });
     const draft: DraftEntry = {

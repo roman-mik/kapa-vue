@@ -104,6 +104,16 @@ describe('useEntryDryRun', () => {
     vi.useRealTimers();
   });
 
+  it('retains missing conversions reported by the everyday spending adapter', async () => {
+    forwardSpendForRange.mockResolvedValue({
+      value: [],
+      unconverted: [{ currency: 'USD', amountMinor: 1200 }],
+    });
+    const state = useEntryDryRun();
+    await state.loadBaseline();
+    expect(state.conversionIssues.value).toEqual([{ currency: 'USD', amountMinor: 1200 }]);
+  });
+
   it('populates ingredients from the exported kapa-core queries', async () => {
     const { loadBaseline, ingredients } = useEntryDryRun();
     await loadBaseline();

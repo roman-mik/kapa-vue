@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { Currency } from '@roman-mik/kapa-core/pocket';
+import ProjectionCompletenessNotice from '@/components/horizon/ProjectionCompletenessNotice.vue';
 import { computed } from 'vue';
 import { formatMonthLabel } from '@roman-mik/kapa-core/horizon';
 import AccountChips from '@/components/horizon/AccountChips.vue';
@@ -14,6 +16,9 @@ import { formatFullDate } from '@/lib/date';
 
 const { accounts } = useAccounts();
 const {
+  conversionIssues,
+  isPartial,
+  refresh,
   loading,
   error,
   reportingCurrency,
@@ -48,7 +53,14 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
 <template>
   <main class="page page--with-rail">
     <div class="page-main">
-      <h1>Today</h1>
+      <h1 tabindex="-1">Today</h1>
+      <ProjectionCompletenessNotice
+        :issues="conversionIssues"
+        :currency="reportingCurrency"
+        :loading="loading"
+        :error="error"
+        @retry="refresh"
+      />
 
       <template v-if="initialLoading">
         <SkeletonBlock height="180px" radius="lg" />
@@ -59,8 +71,11 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
 
       <template v-else>
         <div class="hero">
-          <section class="hero-stat hero-trough">
-            <p class="hero-label">Lowest point ahead</p>
+          <section
+            class="hero-stat hero-trough"
+            :class="{ 'has-shortfall': troughTone === 'negative' }"
+          >
+            <p class="hero-label">Lowest point ahead{{ isPartial ? ' (partial)' : '' }}</p>
             <p class="hero-value" :class="`tone-${troughTone}`">
               {{ trough ? formatMoney(trough.minBalanceMinor, reportingCurrency) : '—' }}
             </p>
@@ -71,13 +86,13 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
 
           <div class="hero-secondary">
             <section class="hero-stat">
-              <p class="hero-label">Balance today</p>
+              <p class="hero-label">Balance today{{ isPartial ? ' (partial)' : '' }}</p>
               <p class="hero-value">
                 {{ balanceToday !== null ? formatMoney(balanceToday, reportingCurrency) : '—' }}
               </p>
             </section>
             <section v-if="monthEnd" class="hero-stat">
-              <p class="hero-label">{{ monthEndLabel }}</p>
+              <p class="hero-label">{{ monthEndLabel }}{{ isPartial ? ' (partial)' : '' }}</p>
               <p class="hero-value">
                 {{ formatMoney(monthEnd.balanceMinor, reportingCurrency) }}
               </p>
@@ -94,12 +109,17 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
               <div class="row-info">
                 <span class="row-name">{{ event.label }}</span>
                 <span class="note"
-                  >{{ formatFullDate(event.date) }} · leaves
+                  >{{ formatFullDate(event.date) }} · {{ isPartial ? 'partial balance' : 'leaves' }}
                   {{ formatMoney(event.balanceAfterMinor, reportingCurrency) }}</span
                 >
               </div>
               <span class="amount" :class="`tone-${eventAmountTone(event.amountMinor)}`">
-                {{ formatMoney(event.amountMinor, reportingCurrency) }}
+                {{
+                  event.unconvertible
+                    ? formatMoney(event.nativeAmountMinor, event.nativeCurrency as Currency) +
+                      ' (conversion unavailable)'
+                    : formatMoney(event.amountMinor, reportingCurrency)
+                }}
               </span>
             </li>
           </ul>
@@ -178,6 +198,20 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
   color: var(--kapa-ink);
 }
 
+.hero-value {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 759px) {
+  .hero-secondary .hero-value {
+    font-size: clamp(1rem, 4vw, 1.5rem);
+  }
+  .hero-secondary .hero-stat {
+    min-width: 0;
+    padding-inline: var(--kapa-space-3);
+  }
+}
+
 .hero-value.tone-negative {
   color: var(--kapa-negative);
 }
@@ -191,10 +225,10 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
 
 @media (min-width: 760px) {
   .hero {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   }
 
-  .hero-trough {
+  .hero-trough.has-shortfall {
     box-shadow: inset 0 0 0 2px var(--kapa-negative);
   }
 
@@ -249,6 +283,9 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
 }
 
 .amount {
+  max-width: 50%;
+  overflow-wrap: anywhere;
+  text-align: right;
   font-weight: 600;
   margin-left: auto;
 }

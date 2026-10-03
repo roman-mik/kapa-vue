@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { Currency } from '@roman-mik/kapa-core/pocket';
+import ProjectionCompletenessNotice from '@/components/horizon/ProjectionCompletenessNotice.vue';
 import { computed, ref } from 'vue';
 import type { LedgerEvent } from '@roman-mik/kapa-core/horizon';
 import BalanceLineChart from '@/components/horizon/BalanceLineChart.vue';
@@ -22,6 +24,9 @@ import { globalTrough } from '@/lib/horizon/trough';
 import { timelineMonths } from '@/lib/horizon/timelineMonths';
 
 const {
+  conversionIssues,
+  isPartial,
+  refresh,
   loading,
   error,
   rangeMonths,
@@ -34,6 +39,8 @@ const {
   dismiss,
 } = useHorizonTimeline();
 const { isDesktop } = useViewport();
+
+const chartEvents = computed(() => events.value.filter((event) => !event.unconvertible));
 
 const chartView = ref<'line' | 'waterfall'>('line');
 
@@ -76,7 +83,14 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
 <template>
   <main class="page page--with-rail">
     <div class="page-main">
-      <h1>Timeline</h1>
+      <h1 tabindex="-1">Timeline</h1>
+      <ProjectionCompletenessNotice
+        :issues="conversionIssues"
+        :currency="reportingCurrency"
+        :loading="loading"
+        :error="error"
+        @retry="refresh"
+      />
 
       <template v-if="initialLoading">
         <SkeletonBlock height="320px" radius="md" />
@@ -86,6 +100,10 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
       <p v-else-if="error" role="alert" class="error">{{ error }}</p>
 
       <template v-else>
+        <p v-if="isPartial">
+          Partial projection: chart, monthly totals and balances exclude amounts without exchange
+          rates.
+        </p>
         <div class="controls">
           <div class="range-control" role="group" aria-label="Date range">
             <BaseButton
@@ -125,10 +143,16 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
           <BalanceLineChart
             v-if="chartView === 'line'"
             :days="days"
-            :events="events"
+            :events="chartEvents"
             :currency="reportingCurrency"
+            :partial="isPartial"
           />
-          <WaterfallChart v-else :events="events" :currency="reportingCurrency" />
+          <WaterfallChart
+            v-else
+            :events="chartEvents"
+            :currency="reportingCurrency"
+            :partial="isPartial"
+          />
         </BaseCard>
 
         <section class="list-section">
@@ -143,7 +167,9 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
                 <div class="month-summary">
                   <span class="month-name">{{ formatFullMonth(month.month) }}</span>
                   <span class="month-line">
-                    ends {{ formatMoney(month.endBalanceMinor, reportingCurrency) }} · low
+                    {{ isPartial ? 'partial end' : 'ends' }}
+                    {{ formatMoney(month.endBalanceMinor, reportingCurrency) }} ·
+                    {{ isPartial ? 'partial low' : 'low' }}
                     {{ formatMoney(month.minBalanceMinor, reportingCurrency) }} on the
                     {{ lowDateDay(month.minBalanceDate) }}
                   </span>
@@ -209,9 +235,15 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
                   </span>
                   <span class="row-meta">
                     <span class="amount" :class="`tone-${eventAmountTone(event.amountMinor)}`">
-                      {{ formatMoney(event.amountMinor, reportingCurrency) }}
+                      {{
+                        event.unconvertible
+                          ? formatMoney(event.nativeAmountMinor, event.nativeCurrency as Currency) +
+                            ' (conversion unavailable)'
+                          : formatMoney(event.amountMinor, reportingCurrency)
+                      }}
                     </span>
                     <span class="leaf-balance">
+                      {{ isPartial ? 'Partial balance' : '' }}
                       {{ formatMoney(event.balanceAfterMinor, reportingCurrency) }}
                     </span>
                   </span>
@@ -225,7 +257,7 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
 
     <aside v-if="isDesktop" class="page-side">
       <BaseCard class="side-card">
-        <h2 class="side-heading">Month summary</h2>
+        <h2 class="side-heading">Month summary{{ isPartial ? ' (partial)' : '' }}</h2>
         <EmptyState
           v-if="!metrics?.months.length"
           title="No data"
@@ -343,7 +375,7 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
 
 .row {
   display: grid;
-  grid-template-columns: 44px 22px minmax(0, 1fr) auto;
+  grid-template-columns: 44px 22px minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--kapa-space-2);
   align-items: center;
   padding: var(--kapa-space-3) var(--kapa-space-3);
@@ -407,6 +439,8 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
 }
 
 .row-meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

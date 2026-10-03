@@ -1,6 +1,7 @@
 import { flushPromises } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vite-plus/test';
 import { effectScope, reactive } from 'vue';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useCap } from './useCap';
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), upsert: vi.fn(), space: vi.fn() }));
@@ -10,9 +11,11 @@ vi.mock('@roman-mik/kapa-core/pocket/queries', () => ({
 }));
 vi.mock('@/lib/supabase', () => ({ supabase: {} }));
 vi.mock('@/stores/space', () => ({ useSpaceStore: mocks.space }));
+vi.mock('@/stores/session', () => ({ useSessionStore: () => ({ user: { id: 'cap-test-user' } }) }));
 
 describe('cap space isolation', () => {
   it('writes and reloads the currently selected space', async () => {
+    queryCache.clear();
     const space = reactive({ currentSpaceId: 'first' });
     mocks.space.mockReturnValue(space);
     mocks.get.mockResolvedValue(null);

@@ -8,6 +8,7 @@
 import { CHARGE_CADENCES, type ChargeCadence } from '@roman-mik/kapa-core/horizon';
 import { CURRENCY_EXPONENT, zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
 import { computed, ref, watch } from 'vue';
+import ProjectionCompletenessNotice from '@/components/horizon/ProjectionCompletenessNotice.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -97,12 +98,17 @@ function resetAll(): void {
 }
 
 watch(
-  () => props.open,
-  async (isOpen) => {
+  () => [props.open, space.currentSpaceId] as const,
+  async ([isOpen, spaceId]) => {
     if (!isOpen) return;
-    await refreshAccounts();
     resetAll();
-    await dryRun.loadBaseline();
+    await Promise.allSettled([
+      refreshAccounts().then(() => {
+        if (props.open && spaceId === space.currentSpaceId && !accountId.value)
+          accountId.value = accounts.value[0]?.id ?? '';
+      }),
+      dryRun.loadBaseline(),
+    ]);
   },
   { immediate: true }
 );
@@ -239,14 +245,15 @@ watch(
 
 const effectText = computed(() => {
   const effect = dryRun.effect.value;
-  if (!effect) return null;
+  if (!effect || dryRun.loading.value || dryRun.error.value || dryRun.conversionIssues.value.length)
+    return null;
   const deltaText =
     effect.todayDeltaMinor === 0
       ? 'no change today'
-      : `${effect.todayDeltaMinor > 0 ? '+' : ''}${formatMoney(effect.todayDeltaMinor, currency.value)} today`;
+      : `${effect.todayDeltaMinor > 0 ? '+' : ''}${formatMoney(effect.todayDeltaMinor, dryRun.reportingCurrency.value)} today`;
   const troughText = effect.troughChanged
     ? effect.troughAfter
-      ? `low point ${formatMoney(effect.troughAfter.minBalanceMinor, currency.value)} on ${formatFullDate(effect.troughAfter.minBalanceDate)}`
+      ? `low point ${formatMoney(effect.troughAfter.minBalanceMinor, dryRun.reportingCurrency.value)} on ${formatFullDate(effect.troughAfter.minBalanceDate)}`
       : 'low point changes'
     : 'low point unchanged';
   return `${deltaText} · ${troughText}`;
@@ -278,12 +285,12 @@ async function onSave(): Promise<void> {
 
     toast.success('Saved.');
     resetTransient();
-    await dryRun.loadBaseline();
   } catch (err) {
     saveError.value = err instanceof Error ? err.message : "Couldn't save.";
   } finally {
     saving.value = false;
   }
+  if (!saveError.value) await dryRun.loadBaseline();
 }
 </script>
 
@@ -468,7 +475,17 @@ async function onSave(): Promise<void> {
         </BaseField>
       </div>
 
-      <p v-if="effectText" class="effect">{{ effectText }}</p>
+      <div class="preview-status">
+        <ProjectionCompletenessNotice
+          :issues="dryRun.conversionIssues.value"
+          :currency="dryRun.reportingCurrency.value"
+          :loading="dryRun.loading.value"
+          :error="dryRun.error.value"
+          @retry="dryRun.loadBaseline"
+          @inspect="handleClose"
+        />
+        <p v-if="effectText" class="effect">{{ effectText }}</p>
+      </div>
 
       <p v-if="saveError" role="alert" class="error">{{ saveError }}</p>
 
@@ -485,6 +502,9 @@ async function onSave(): Promise<void> {
 </template>
 
 <style scoped>
+.preview-status {
+  min-height: 3rem;
+}
 .entry-sheet {
   display: flex;
   flex-direction: column;
