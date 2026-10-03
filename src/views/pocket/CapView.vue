@@ -90,6 +90,7 @@ const modeConsequence = computed(() => {
 });
 
 async function onSubmit(): Promise<void> {
+  if (saving.value) return;
   saveError.value = null;
   const parsedAmount = nonNegativeAmountSchema.safeParse(capAmount.value);
   if (!parsedAmount.success) {

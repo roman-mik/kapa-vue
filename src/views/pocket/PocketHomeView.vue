@@ -117,7 +117,10 @@ async function onDelete(row: ExpenseView): Promise<void> {
           </EmptyState>
         </BaseCard>
 
-        <CapProgressCard v-else :summary="summary" />
+        <template v-else>
+          <CapProgressCard :summary="summary" />
+          <router-link :to="{ name: 'pocket-cap' }">Edit monthly cap</router-link>
+        </template>
 
         <BaseCard v-if="summary.home.kind !== 'no-cap'" padding="sm">
           <h2>Daily spending</h2>
