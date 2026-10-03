@@ -1,6 +1,8 @@
 import type { DryRunEffect } from '@/lib/horizon/dryRunProjection';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
+import { buildProjection } from '@roman-mik/kapa-core/horizon';
+import { spliceDraft } from '@/lib/horizon/dryRunProjection';
 import { nextTick, ref } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
@@ -75,7 +77,11 @@ describe('EntrySheet', () => {
       accounts: ref([{ id: 'a1', name: 'Checking', currency: 'RSD' }]),
       refresh: vi.fn().mockResolvedValue(undefined),
     });
-    useIncomeStreams.mockReturnValue({ add: addIncomeStream.mockResolvedValue(undefined) });
+    useIncomeStreams.mockReturnValue({
+      add: addIncomeStream.mockResolvedValue(undefined),
+      calendar: ref(null),
+      error: ref(null),
+    });
     useObligations.mockReturnValue({ add: addObligation.mockResolvedValue(undefined) });
     useOneOffEvents.mockReturnValue({ add: addOneOff.mockResolvedValue(undefined) });
     usePlannedSpend.mockReturnValue({ add: addPlannedSpend.mockResolvedValue(undefined) });
@@ -190,13 +196,154 @@ describe('EntrySheet', () => {
     wrapper.unmount();
   });
 
-  it('side=in always creates an income stream', async () => {
+  it('side=in one-time creates a dated receipt', async () => {
     const wrapper = mountSheet({ open: true, defaultSide: 'in' });
     await nextTick();
     await fillAmount(wrapper, '500');
     await clickSave();
-    expect(addIncomeStream).toHaveBeenCalledTimes(1);
+    expect(addOneOff).toHaveBeenCalledWith(
+      expect.objectContaining({ direction: 'in', amountMinor: 500 })
+    );
+    expect(addIncomeStream).not.toHaveBeenCalled();
     expect(addObligation).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it('saves a receipt on the selected date exactly once in the projection', async () => {
+    const wrapper = mountSheet({ open: true, defaultSide: 'in' });
+    await nextTick();
+    await fillAmount(wrapper, '500');
+    const dateChip = Array.from(document.body.querySelectorAll('button.chip')).find((b) =>
+      b.textContent?.includes('Today')
+    );
+    dateChip?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+    const input = document.body.querySelector<HTMLInputElement>('input[type="date"]')!;
+    input.value = '2026-10-10';
+    input.dispatchEvent(new Event('input'));
+    await nextTick();
+    await clickSave();
+    const value = addOneOff.mock.calls[0]![0];
+    expect(value.date).toBe('2026-10-10');
+    const result = buildProjection(
+      spliceDraft(
+        {
+          accounts: [
+            {
+              id: 'a1',
+              currency: 'RSD',
+              current_balance_minor: 0,
+              include_in_total: true,
+              archived: false,
+            },
+          ],
+          incomeStreams: [],
+          obligations: [],
+          oneOffEvents: [],
+          plannedSpend: [],
+          pocketSpend: { actuals: [], forward: [] },
+          todayKey: '2026-10-03',
+          range: { from: '2026-10-03', to: '2026-12-31' },
+          reportingCurrency: 'RSD',
+          rates: [],
+          calendar: { workingWeekdays: [1, 2, 3, 4, 5], holidays: [] },
+          eventOrder: 'income,oneOffIn,obligation,plannedSpend,oneOffOut',
+        },
+        { kind: 'oneOff', value }
+      )
+    );
+    expect(result.value.events.map((e) => [e.date, e.amountMinor])).toEqual([['2026-10-10', 500]]);
+    wrapper.unmount();
+  });
+
+  it('offers account setup and blocks save without accounts', async () => {
+    useAccounts.mockReturnValue({
+      accounts: ref([]),
+      loading: ref(false),
+      error: ref(null),
+      refresh: vi.fn().mockResolvedValue(undefined),
+    });
+    const wrapper = mountSheet({ open: true, defaultSide: 'out' });
+    await nextTick();
+    expect(document.body.textContent).toContain('Add an account');
+    expect(document.body.querySelector('.setup-link')).not.toBeNull();
+    await fillAmount(wrapper, '500');
+    await clickSave();
+    expect(addOneOff).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it('returns to an enabled sheet after saving recurring income', async () => {
+    useIncomeStreams.mockReturnValue({
+      add: addIncomeStream,
+      calendar: ref({ workingWeekdays: [1, 2, 3, 4, 5], holidays: [] }),
+      error: ref(null),
+    });
+    const wrapper = mountSheet({ open: true, defaultSide: 'in' });
+    await nextTick();
+    await fillAmount(wrapper, '1000');
+    const chip = Array.from(document.body.querySelectorAll('button.chip')).find((b) =>
+      b.textContent?.includes('One-time')
+    )!;
+    chip.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+    const check = document.body.querySelector<HTMLInputElement>(
+      '.chip-panel input[type="checkbox"]'
+    )!;
+    check.checked = true;
+    check.dispatchEvent(new Event('change'));
+    await nextTick();
+    const name = document.body.querySelector<HTMLInputElement>('.form-card input[type="text"]')!;
+    name.value = 'Salary';
+    name.dispatchEvent(new Event('input'));
+    await nextTick();
+    document.body.querySelector('form')!.dispatchEvent(new Event('submit'));
+    await flushPromises();
+    await nextTick();
+    expect(addIncomeStream).toHaveBeenCalledTimes(1);
+    expect(
+      Array.from(document.body.querySelectorAll('button')).find(
+        (b) => b.textContent?.trim() === 'Done'
+      )?.disabled
+    ).toBe(false);
+    expect(document.body.querySelector('.form-card')).toBeNull();
+    wrapper.unmount();
+  });
+
+  it('labels weekly planned input and rejects an invalid monthly cap', async () => {
+    const wrapper = mountSheet({ open: true, defaultSide: 'out' });
+    await nextTick();
+    await fillAmount(wrapper, '10');
+    const chip = Array.from(document.body.querySelectorAll('button.chip')).find((b) =>
+      b.textContent?.includes('Not planned')
+    )!;
+    chip.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await nextTick();
+    const check = document.body.querySelector<HTMLInputElement>(
+      '.chip-panel input[type="checkbox"]'
+    )!;
+    check.checked = true;
+    check.dispatchEvent(new Event('change'));
+    await nextTick();
+    const cadence = document.body.querySelector<HTMLSelectElement>('.chip-panel select')!;
+    cadence.value = 'weekly';
+    cadence.dispatchEvent(new Event('change'));
+    await nextTick();
+    expect(document.body.textContent).toContain('Amount per week (RSD)');
+    const cap = document.body.querySelector<HTMLInputElement>('.chip-panel input[type="number"]')!;
+    cap.value = '-1';
+    cap.dispatchEvent(new Event('input'));
+    await nextTick();
+    await clickSave();
+    expect(addPlannedSpend).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('Monthly cap must');
+    cap.value = '100';
+    cap.dispatchEvent(new Event('input'));
+    await nextTick();
+    await clickSave();
+    expect(addPlannedSpend).toHaveBeenCalledWith(
+      expect.objectContaining({ dailyAmountMinor: 10, chargeCadence: 'weekly', capMinor: 100 })
+    );
     wrapper.unmount();
   });
 

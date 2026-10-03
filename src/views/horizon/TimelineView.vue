@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router';
+import { paymentReviewRoute } from '@/lib/horizon/paymentReview';
+const router = useRouter();
 import type { Currency } from '@roman-mik/kapa-core/pocket';
 import ProjectionCompletenessNotice from '@/components/horizon/ProjectionCompletenessNotice.vue';
 import { computed, ref } from 'vue';
@@ -137,7 +140,11 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
           </div>
         </div>
 
-        <NegativeDayBanner :warnings="warnings" @dismiss="onDismiss" />
+        <NegativeDayBanner
+          :warnings="warnings"
+          @dismiss="onDismiss"
+          @fix="router.push(paymentReviewRoute($event))"
+        />
 
         <BaseCard>
           <BalanceLineChart

@@ -9,7 +9,9 @@ const props = defineProps<{ items: SchedulePreviewItem[] }>();
   <ol v-if="props.items.length" class="preview" data-testid="schedule-preview">
     <li v-for="item in props.items" :key="item.date" class="date">
       <span class="date-key">{{ formatFullDate(item.date) }}</span>
-      <span v-if="item.shifted" class="shifted">{{ formatFullDate(item.originalDate!) }}</span>
+      <span v-if="item.shifted" class="shifted"
+        >Moved from {{ formatFullDate(item.originalDate!) }}</span
+      >
       <span v-if="item.label" class="label">{{ item.label }}</span>
     </li>
   </ol>

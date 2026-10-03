@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { type Currency, type CurrencyBucket } from '@roman-mik/kapa-core/pocket';
 import { computed, ref } from 'vue';
+import PaymentReview from '@/components/horizon/PaymentReview.vue';
+import type { PaymentReviewTarget } from '@/lib/horizon/paymentReview';
 import IncomeStreamForm from '@/components/horizon/IncomeStreamForm.vue';
 import RowEditor, { type RowEditorEntry } from '@/components/horizon/RowEditor.vue';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
@@ -9,6 +11,7 @@ import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseBadge from '@/components/ui/BaseBadge.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
+import { useOneOffEvents } from '@/composables/useOneOffEvents';
 import { useAccounts } from '@/composables/useAccounts';
 import { useConvertedAmount } from '@/composables/useConvertedAmount';
 import { useEntrySheet } from '@/composables/useEntrySheet';
@@ -22,21 +25,72 @@ import { formatMoney, formatRate } from '@/lib/money';
 import { formatFullDate, formatFullMonth } from '@/lib/date';
 import { useSpaceStore } from '@/stores/space';
 
-const props = withDefaults(defineProps<{ isDesktop?: boolean }>(), { isDesktop: false });
+const props = withDefaults(
+  defineProps<{ isDesktop?: boolean; reviewTarget?: PaymentReviewTarget | null }>(),
+  { isDesktop: false }
+);
 
+const emit = defineEmits<{ reviewFinished: [] }>();
 const space = useSpaceStore();
 const spaceCurrency = computed<Currency>(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
 
 const { streamsWithMonth, convertibles, month, calendar, loading, error, add, update, archive } =
   useIncomeStreams();
 const { accounts } = useAccounts();
-const { spaceCurrencyAmount, fxAsOf, unconvertible, rateFor } = useConvertedAmount(convertibles);
+const {
+  allEvents,
+  monthOneOffs,
+  loading: receiptsLoading,
+  error: receiptsError,
+  update: updateReceipt,
+  remove: removeReceipt,
+} = useOneOffEvents();
+const receipts = computed(() => monthOneOffs.value.filter((e) => e.direction === 'in'));
+const incomeConvertibles = computed(() => [
+  ...convertibles.value.map((item) => ({ ...item, id: `stream:${item.id}` })),
+  ...receipts.value.map((e) => ({
+    id: `receipt:${e.id}`,
+    currency: e.currency as Currency,
+    amountMinor: e.amount_minor,
+    asOfDate: e.date,
+  })),
+]);
+const { spaceCurrencyAmount, fxAsOf, unconvertible, rateFor } =
+  useConvertedAmount(incomeConvertibles);
+const reviewStream = computed(() =>
+  props.reviewTarget?.kind === 'income'
+    ? streamsWithMonth.value.find((s) => s.id === props.reviewTarget?.id)
+    : undefined
+);
+const reviewReceipt = computed(() =>
+  props.reviewTarget?.kind === 'oneOffIn'
+    ? allEvents.value.find((e) => e.id === props.reviewTarget?.id && e.direction === 'in')
+    : undefined
+);
+const reviewReceiptEntry = computed<RowEditorEntry | null>(() =>
+  reviewReceipt.value
+    ? { kind: 'oneOff', initial: reviewReceipt.value, update: updateReceipt, remove: removeReceipt }
+    : null
+);
+const filteredReceipts = computed(() => (kindFilter.value === 'recurring' ? [] : receipts.value));
+const editingReceipt = ref<string | null>(null);
+const receiptSource = computed(() =>
+  allEvents.value.find((e) => e.id === editingReceipt.value && e.direction === 'in')
+);
+function receiptEntry(): RowEditorEntry | null {
+  return receiptSource.value
+    ? { kind: 'oneOff', initial: receiptSource.value, update: updateReceipt, remove: removeReceipt }
+    : null;
+}
+function closeReceipt(): void {
+  editingReceipt.value = null;
+}
 
 // The In/Out side is fixed here by the shell — this panel is the In side.
 const monthLabel = computed(() => (month.value ? formatFullMonth(month.value) : ''));
 
 const totalMinor = computed(() =>
-  convertibles.value.reduce((sum, item) => sum + (spaceCurrencyAmount(item) ?? 0), 0)
+  incomeConvertibles.value.reduce((sum, item) => sum + (spaceCurrencyAmount(item) ?? 0), 0)
 );
 
 const unconvertibleBuckets = computed<CurrencyBucket[]>(() => {
@@ -170,11 +224,58 @@ function fxMeta(stream: IncomeStreamMonth): { native: string; rate: string } | n
             Add
           </BaseButton>
         </div>
-        <span class="hero-amount tone-positive">{{ formatMoney(totalMinor, spaceCurrency) }}</span>
+        <span class="hero-amount tone-positive"
+          >{{ formatMoney(totalMinor, spaceCurrency)
+          }}{{ unconvertibleBuckets.length ? ' (partial)' : '' }}</span
+        >
       </div>
 
+      <p class="fx-note">Counted in {{ monthLabel }}</p>
+      <UnconvertedNote
+        :buckets="unconvertibleBuckets"
+        :currency="spaceCurrency"
+        context="in this month’s income"
+      />
       <p class="fx-note" v-if="fxNote">{{ fxNote }}</p>
 
+      <PaymentReview
+        v-if="reviewTarget"
+        :target="reviewTarget"
+        :loading="loading || receiptsLoading"
+        :error="error || receiptsError"
+        :found="!!(reviewStream || reviewReceipt)"
+        :recurring="!!reviewStream"
+        @close="emit('reviewFinished')"
+      >
+        <RowEditor
+          v-if="reviewReceiptEntry"
+          :entry="reviewReceiptEntry"
+          @saved="emit('reviewFinished')"
+          @removed="emit('reviewFinished')"
+          @cancelled="emit('reviewFinished')"
+        />
+        <RowEditor
+          v-else-if="reviewStream && reviewStream.kind !== 'hourly' && calendar"
+          :entry="streamEntry(reviewStream)"
+          @saved="emit('reviewFinished')"
+          @archived="emit('reviewFinished')"
+          @cancelled="emit('reviewFinished')"
+        />
+        <IncomeStreamForm
+          v-else-if="reviewStream && calendar"
+          :accounts="accounts"
+          :space-currency="spaceCurrency"
+          :default-start-date="reviewStream.start_date"
+          :calendar="calendar"
+          :initial="reviewStream"
+          :save="add"
+          :update="update"
+          :archive="archive"
+          @saved="emit('reviewFinished')"
+          @archived="emit('reviewFinished')"
+          @cancelled="emit('reviewFinished')"
+        />
+      </PaymentReview>
       <div class="kind-filter" role="group" aria-label="Filter by kind">
         <button
           v-for="opt in KIND_OPTIONS"
@@ -189,17 +290,19 @@ function fxMeta(stream: IncomeStreamMonth): { native: string; rate: string } | n
         </button>
       </div>
 
-      <template v-if="loading && !streamsWithMonth.length">
+      <template v-if="(loading || receiptsLoading) && !streamsWithMonth.length && !receipts.length">
         <SkeletonBlock height="42px" />
         <SkeletonBlock height="42px" />
       </template>
 
-      <p v-else-if="error" role="alert" class="error">{{ error }}</p>
+      <p v-else-if="error || receiptsError" role="alert" class="error">
+        {{ error || receiptsError }}
+      </p>
 
       <template v-else>
         <EmptyState
-          v-if="!filtered.length"
-          title="No income streams"
+          v-if="!filtered.length && !filteredReceipts.length"
+          title="No income"
           message="Add the money that comes in and see what each month is worth."
         />
 
@@ -236,7 +339,14 @@ function fxMeta(stream: IncomeStreamMonth): { native: string; rate: string } | n
               />
             </template>
             <template v-else>
-              <button type="button" class="row-main" @click="editingId = stream.id">
+              <button
+                type="button"
+                class="row-main"
+                @click="
+                  editingReceipt = null;
+                  editingId = stream.id;
+                "
+              >
                 <span class="glyph tone-positive">
                   <svg width="22" height="22" viewBox="0 0 22 22">
                     <circle cx="11" cy="11" r="7" />
@@ -273,6 +383,41 @@ function fxMeta(stream: IncomeStreamMonth): { native: string; rate: string } | n
                 </span>
               </button>
             </template>
+          </li>
+          <li
+            v-for="receipt in filteredReceipts"
+            :key="`receipt:${receipt.id}`"
+            class="row"
+            :class="{ editing: editingReceipt === receipt.id }"
+          >
+            <RowEditor
+              v-if="editingReceipt === receipt.id && receiptEntry()"
+              class="edit-form"
+              :entry="receiptEntry()!"
+              @saved="closeReceipt"
+              @removed="closeReceipt"
+              @cancelled="closeReceipt"
+            />
+            <button
+              v-else
+              class="row-main"
+              type="button"
+              @click="
+                editingId = null;
+                editingReceipt = receipt.id;
+              "
+            >
+              <span class="glyph tone-positive" aria-hidden="true">+</span>
+              <span class="row-info"
+                ><span class="row-name">{{ receipt.name }}</span
+                ><span class="schedule"
+                  >One-time receipt · {{ formatFullDate(receipt.date) }}</span
+                ></span
+              >
+              <span class="row-total">{{
+                formatMoney(receipt.amount_minor, receipt.currency as Currency)
+              }}</span>
+            </button>
           </li>
         </ul>
       </template>
@@ -488,5 +633,26 @@ function fxMeta(stream: IncomeStreamMonth): { native: string; rate: string } | n
   font-family: var(--font-heading);
   font-size: 28px;
   margin: 0 0 var(--kapa-space-2);
+}
+</style>
+
+<style scoped>
+.row-main {
+  grid-template-columns: 22px minmax(0, 1fr) minmax(0, auto);
+}
+.row-total,
+.row-name,
+.hero-amount {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 400px) {
+  .row-total {
+    grid-column: 2 / -1;
+    align-items: flex-start;
+    text-align: left;
+  }
+  .heading-row {
+    flex-wrap: wrap;
+  }
 }
 </style>

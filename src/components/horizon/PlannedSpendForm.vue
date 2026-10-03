@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { entryDateSchema } from '@/lib/horizon/entryValidation';
 import { CURRENCIES, CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
 import { CHARGE_CADENCES, type ChargeCadence } from '@roman-mik/kapa-core/horizon';
 import type {
@@ -17,7 +18,6 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import {
   accountNameSchema,
-  expenseDateSchema,
   firstIssueMessage,
   optionalPositiveAmountSchema,
   positiveAmountSchema,
@@ -131,18 +131,18 @@ async function onSubmit(): Promise<void> {
     saveError.value = firstIssueMessage(parsedAmount) ?? 'Enter a valid amount.';
     return;
   }
-  const parsedCap = optionalPositiveAmountSchema.safeParse(cap.value);
+  const parsedCap = optionalPositiveAmountSchema.safeParse(String(cap.value));
   if (!parsedCap.success) {
     saveError.value = firstIssueMessage(parsedCap) ?? 'Enter a valid amount.';
     return;
   }
-  const parsedStart = expenseDateSchema.safeParse(startDate.value);
+  const parsedStart = entryDateSchema.safeParse(startDate.value);
   if (!parsedStart.success) {
     saveError.value = firstIssueMessage(parsedStart) ?? 'Pick a valid date.';
     return;
   }
   if (endDate.value) {
-    const parsedEnd = expenseDateSchema.safeParse(endDate.value);
+    const parsedEnd = entryDateSchema.safeParse(endDate.value);
     if (!parsedEnd.success) {
       saveError.value = firstIssueMessage(parsedEnd) ?? 'Pick a valid date.';
       return;
@@ -256,7 +256,7 @@ async function onArchive(): Promise<void> {
           />
         </BaseField>
 
-        <BaseField label="Cadence" v-slot="{ id }">
+        <BaseField label="Amount period" v-slot="{ id }">
           <BaseSelect :id="id" v-model="chargeCadence">
             <option v-for="c in CHARGE_CADENCES" :key="c" :value="c">
               {{ CADENCE_LABELS[c] }}
@@ -265,8 +265,12 @@ async function onArchive(): Promise<void> {
         </BaseField>
       </div>
 
+      <p class="cadence-note">
+        Weekly and monthly amounts are averaged across active days. The cap limits the total for
+        each month.
+      </p>
       <div class="grid">
-        <BaseField label="Cap (optional)" v-slot="{ id }">
+        <BaseField label="Monthly cap (optional)" v-slot="{ id }">
           <BaseInput
             :id="id"
             v-model="cap"
@@ -342,5 +346,19 @@ async function onArchive(): Promise<void> {
 .error {
   color: var(--kapa-negative);
   margin: 0;
+}
+</style>
+
+<style scoped>
+.grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.actions {
+  flex-wrap: wrap;
+}
+@media (max-width: 400px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>
