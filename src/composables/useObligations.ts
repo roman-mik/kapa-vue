@@ -11,7 +11,6 @@ import {
   createObligation,
   createObligationSchedule,
   deleteObligation,
-  getWorkCalendar,
   listObligations,
   obligationScheduleRule,
   replaceObligationSchedules,
@@ -21,7 +20,9 @@ import {
   type ObligationWithSchedules,
 } from '@roman-mik/kapa-core/horizon/queries';
 import { currentMonth, type Currency } from '@roman-mik/kapa-core/pocket';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
+import { useSpaceQuery } from '@/composables/useSpaceQuery';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
 
@@ -115,38 +116,17 @@ export interface ObligationMonth extends ObligationWithSchedules {
 
 export function useObligations() {
   const space = useSpaceStore();
-  const allObligations = ref<ObligationWithSchedules[]>([]);
-  const calendar = ref<ScheduleCalendar | null>(null);
-  const month = ref('');
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  async function refresh(): Promise<void> {
-    const currentSpace = space.currentSpace;
-    if (!currentSpace) {
-      allObligations.value = [];
-      calendar.value = null;
-      month.value = '';
-      return;
-    }
-    loading.value = true;
-    error.value = null;
-    try {
-      const [workCalendar, obligations] = await Promise.all([
-        getWorkCalendar(supabase, currentSpace.id),
-        listObligations(supabase, currentSpace.id),
-      ]);
-      calendar.value = workCalendar;
-      month.value = currentMonth(new Date(), currentSpace.timezone);
-      allObligations.value = obligations;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Couldn't load obligations.";
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
+  const month = computed(() =>
+    space.currentSpace ? currentMonth(new Date(), space.currentSpace.timezone) : ''
+  );
+  const query = useSpaceQuery<ObligationWithSchedules[]>({
+    resource: 'obligations',
+    staleTimeMs: 30_000,
+    load: ({ spaceId }) => listObligations(supabase, spaceId),
+  });
+  const calendarQuery = useWorkCalendar();
+  const allObligations = computed(() => query.data.value ?? []);
+  const calendar = computed<ScheduleCalendar | null>(() => calendarQuery.data.value ?? null);
 
   // Archived obligations drop out of Money-out; they stay in the DB so
   // projections keep their references (same contract as accounts/streams).
@@ -193,6 +173,7 @@ export function useObligations() {
    * list — mirrors `useIncomeStreams.add`.
    */
   async function add(input: NewObligation): Promise<void> {
+    const invalidate = query.invalidate;
     const spaceId = space.currentSpaceId;
     if (!spaceId) return;
     const { id } = await createObligation(supabase, {
@@ -217,7 +198,7 @@ export function useObligations() {
       await deleteObligation(supabase, id);
       throw err;
     }
-    await refresh();
+    await invalidate();
   }
 
   /**
@@ -227,6 +208,7 @@ export function useObligations() {
    * a thrown error for the form to show, mirroring `useIncomeStreams.update`.
    */
   async function update(input: ObligationEdit): Promise<void> {
+    const invalidate = query.invalidate;
     const spaceId = space.currentSpaceId;
     if (!spaceId) return;
     const patch: ObligationUpdate = {
@@ -252,15 +234,16 @@ export function useObligations() {
       },
     ];
     await replaceObligationSchedules(supabase, input.id, schedules);
-    await refresh();
+    await invalidate();
   }
 
   async function archive(id: string, updatedAt: string): Promise<void> {
+    const invalidate = query.invalidate;
     const outcome = await archiveObligation(supabase, id, updatedAt);
     if (!outcome.ok) {
       throw new Error('This obligation was changed elsewhere — refresh and try again.');
     }
-    await refresh();
+    await invalidate();
   }
 
   return {
@@ -268,9 +251,11 @@ export function useObligations() {
     convertibles,
     month,
     calendar,
-    loading,
-    error,
-    refresh,
+    loading: computed(() => query.loading.value || calendarQuery.loading.value),
+    error: computed(() => query.error.value ?? calendarQuery.error.value),
+    refresh: async () => {
+      await Promise.all([query.refresh(), calendarQuery.refresh()]);
+    },
     add,
     update,
     archive,

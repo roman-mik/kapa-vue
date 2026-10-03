@@ -10,7 +10,8 @@ import {
   listExpensesInRange,
   updateExpense,
 } from '@roman-mik/kapa-core/pocket/queries';
-import { ref, watch } from 'vue';
+import { computed } from 'vue';
+import { useSpaceQuery } from '@/composables/useSpaceQuery';
 import { supabase } from '@/lib/supabase';
 import { useSessionStore } from '@/stores/session';
 import { useSpaceStore } from '@/stores/space';
@@ -31,32 +32,23 @@ export interface NewExpense {
 export function useExpenses() {
   const space = useSpaceStore();
   const session = useSessionStore();
-  const expenses = ref<ExpenseView[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  async function refresh(): Promise<void> {
-    const currentSpace = space.currentSpace;
-    if (!currentSpace) {
-      expenses.value = [];
-      return;
-    }
-    loading.value = true;
-    error.value = null;
-    try {
-      const month = currentMonth(new Date(), currentSpace.timezone);
-      const { startUtc, endUtc } = monthWindow(month, currentSpace.timezone);
-      expenses.value = await listExpensesInRange(supabase, currentSpace.id, startUtc, endUtc);
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Couldn't load expenses.";
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
+  const month = computed(() =>
+    space.currentSpace ? currentMonth(new Date(), space.currentSpace.timezone) : null
+  );
+  const query = useSpaceQuery<ExpenseView[]>({
+    resource: 'pocketExpenses',
+    staleTimeMs: 30_000,
+    params: () => [month.value, space.currentSpace?.timezone],
+    load: ({ spaceId, params }) => {
+      const [month, timezone] = params as [string, string];
+      const { startUtc, endUtc } = monthWindow(month, timezone);
+      return listExpensesInRange(supabase, spaceId, startUtc, endUtc);
+    },
+  });
+  const expenses = computed(() => query.data.value ?? []);
 
   async function add(expense: NewExpense): Promise<void> {
+    const invalidate = query.invalidate;
     const spaceId = space.currentSpaceId;
     if (!spaceId) return;
     await addExpense(supabase, {
@@ -68,7 +60,7 @@ export function useExpenses() {
       note: expense.note,
       ...(expense.spentAt ? { spent_at: expense.spentAt } : {}),
     });
-    await refresh();
+    await invalidate();
   }
 
   // `expectedUpdatedAt` is the row's `updated_at` as this client last read
@@ -80,16 +72,26 @@ export function useExpenses() {
     patch: ExpenseUpdate,
     expectedUpdatedAt: string
   ): Promise<MutationOutcome> {
+    const invalidate = query.invalidate;
     const outcome = await updateExpense(supabase, expenseId, patch, expectedUpdatedAt);
-    await refresh();
+    await invalidate();
     return outcome;
   }
 
   async function remove(expenseId: string, expectedUpdatedAt: string): Promise<MutationOutcome> {
+    const invalidate = query.invalidate;
     const outcome = await deleteExpense(supabase, expenseId, expectedUpdatedAt);
-    await refresh();
+    await invalidate();
     return outcome;
   }
 
-  return { expenses, loading, error, refresh, add, update, remove };
+  return {
+    expenses,
+    loading: query.loading,
+    error: query.error,
+    refresh: query.refresh,
+    add,
+    update,
+    remove,
+  };
 }

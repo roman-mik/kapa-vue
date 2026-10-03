@@ -17,14 +17,13 @@ panel isn't a mockup — it calls the same `@roman-mik/kapa-core` functions
 (`remaining`, `safeDaily`, `spentPct`, `projection`, `pocketHomeView`) that the signed-in app
 runs against real data.
 
-## Horizon — in design
+## Horizon — shipped
 
 A day-by-day cashflow projection across accounts, currencies, and pay schedules — built to
 answer the question Pocket can't: not just what's left this month, but when a comfortable
-month-end balance hides a mid-month shortfall. The projection engine itself isn't built yet
-(`kapa-core` currently only exposes `listAccounts` for it); the landing page demos the intended
-behavior with a deterministic fixture standing in for the real engine, honestly marked
-"in design" throughout.
+month-end balance hides a mid-month shortfall. Today, Timeline, accounts, income, obligations,
+planned spend, warnings and settings use the projection engine in `kapa-core`. The public
+landing demo remains a deterministic fixture.
 
 ## Architecture
 
@@ -34,6 +33,29 @@ behavior with a deterministic fixture standing in for the real engine, honestly 
 - **Supabase / Postgres** — the shared backend, with row-level security enforced at the
   database rather than the app layer.
 - **This repo** — a Vite + Vue 3 SPA, offline-capable as an installable PWA.
+
+### Client server state
+
+`useSpaceQuery` shares remote data through an in-memory Vue cache. Keys contain the
+authenticated user, space, resource and query parameters (month/timezone, category archive
+filter, FX cutoff date or projection range). Financial calculations remain in `kapa-core`;
+Pinia owns session, selected space and preferences.
+
+Resource data stays fresh for 30 seconds; dated FX snapshots use one hour. Mounting a
+consumer reuses fresh data and refetches stale data; explicit `refresh()` forces a read.
+Stale data remains visible during refresh, with a separate reactive loading flag and error.
+This is an in-memory read cache, without persistence, offline writes or automatic polling.
+
+Mutations invalidate all variants of their resource in the captured user/space. The
+dependency map in `src/lib/serverState/invalidation.ts` refreshes affected projections;
+calendar changes also refresh income and obligations. Concurrent reads share a promise,
+and generations prevent invalidated requests from replacing newer data. Space switches
+select another entry immediately; auth changes clear all cached data.
+
+When adding a resource, include every query argument in its key, read captured parameters
+inside its loader, and declare mutation dependencies in the invalidation map. Capture
+`query.invalidate` before awaiting a write so changing space cannot invalidate another
+space's data.
 
 ## Engineering
 

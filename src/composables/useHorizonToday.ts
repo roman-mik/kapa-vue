@@ -1,134 +1,93 @@
-import {
-  addDays,
-  computeMetrics,
-  computeNegativeDayWarnings,
-  projectionForRange,
-  type LedgerEvent,
-  type NegativeDayWarning,
-} from '@roman-mik/kapa-core/horizon';
-import {
-  dismissNegativeDay,
-  getSettings,
-  listProjectionDismissals,
-  type ProjectionDismissal,
-  type SpendMode,
-} from '@roman-mik/kapa-core/horizon/queries';
-import { getCap } from '@roman-mik/kapa-core/pocket/queries';
+import { computeMetrics, computeNegativeDayWarnings } from '@roman-mik/kapa-core/horizon';
+import { dismissNegativeDay } from '@roman-mik/kapa-core/horizon/queries';
 import { zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
+import { useCap } from '@/composables/useCap';
+import { useHorizonProjection } from '@/composables/useHorizonProjection';
+import { useHorizonSettingsResource } from '@/composables/useHorizonSettingsResource';
+import { useProjectionDismissals } from '@/composables/useProjectionDismissals';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
-
-const DEFAULT_HORIZON_DAYS = 90;
 
 export interface MonthMin {
   minBalanceMinor: number;
   minBalanceDate: string;
 }
 
-/**
- * The single fetch behind Horizon's Today screen. One `projectionForRange`
- * call feeds three derivations (H11 metrics, H12 warnings, next-events) —
- * reusing `useHorizonWarnings` here would mean a second, redundant
- * projection fetch just for the banner.
- */
 export function useHorizonToday() {
   const space = useSpaceStore();
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  const reportingCurrency = ref<Currency>('RSD');
-  const spendMode = ref<SpendMode>('cap');
-  const capMinor = ref<number | null>(null);
-  const endBalanceMinor = ref(0);
-  const monthMin = ref<MonthMin | null>(null);
-  const nextEvents = ref<LedgerEvent[]>([]);
-  const allWarnings = ref<NegativeDayWarning[]>([]);
-
-  async function refresh(): Promise<void> {
-    const currentSpace = space.currentSpace;
-    if (!currentSpace) {
-      endBalanceMinor.value = 0;
-      monthMin.value = null;
-      nextEvents.value = [];
-      allWarnings.value = [];
-      capMinor.value = null;
-      return;
-    }
-    loading.value = true;
-    error.value = null;
-    try {
-      const now = new Date();
-      const todayKey = zonedDateKey(now, currentSpace.timezone);
-      const range = { from: todayKey, to: addDays(todayKey, DEFAULT_HORIZON_DAYS) };
-
-      const [projection, settings, cap, dismissals] = await Promise.all([
-        projectionForRange(supabase, currentSpace.id, {
-          now,
-          timeZone: currentSpace.timezone,
-          range,
-        }),
-        getSettings(supabase, currentSpace.id),
-        getCap(supabase, currentSpace.id),
-        listProjectionDismissals(supabase, currentSpace.id),
-      ]);
-
-      reportingCurrency.value = settings.reporting_currency as Currency;
-      spendMode.value = settings.spend_mode;
-      capMinor.value = cap?.monthly_cap_minor ?? null;
-
-      const metrics = computeMetrics(projection.value.days);
-      endBalanceMinor.value = metrics.endBalanceMinor;
-      const currentMonth = metrics.months[0] ?? null;
-      monthMin.value = currentMonth
-        ? {
-            minBalanceMinor: currentMonth.minBalanceMinor,
-            minBalanceDate: currentMonth.minBalanceDate,
-          }
-        : null;
-
-      nextEvents.value = projection.value.events.filter((e) => e.date >= todayKey).slice(0, 3);
-
-      allWarnings.value = computeNegativeDayWarnings(
-        projection.value.days,
-        dismissals.map((d: ProjectionDismissal) => ({
-          negativeDate: d.negative_date,
-          shortfallMinor: d.shortfall_minor,
-        })),
-        reportingCurrency.value
-      );
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Couldn't load today's summary.";
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
-
-  const warnings = computed(() => allWarnings.value);
-
+  const projection = useHorizonProjection(() => 90);
+  const settings = useHorizonSettingsResource();
+  const dismissals = useProjectionDismissals();
+  const cap = useCap();
+  const reportingCurrency = computed(
+    () => (settings.data.value?.reporting_currency ?? 'RSD') as Currency
+  );
+  const metrics = computed(() =>
+    projection.data.value ? computeMetrics(projection.data.value.value.days) : null
+  );
+  const monthMin = computed<MonthMin | null>(() => {
+    const month = metrics.value?.months[0];
+    return month
+      ? { minBalanceMinor: month.minBalanceMinor, minBalanceDate: month.minBalanceDate }
+      : null;
+  });
+  const nextEvents = computed(() => {
+    const current = space.currentSpace;
+    if (!current) return [];
+    const today = zonedDateKey(new Date(), current.timezone);
+    return (
+      projection.data.value?.value.events.filter((event) => event.date >= today).slice(0, 3) ?? []
+    );
+  });
+  const warnings = computed(() => {
+    if (!projection.data.value || !dismissals.data.value) return [];
+    return computeNegativeDayWarnings(
+      projection.data.value.value.days,
+      dismissals.data.value.map((d) => ({
+        negativeDate: d.negative_date,
+        shortfallMinor: d.shortfall_minor,
+      })),
+      reportingCurrency.value
+    );
+  });
   async function dismiss(date: string, reason: string): Promise<void> {
+    const invalidate = dismissals.invalidate;
     const spaceId = space.currentSpaceId;
-    const warning = allWarnings.value.find((w) => w.date === date);
+    const warning = warnings.value.find((w) => w.date === date);
     if (!spaceId || !warning) return;
     await dismissNegativeDay(supabase, spaceId, {
-      negative_date: warning.date,
+      negative_date: date,
       shortfall_minor: warning.shortfallMinor,
       currency: warning.currency,
       reason,
     });
-    allWarnings.value = allWarnings.value.filter((w) => w.date !== date);
+    await invalidate();
   }
-
   return {
-    loading,
-    error,
-    refresh,
+    loading: computed(
+      () =>
+        projection.loading.value ||
+        settings.loading.value ||
+        dismissals.loading.value ||
+        cap.loading.value
+    ),
+    error: computed(
+      () =>
+        projection.error.value ?? settings.error.value ?? dismissals.error.value ?? cap.error.value
+    ),
+    refresh: async () => {
+      await Promise.all([
+        projection.refresh(),
+        settings.refresh(),
+        dismissals.refresh(),
+        cap.refresh(),
+      ]);
+    },
     reportingCurrency,
-    spendMode,
-    capMinor,
-    endBalanceMinor,
+    spendMode: computed(() => settings.data.value?.spend_mode ?? 'cap'),
+    capMinor: computed(() => cap.cap.value?.monthly_cap_minor ?? null),
+    endBalanceMinor: computed(() => metrics.value?.endBalanceMinor ?? 0),
     monthMin,
     nextEvents,
     warnings,

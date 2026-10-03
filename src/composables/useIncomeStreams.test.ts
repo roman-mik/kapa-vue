@@ -1,6 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
+import { useSessionStore } from '@/stores/session';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useIncomeStreams } from './useIncomeStreams';
 
 const {
@@ -94,6 +96,8 @@ function scheduleRow(overrides: Record<string, unknown> = {}): Record<string, un
 describe('useIncomeStreams', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    queryCache.clear();
+    useSessionStore().user = { id: 'u1' } as never;
     vi.clearAllMocks();
     // Sep 2026 seen from Belgrade: 22 working days (Mon–Fri, no holidays).
     vi.useFakeTimers();

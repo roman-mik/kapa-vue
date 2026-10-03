@@ -3,7 +3,6 @@ import {
   createIncomeSchedule,
   createIncomeStream,
   deleteIncomeStream,
-  getWorkCalendar,
   incomeScheduleMathInput,
   incomeStreamMathInput,
   listIncomeStreams,
@@ -19,7 +18,9 @@ import {
   type IncomePaymentOccurrence,
 } from '@roman-mik/kapa-core/horizon';
 import { currentMonth, type Currency } from '@roman-mik/kapa-core/pocket';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
+import { useSpaceQuery } from '@/composables/useSpaceQuery';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
 
@@ -81,38 +82,20 @@ export function streamKindLabel(kind: string): StreamKindLabel {
 
 export function useIncomeStreams() {
   const space = useSpaceStore();
-  const allStreams = ref<IncomeStreamWithSchedules[]>([]);
-  const calendar = ref<{ workingWeekdays: number[]; holidays: string[] } | null>(null);
-  const month = ref('');
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  async function refresh(): Promise<void> {
-    const currentSpace = space.currentSpace;
-    if (!currentSpace) {
-      allStreams.value = [];
-      calendar.value = null;
-      month.value = '';
-      return;
-    }
-    loading.value = true;
-    error.value = null;
-    try {
-      const [workCalendar, streams] = await Promise.all([
-        getWorkCalendar(supabase, currentSpace.id),
-        listIncomeStreams(supabase, currentSpace.id),
-      ]);
-      calendar.value = workCalendar;
-      month.value = currentMonth(new Date(), currentSpace.timezone);
-      allStreams.value = streams;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Couldn't load income streams.";
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
+  const month = computed(() =>
+    space.currentSpace ? currentMonth(new Date(), space.currentSpace.timezone) : ''
+  );
+  const query = useSpaceQuery({
+    resource: 'incomeStreams',
+    staleTimeMs: 30_000,
+    load: ({ spaceId }) => listIncomeStreams(supabase, spaceId),
+  });
+  const calendarQuery = useWorkCalendar();
+  const allStreams = computed<IncomeStreamWithSchedules[]>(() => query.data.value ?? []);
+  const calendar = computed(() => calendarQuery.data.value ?? null);
+  const refresh = async () => {
+    await Promise.all([query.refresh(), calendarQuery.refresh()]);
+  };
 
   // Archived streams drop out of Money-in; they stay in the DB so projections
   // keep their references (same contract as accounts).
@@ -146,6 +129,7 @@ export function useIncomeStreams() {
    * the orphaned stream back so a half-saved stream never shows in the list.
    */
   async function add(input: NewIncomeStream): Promise<void> {
+    const invalidate = query.invalidate;
     const spaceId = space.currentSpaceId;
     if (!spaceId) return;
     const { id } = await createIncomeStream(supabase, {
@@ -175,7 +159,7 @@ export function useIncomeStreams() {
       await deleteIncomeStream(supabase, id);
       throw err;
     }
-    await refresh();
+    await invalidate();
   }
 
   /**
@@ -185,6 +169,7 @@ export function useIncomeStreams() {
    * thrown error for the form to show.
    */
   async function update(input: IncomeStreamEdit): Promise<void> {
+    const invalidate = query.invalidate;
     const spaceId = space.currentSpaceId;
     if (!spaceId) return;
     const hourly = input.kind === 'hourly';
@@ -210,15 +195,16 @@ export function useIncomeStreams() {
       ? hourlySchedules(input.id, spaceId, input.lagDays)
       : fixedSchedules(input.id, spaceId, input.paymentRule, input.payDay);
     await replaceIncomeSchedules(supabase, input.id, schedules);
-    await refresh();
+    await invalidate();
   }
 
   async function archive(id: string, updatedAt: string): Promise<void> {
+    const invalidate = query.invalidate;
     const outcome = await archiveIncomeStream(supabase, id, updatedAt);
     if (!outcome.ok) {
       throw new Error('This income stream was changed elsewhere — refresh and try again.');
     }
-    await refresh();
+    await invalidate();
   }
 
   return {
@@ -226,8 +212,8 @@ export function useIncomeStreams() {
     convertibles,
     month,
     calendar,
-    loading,
-    error,
+    loading: computed(() => query.loading.value || calendarQuery.loading.value),
+    error: computed(() => query.error.value ?? calendarQuery.error.value),
     refresh,
     add,
     update,

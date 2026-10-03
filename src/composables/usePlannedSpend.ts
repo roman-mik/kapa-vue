@@ -9,7 +9,8 @@ import {
   type PlannedSpendUpdate,
 } from '@roman-mik/kapa-core/horizon/queries';
 import { currentMonth, type Currency } from '@roman-mik/kapa-core/pocket';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
+import { useSpaceQuery } from '@/composables/useSpaceQuery';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
 
@@ -35,31 +36,15 @@ export interface PlannedSpendMonth extends PlannedSpend {
 
 export function usePlannedSpend() {
   const space = useSpaceStore();
-  const allItems = ref<PlannedSpend[]>([]);
-  const month = ref('');
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  async function refresh(): Promise<void> {
-    const currentSpace = space.currentSpace;
-    if (!currentSpace) {
-      allItems.value = [];
-      month.value = '';
-      return;
-    }
-    loading.value = true;
-    error.value = null;
-    try {
-      month.value = currentMonth(new Date(), currentSpace.timezone);
-      allItems.value = await listPlannedSpend(supabase, currentSpace.id);
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Couldn't load planned spend.";
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
+  const month = computed(() =>
+    space.currentSpace ? currentMonth(new Date(), space.currentSpace.timezone) : ''
+  );
+  const query = useSpaceQuery<PlannedSpend[]>({
+    resource: 'plannedSpend',
+    staleTimeMs: 30_000,
+    load: ({ spaceId }) => listPlannedSpend(supabase, spaceId),
+  });
+  const allItems = computed(() => query.data.value ?? []);
 
   // Archived items drop out of Money-out; they stay in the DB so projections
   // keep their references (same contract as accounts/obligations/streams).
@@ -89,6 +74,7 @@ export function usePlannedSpend() {
   );
 
   async function add(input: NewPlannedSpend): Promise<void> {
+    const invalidate = query.invalidate;
     const spaceId = space.currentSpaceId;
     if (!spaceId) return;
     await createPlannedSpend(supabase, {
@@ -103,7 +89,7 @@ export function usePlannedSpend() {
       start_date: input.startDate,
       end_date: input.endDate,
     });
-    await refresh();
+    await invalidate();
   }
 
   // `expectedUpdatedAt` is the row's `updated_at` as this client last read
@@ -115,16 +101,28 @@ export function usePlannedSpend() {
     patch: PlannedSpendUpdate,
     expectedUpdatedAt: string
   ): Promise<MutationOutcome> {
+    const invalidate = query.invalidate;
     const outcome = await updatePlannedSpend(supabase, id, patch, expectedUpdatedAt);
-    await refresh();
+    await invalidate();
     return outcome;
   }
 
   async function archive(id: string, expectedUpdatedAt: string): Promise<MutationOutcome> {
+    const invalidate = query.invalidate;
     const outcome = await archivePlannedSpend(supabase, id, expectedUpdatedAt);
-    await refresh();
+    await invalidate();
     return outcome;
   }
 
-  return { itemsWithMonth, convertibles, month, loading, error, refresh, add, update, archive };
+  return {
+    itemsWithMonth,
+    convertibles,
+    month,
+    loading: query.loading,
+    error: query.error,
+    refresh: query.refresh,
+    add,
+    update,
+    archive,
+  };
 }

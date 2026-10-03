@@ -1,6 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
+import { useSessionStore } from '@/stores/session';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useHorizonTimeline } from './useHorizonTimeline';
 
 const { projectionForRange, getSettings, listProjectionDismissals, dismissNegativeDay } =
@@ -59,6 +61,8 @@ function fakeEvent(overrides: Record<string, unknown> = {}): Record<string, unkn
 describe('useHorizonTimeline', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    queryCache.clear();
+    useSessionStore().user = { id: 'u1' } as never;
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-01T00:00:00Z'));
@@ -154,6 +158,9 @@ describe('useHorizonTimeline', () => {
     await flush();
     expect(warnings.value).toHaveLength(1);
 
+    listProjectionDismissals.mockResolvedValue([
+      { negative_date: '2026-09-02', shortfall_minor: 500 },
+    ]);
     await dismiss('2026-09-02', 'will top up before then');
 
     expect(dismissNegativeDay).toHaveBeenCalledWith(expect.anything(), 'sp1', {

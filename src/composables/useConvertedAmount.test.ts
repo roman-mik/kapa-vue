@@ -4,6 +4,8 @@ import { ref } from 'vue';
 import type { FxRate } from '@roman-mik/kapa-core/pocket';
 import type { Convertible } from './useConvertedAmount';
 import { useSpaceStore } from '@/stores/space';
+import { useSessionStore } from '@/stores/session';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useConvertedAmount } from './useConvertedAmount';
 
 const { listFxRates } = vi.hoisted(() => ({ listFxRates: vi.fn() }));
@@ -27,6 +29,8 @@ function account(overrides: Partial<Convertible> = {}): Convertible {
 describe('useConvertedAmount', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    queryCache.clear();
+    useSessionStore().user = { id: 'u1' } as never;
     const space = useSpaceStore();
     space.spaces = [
       {

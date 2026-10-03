@@ -1,6 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
+import { useSessionStore } from '@/stores/session';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useSpendMode } from './useSpendMode';
 
 const { getSettings, setSpendMode } = vi.hoisted(() => ({
@@ -27,6 +29,8 @@ function flush(): Promise<void> {
 describe('useSpendMode', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    queryCache.clear();
+    useSessionStore().user = { id: 'u1' } as never;
     vi.clearAllMocks();
     const space = useSpaceStore();
     space.spaces = [

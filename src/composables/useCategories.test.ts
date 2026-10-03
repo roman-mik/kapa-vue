@@ -1,6 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
+import { useSessionStore } from '@/stores/session';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useCategories } from './useCategories';
 
 const { listCategories, addCategory, renameCategory, archiveCategory, restoreCategory } =
@@ -27,7 +29,9 @@ function flush(): Promise<void> {
 describe('useCategories', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    queryCache.clear();
     vi.clearAllMocks();
+    useSessionStore().user = { id: 'u1' } as never;
     listCategories.mockResolvedValue([{ id: 'c1', name: 'Groceries' }]);
     const space = useSpaceStore();
     space.currentSpaceId = 's1';

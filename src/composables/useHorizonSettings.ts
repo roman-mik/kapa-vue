@@ -1,8 +1,6 @@
 import {
   addHoliday,
   deleteHoliday,
-  getSettings,
-  getWorkCalendar,
   listHolidays,
   setEventOrder,
   setSpendMode,
@@ -13,8 +11,13 @@ import {
   type SpaceSettings,
   type SpendMode,
 } from '@roman-mik/kapa-core/horizon/queries';
-import { getCap } from '@roman-mik/kapa-core/pocket/queries';
-import { ref, watch } from 'vue';
+import { useCap } from '@/composables/useCap';
+import { useHorizonSettingsResource } from '@/composables/useHorizonSettingsResource';
+import { useWorkCalendar } from '@/composables/useWorkCalendar';
+import { queryCache } from '@/lib/serverState/queryCache';
+import { useSessionStore } from '@/stores/session';
+import { computed, ref } from 'vue';
+import { useSpaceQuery } from '@/composables/useSpaceQuery';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
 
@@ -27,51 +30,69 @@ import { useSpaceStore } from '@/stores/space';
  */
 export function useHorizonSettings() {
   const space = useSpaceStore();
-  const settings = ref<SpaceSettings | null>(null);
-  const workingWeekdays = ref<number[]>([]);
-  const holidays = ref<Holiday[]>([]);
-  const capMinor = ref<number | null>(null);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  async function refresh(): Promise<void> {
-    const currentSpace = space.currentSpace;
-    if (!currentSpace) {
-      settings.value = null;
-      workingWeekdays.value = [];
-      holidays.value = [];
-      capMinor.value = null;
-      return;
-    }
-    loading.value = true;
-    error.value = null;
-    try {
-      const [settingsRow, calendar, holidayRows, cap] = await Promise.all([
-        getSettings(supabase, currentSpace.id),
-        getWorkCalendar(supabase, currentSpace.id),
-        listHolidays(supabase, currentSpace.id),
-        getCap(supabase, currentSpace.id),
-      ]);
-      settings.value = settingsRow;
-      workingWeekdays.value = calendar.workingWeekdays;
-      holidays.value = holidayRows;
-      capMinor.value = cap?.monthly_cap_minor ?? null;
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Couldn't load settings.";
-    } finally {
-      loading.value = false;
-    }
+  const query = useHorizonSettingsResource();
+  const calendar = useWorkCalendar();
+  const cap = useCap();
+  const holidayQuery = useSpaceQuery({
+    resource: 'holidays',
+    staleTimeMs: 30_000,
+    load: ({ spaceId }) => listHolidays(supabase, spaceId),
+  });
+  const settings = computed<SpaceSettings | null>({
+    get: () => query.data.value ?? null,
+    set: (settings) => {
+      if (settings) query.setData(() => settings);
+    },
+  });
+  const workingWeekdays = computed<number[]>({
+    get: () => calendar.data.value?.workingWeekdays ?? [],
+    set: (workingWeekdays) => {
+      if (calendar.data.value) calendar.setData((data) => ({ ...data!, workingWeekdays }));
+    },
+  });
+  const holidays = computed<Holiday[]>({
+    get: () => holidayQuery.data.value ?? [],
+    set: (holidays) => {
+      holidayQuery.setData(() => holidays);
+    },
+  });
+  const capMinor = computed(() => cap.cap.value?.monthly_cap_minor ?? null);
+  const saveError = ref<string | null>(null);
+  const error = computed({
+    get: () =>
+      saveError.value ??
+      query.error.value ??
+      calendar.error.value ??
+      holidayQuery.error.value ??
+      cap.error.value,
+    set: (value) => {
+      saveError.value = value;
+    },
+  });
+  const loading = computed(
+    () =>
+      query.loading.value ||
+      calendar.loading.value ||
+      holidayQuery.loading.value ||
+      cap.loading.value
+  );
+  const refresh = async () => {
+    await Promise.all([query.refresh(), calendar.refresh(), holidayQuery.refresh(), cap.refresh()]);
+  };
+  async function refreshProjection(spaceId: string) {
+    const userId = useSessionStore().user?.id;
+    if (userId) await queryCache.invalidate([userId, spaceId, 'projection']);
   }
-
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
 
   async function saveEventOrder(order: EventOrder): Promise<void> {
     const spaceId = space.currentSpaceId;
     if (!spaceId || !settings.value) return;
     try {
       await setEventOrder(supabase, spaceId, order);
+      if (space.currentSpaceId !== spaceId) return;
       settings.value = { ...settings.value, event_order: order };
       error.value = null;
+      await refreshProjection(spaceId);
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Couldn't save event order.";
     }
@@ -82,8 +103,10 @@ export function useHorizonSettings() {
     if (!spaceId || !settings.value) return;
     try {
       await setSpendMode(supabase, spaceId, mode);
+      if (space.currentSpaceId !== spaceId) return;
       settings.value = { ...settings.value, spend_mode: mode };
       error.value = null;
+      await refreshProjection(spaceId);
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Couldn't save spend mode.";
     }
@@ -94,26 +117,35 @@ export function useHorizonSettings() {
     if (!spaceId) return;
     try {
       await upsertWorkCalendar(supabase, spaceId, weekdays);
+      if (space.currentSpaceId !== spaceId) return;
       workingWeekdays.value = weekdays;
       error.value = null;
+      await calendar.invalidate();
     } catch (err) {
       error.value = err instanceof Error ? err.message : "Couldn't save work calendar.";
     }
   }
 
   async function addHolidayForSpace(date: string, name: string): Promise<HolidayMutationOutcome> {
+    const invalidate = holidayQuery.invalidate;
     const spaceId = space.currentSpaceId;
     if (!spaceId) return { ok: false, reason: 'duplicate' };
     const outcome = await addHoliday(supabase, spaceId, { date, name });
-    if (outcome.ok) await refresh();
+    if (outcome.ok) await invalidate();
     return outcome;
   }
 
   async function removeHoliday(holidayId: string): Promise<void> {
+    const invalidate = calendar.invalidate;
     const spaceId = space.currentSpaceId;
     if (!spaceId) return;
     await deleteHoliday(supabase, holidayId);
+    if (space.currentSpaceId !== spaceId) {
+      await invalidate();
+      return;
+    }
     holidays.value = holidays.value.filter((h) => h.id !== holidayId);
+    await invalidate();
   }
 
   return {

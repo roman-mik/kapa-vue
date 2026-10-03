@@ -5,6 +5,8 @@ import { CURRENCY_EXPONENT, zonedDateKey, type Currency } from '@roman-mik/kapa-
 import { reactive, ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
+import { useSessionStore } from '@/stores/session';
+import { invalidateResources } from '@/lib/serverState/invalidation';
 
 /** Per-account reconcile form state: the actual balance (major string) + optional note. */
 export interface ReconcileDraft {
@@ -68,6 +70,7 @@ export function useReconcile(getAccounts: () => Account[], onSaved: () => void |
   async function save(): Promise<boolean> {
     const spaceId = space.currentSpaceId;
     if (!spaceId) return false;
+    const userId = useSessionStore().user?.id;
 
     // Use the account's current balance as-is if the field wasn't touched;
     // normalize the draft's number regardless so the stored actual matches
@@ -85,6 +88,8 @@ export function useReconcile(getAccounts: () => Account[], onSaved: () => void |
     saveError.value = null;
     try {
       await reconcileBalances(supabase, spaceId, entries);
+      if (userId) await invalidateResources(userId, spaceId, 'accounts');
+      if (space.currentSpaceId !== spaceId) return true;
 
       // Reset drafts to each account's newly-persisted balance so the panel
       // re-opens with the reconciled figure, and reflect the new balances.
@@ -118,6 +123,7 @@ export function useReconcile(getAccounts: () => Account[], onSaved: () => void |
     const currentSpace = space.currentSpace;
     const spaceId = space.currentSpaceId;
     if (!currentSpace || !spaceId) return false;
+    const userId = useSessionStore().user?.id;
 
     const variance = varianceFor(account);
     if (variance === 0) return false;
@@ -137,6 +143,8 @@ export function useReconcile(getAccounts: () => Account[], onSaved: () => void |
         date: todayKey,
         direction,
       });
+      if (userId) await invalidateResources(userId, spaceId, 'oneOffEvents');
+      if (space.currentSpaceId !== spaceId) return true;
       await onSaved();
       return true;
     } catch (err) {

@@ -1,6 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
+import { useSessionStore } from '@/stores/session';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useOneOffEvents } from './useOneOffEvents';
 
 const { listOneOffEvents, createOneOffEvent, updateOneOffEvent, deleteOneOffEvent } = vi.hoisted(
@@ -49,7 +51,9 @@ function oneOffRow(overrides: Record<string, unknown> = {}): Record<string, unkn
 describe('useOneOffEvents', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    queryCache.clear();
     vi.clearAllMocks();
+    useSessionStore().user = { id: 'u1' } as never;
     // Sep 2026 seen from Belgrade.
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-15T00:00:00Z'));

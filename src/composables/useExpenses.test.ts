@@ -1,6 +1,8 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
+import { useSessionStore } from '@/stores/session';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { useExpenses } from './useExpenses';
 
 const { listExpensesInRange, addExpense, updateExpense, deleteExpense } = vi.hoisted(() => ({
@@ -26,7 +28,9 @@ const CONFLICT = { ok: false, reason: 'conflict' } as const;
 describe('useExpenses', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    queryCache.clear();
     vi.clearAllMocks();
+    useSessionStore().user = { id: 'u1' } as never;
     listExpensesInRange.mockResolvedValue([{ id: 'e1', updated_at: '2026-08-28T10:00:00Z' }]);
     const space = useSpaceStore();
     space.spaces = [

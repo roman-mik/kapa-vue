@@ -9,7 +9,8 @@ import {
   type AccountUpdate,
   type MutationOutcome,
 } from '@roman-mik/kapa-core/horizon/queries';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
+import { useSpaceQuery } from '@/composables/useSpaceQuery';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
 
@@ -22,29 +23,12 @@ export interface NewAccount {
 }
 
 export function useAccounts() {
-  const space = useSpaceStore();
-  const allAccounts = ref<Account[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  async function refresh(): Promise<void> {
-    const currentSpace = space.currentSpace;
-    if (!currentSpace) {
-      allAccounts.value = [];
-      return;
-    }
-    loading.value = true;
-    error.value = null;
-    try {
-      allAccounts.value = await listAccounts(supabase, currentSpace.id);
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Couldn't load accounts.";
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
+  const query = useSpaceQuery<Account[]>({
+    resource: 'accounts',
+    staleTimeMs: 30_000,
+    load: ({ spaceId }) => listAccounts(supabase, spaceId),
+  });
+  const allAccounts = computed(() => query.data.value ?? []);
 
   // Archived accounts drop out of the active list; they stay in the DB so
   // projections keep their references. The hero total no longer lives here —
@@ -53,7 +37,8 @@ export function useAccounts() {
   const accounts = computed(() => allAccounts.value.filter((a) => !a.archived));
 
   async function add(input: NewAccount): Promise<void> {
-    const spaceId = space.currentSpaceId;
+    const invalidate = query.invalidate;
+    const spaceId = useSpaceStore().currentSpaceId;
     if (!spaceId) return;
     await createAccount(supabase, {
       space_id: spaceId,
@@ -63,7 +48,7 @@ export function useAccounts() {
       type: input.type,
       include_in_total: input.includeInTotal,
     });
-    await refresh();
+    await invalidate();
   }
 
   // `expectedUpdatedAt` is the row's `updated_at` as this client last read
@@ -75,16 +60,26 @@ export function useAccounts() {
     patch: AccountUpdate,
     expectedUpdatedAt: string
   ): Promise<MutationOutcome> {
+    const invalidate = query.invalidate;
     const outcome = await updateAccount(supabase, accountId, patch, expectedUpdatedAt);
-    await refresh();
+    await invalidate();
     return outcome;
   }
 
   async function archive(accountId: string, expectedUpdatedAt: string): Promise<MutationOutcome> {
+    const invalidate = query.invalidate;
     const outcome = await archiveAccount(supabase, accountId, expectedUpdatedAt);
-    await refresh();
+    await invalidate();
     return outcome;
   }
 
-  return { accounts, loading, error, refresh, add, update, archive };
+  return {
+    accounts,
+    loading: query.loading,
+    error: query.error,
+    refresh: query.refresh,
+    add,
+    update,
+    archive,
+  };
 }

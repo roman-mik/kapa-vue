@@ -1,12 +1,6 @@
-import {
-  convertToCurrency,
-  zonedDateKey,
-  type Currency,
-  type FxRate,
-} from '@roman-mik/kapa-core/pocket';
-import { listFxRates } from '@roman-mik/kapa-core/core';
-import { computed, ref, watch, type Ref } from 'vue';
-import { supabase } from '@/lib/supabase';
+import { convertToCurrency, zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
+import { computed, type Ref } from 'vue';
+import { useFxRates } from '@/composables/useFxRates';
 import { useSpaceStore } from '@/stores/space';
 
 /**
@@ -43,37 +37,9 @@ export function useConvertedAmount(items: Ref<Convertible[]>) {
 
   const spaceCurrency = computed(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
 
-  const rates = ref<FxRate[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
+  const fxRates = useFxRates();
 
   const timeZone = computed(() => space.currentSpace?.timezone);
-
-  async function refresh(): Promise<void> {
-    const currentSpace = space.currentSpace;
-    if (!currentSpace) {
-      rates.value = [];
-      return;
-    }
-    loading.value = true;
-    error.value = null;
-    try {
-      const onOrBefore = zonedDateKey(new Date(), currentSpace.timezone);
-      const rows = await listFxRates(supabase, onOrBefore);
-      rates.value = rows.map((r) => ({
-        baseCurrency: r.base_currency as Currency,
-        quoteCurrency: r.quote_currency as Currency,
-        rateE8: r.rate_e8,
-        rateDate: r.rate_date,
-      }));
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Couldn't load exchange rates.";
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
 
   const convertedById = computed<Map<string, number | null>>(() => {
     const map = new Map<string, number | null>();
@@ -91,7 +57,7 @@ export function useConvertedAmount(items: Ref<Convertible[]>) {
           item.currency,
           spaceCurrency.value,
           asOf,
-          rates.value
+          fxRates.rates.value
         ) ?? null
       );
     }
@@ -117,9 +83,9 @@ export function useConvertedAmount(items: Ref<Convertible[]>) {
 
   return {
     spaceCurrency,
-    rates,
-    loading,
-    error,
+    rates: fxRates.rates,
+    loading: fxRates.loading,
+    error: fxRates.error,
     isForeign,
     convertedMinor,
     spaceCurrencyAmount,

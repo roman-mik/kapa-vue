@@ -8,7 +8,8 @@ import {
   type OneOffEvent,
 } from '@roman-mik/kapa-core/horizon/queries';
 import { currentMonth, type Currency } from '@roman-mik/kapa-core/pocket';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
+import { useSpaceQuery } from '@/composables/useSpaceQuery';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
 
@@ -53,31 +54,15 @@ export interface OneOffEventEdit extends NewOneOffEvent {
 
 export function useOneOffEvents() {
   const space = useSpaceStore();
-  const allEvents = ref<OneOffEvent[]>([]);
-  const month = ref('');
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-
-  async function refresh(): Promise<void> {
-    const currentSpace = space.currentSpace;
-    if (!currentSpace) {
-      allEvents.value = [];
-      month.value = '';
-      return;
-    }
-    loading.value = true;
-    error.value = null;
-    try {
-      month.value = currentMonth(new Date(), currentSpace.timezone);
-      allEvents.value = await listOneOffEvents(supabase, currentSpace.id);
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : "Couldn't load one-off events.";
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
+  const month = computed(() =>
+    space.currentSpace ? currentMonth(new Date(), space.currentSpace.timezone) : ''
+  );
+  const query = useSpaceQuery<OneOffEvent[]>({
+    resource: 'oneOffEvents',
+    staleTimeMs: 30_000,
+    load: ({ spaceId }) => listOneOffEvents(supabase, spaceId),
+  });
+  const allEvents = computed(() => query.data.value ?? []);
 
   /** The month's one-offs, already ordered by date (the query orders by `date`). */
   const monthOneOffs = computed(() =>
@@ -95,6 +80,7 @@ export function useOneOffEvents() {
 
   /** Single insert — the composable equivalent of a rollback is unnecessary. */
   async function add(input: NewOneOffEvent): Promise<void> {
+    const invalidate = query.invalidate;
     const spaceId = space.currentSpaceId;
     if (!spaceId) return;
     await createOneOffEvent(supabase, {
@@ -107,10 +93,11 @@ export function useOneOffEvents() {
       date: input.date,
       direction: input.direction,
     });
-    await refresh();
+    await invalidate();
   }
 
   async function update(input: OneOffEventEdit): Promise<void> {
+    const invalidate = query.invalidate;
     await updateOneOffEvent(supabase, input.id, {
       name: input.name,
       category: input.category,
@@ -120,15 +107,26 @@ export function useOneOffEvents() {
       date: input.date,
       direction: input.direction,
     });
-    await refresh();
+    await invalidate();
   }
 
   async function remove(id: string): Promise<void> {
+    const invalidate = query.invalidate;
     await deleteOneOffEvent(supabase, id);
-    await refresh();
+    await invalidate();
   }
 
-  return { monthOneOffs, convertibles, month, loading, error, refresh, add, update, remove };
+  return {
+    monthOneOffs,
+    convertibles,
+    month,
+    loading: query.loading,
+    error: query.error,
+    refresh: query.refresh,
+    add,
+    update,
+    remove,
+  };
 }
 
 export { SPEND_CATEGORIES, deleteOneOffEvent };
