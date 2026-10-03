@@ -13,6 +13,7 @@ const props = defineProps<{
   days: ProjectionDay[];
   events: LedgerEvent[];
   currency: Currency;
+  partial?: boolean;
 }>();
 
 const PADDING = { top: 20, right: 24, bottom: 32, left: 56 };
@@ -185,7 +186,11 @@ const summaryText = computed(() => {
   <div class="chart-scroll">
     <svg
       role="img"
-      :aria-label="summaryText"
+      :aria-label="
+        partial
+          ? 'Partial projection; excludes amounts without exchange rates. ' + summaryText
+          : summaryText
+      "
       :width="width"
       :height="CHART_HEIGHT"
       :viewBox="`0 0 ${width} ${CHART_HEIGHT}`"

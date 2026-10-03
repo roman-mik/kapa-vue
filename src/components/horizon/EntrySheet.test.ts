@@ -1,3 +1,4 @@
+import type { DryRunEffect } from '@/lib/horizon/dryRunProjection';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { nextTick, ref } from 'vue';
@@ -46,7 +47,7 @@ const addOneOff = vi.fn();
 const addPlannedSpend = vi.fn();
 const loadBaseline = vi.fn();
 const preview = vi.fn();
-const dryRunEffect = ref<null>(null);
+const dryRunEffect = ref<DryRunEffect | null>(null);
 
 function mountSheet(props: { open: boolean; defaultSide: 'in' | 'out' }) {
   return mount(EntrySheet, { props, attachTo: document.body });
@@ -82,6 +83,10 @@ describe('EntrySheet', () => {
       loadBaseline: loadBaseline.mockResolvedValue(undefined),
       preview,
       effect: dryRunEffect,
+      loading: ref(false),
+      error: ref(null),
+      conversionIssues: ref([]),
+      reportingCurrency: ref('RSD'),
     });
   });
 
@@ -106,6 +111,76 @@ describe('EntrySheet', () => {
     await nextTick();
     await nextTick();
   }
+
+  it('suppresses numeric claims when a preview is incomplete and still permits saving', async () => {
+    useEntryDryRun.mockReturnValue({
+      loadBaseline,
+      preview,
+      effect: dryRunEffect,
+      loading: ref(false),
+      error: ref(null),
+      conversionIssues: ref([{ currency: 'EUR', amountMinor: 1000 }]),
+      reportingCurrency: ref('RSD'),
+    });
+    dryRunEffect.value = {
+      todayDeltaMinor: 0,
+      troughBefore: null,
+      troughAfter: null,
+      troughChanged: false,
+      unconverted: [],
+    };
+    const wrapper = mountSheet({ open: true, defaultSide: 'out' });
+    await nextTick();
+    await fillAmount(wrapper, '500');
+    expect(document.body.textContent).toContain('Forecast incomplete');
+    expect(document.body.querySelector('.effect')).toBeNull();
+    await clickSave();
+    expect(addOneOff).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+
+  it('formats preview effects in reporting currency rather than entry currency', async () => {
+    useSpaceStore().spaces[0]!.currency = 'EUR';
+    const wrapper = mountSheet({ open: true, defaultSide: 'out' });
+    await nextTick();
+    dryRunEffect.value = {
+      todayDeltaMinor: -1000,
+      troughBefore: null,
+      troughAfter: null,
+      troughChanged: false,
+      unconverted: [],
+    };
+    await nextTick();
+    expect(document.body.querySelector('.effect')?.textContent).toContain('RSD');
+    wrapper.unmount();
+  });
+
+  it('keeps a successful save separate from a failed preview refresh', async () => {
+    const previewError = ref<string | null>(null);
+    useEntryDryRun.mockReturnValue({
+      loadBaseline,
+      preview,
+      effect: dryRunEffect,
+      loading: ref(false),
+      error: previewError,
+      conversionIssues: ref([]),
+      reportingCurrency: ref('RSD'),
+    });
+    loadBaseline
+      .mockImplementationOnce(async () => {})
+      .mockImplementationOnce(async () => {
+        previewError.value = 'offline';
+      });
+    const wrapper = mountSheet({ open: true, defaultSide: 'out' });
+    await nextTick();
+    await fillAmount(wrapper, '500');
+    await clickSave();
+    expect(addOneOff).toHaveBeenCalledTimes(1);
+    expect(document.body.querySelector('.error')).toBeNull();
+    expect(document.body.textContent).toContain('Forecast unavailable');
+    expect(document.body.querySelector<HTMLInputElement>('[data-autofocus]')?.value).toBe('');
+    wrapper.unmount();
+  });
 
   it('focuses the amount field when opened', async () => {
     const wrapper = mountSheet({ open: true, defaultSide: 'out' });

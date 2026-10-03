@@ -66,6 +66,9 @@ const metrics: HorizonMetrics = {
 
 function baseComposable(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
+    conversionIssues: ref([]),
+    isPartial: ref(false),
+    refresh: vi.fn(),
     loading: ref(false),
     error: ref(null),
     rangeMonths: ref(3),
@@ -85,6 +88,28 @@ function setDesktop(value: boolean): void {
 }
 
 describe('TimelineView', () => {
+  it('labels partial balances and displays unavailable conversions as native money', () => {
+    setDesktop(false);
+    useHorizonTimeline.mockReturnValue(
+      baseComposable({
+        isPartial: ref(true),
+        conversionIssues: ref([{ currency: 'EUR', amountMinor: 50000 }]),
+        events: ref([
+          fakeEvent({
+            unconvertible: true,
+            nativeCurrency: 'EUR',
+            nativeAmountMinor: -50000,
+            amountMinor: 0,
+          }),
+        ]),
+      })
+    );
+    const wrapper = mount(TimelineView);
+    expect(wrapper.text()).toContain('Forecast incomplete');
+    expect(wrapper.find('.amount').text()).toContain('conversion unavailable');
+    expect(wrapper.find('.leaf-balance').text()).toContain('Partial balance');
+  });
+
   it('shows skeletons while loading with no data yet', () => {
     setDesktop(false);
     useHorizonTimeline.mockReturnValue(

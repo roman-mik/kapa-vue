@@ -18,6 +18,7 @@ import type { NewIncomeStream } from '@/composables/useIncomeStreams';
 import type { NewObligation } from '@/composables/useObligations';
 import type { NewOneOffEvent } from '@/composables/useOneOffEvents';
 import type { NewPlannedSpend } from '@/composables/usePlannedSpend';
+import type { CurrencyBucket } from '@roman-mik/kapa-core/pocket';
 import { globalTrough, type Trough } from '@/lib/horizon/trough';
 
 /** A `ProjectionInput` minus the one entity kind the draft will add. */
@@ -30,6 +31,7 @@ export type DraftEntry =
   | { kind: 'plannedSpend'; value: NewPlannedSpend };
 
 export interface DryRunEffect {
+  unconverted: CurrencyBucket[];
   /** with-draft balanceToday minus baseline balanceToday. */
   todayDeltaMinor: number;
   troughBefore: Trough | null;
@@ -191,8 +193,10 @@ export function spliceDraft(base: DryRunIngredients, draft: DraftEntry): Project
 
 /** Runs `buildProjection` on both inputs and diffs today's balance + the trough. */
 export function diffEffect(baseline: ProjectionInput, withDraft: ProjectionInput): DryRunEffect {
-  const before = buildProjection(baseline).value.days;
-  const after = buildProjection(withDraft).value.days;
+  const baselineResult = buildProjection(baseline);
+  const draftResult = buildProjection(withDraft);
+  const before = baselineResult.value.days;
+  const after = draftResult.value.days;
   const troughBefore = globalTrough(before);
   const troughAfter = globalTrough(after);
   const troughChanged =
@@ -201,6 +205,7 @@ export function diffEffect(baseline: ProjectionInput, withDraft: ProjectionInput
     troughBefore.minBalanceMinor !== troughAfter.minBalanceMinor ||
     troughBefore.minBalanceDate !== troughAfter.minBalanceDate;
   return {
+    unconverted: draftResult.unconverted,
     todayDeltaMinor: (after[0]?.balanceMinor ?? 0) - (before[0]?.balanceMinor ?? 0),
     troughBefore,
     troughAfter,

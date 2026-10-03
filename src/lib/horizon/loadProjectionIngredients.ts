@@ -27,6 +27,7 @@ import { listFxRates } from '@roman-mik/kapa-core/core';
 import {
   zonedDateKey,
   type Converted,
+  type CurrencyBucket,
   type Currency,
   type FxRate,
 } from '@roman-mik/kapa-core/pocket';
@@ -36,6 +37,7 @@ import type { ProjectionInput } from '@roman-mik/kapa-core/horizon';
 export interface ProjectionIngredients {
   input: ProjectionInput;
   settings: SpaceSettings;
+  unconverted: CurrencyBucket[];
 }
 
 /** Loads a real `ProjectionInput` for `spaceId` over `[todayKey, todayKey + horizonDays]`. */
@@ -184,5 +186,5 @@ export async function loadProjectionIngredients(
     eventOrder: settings.event_order,
   };
 
-  return { input, settings };
+  return { input, settings, unconverted: [...actuals.unconverted, ...forward.unconverted] };
 }
