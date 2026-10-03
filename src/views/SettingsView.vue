@@ -174,6 +174,11 @@ async function onCopyInvite(): Promise<void> {
     <h1>Settings</h1>
 
     <BaseCard padding="sm" class="section">
+      <h2>Pocket</h2>
+      <router-link :to="{ name: 'pocket-cap' }">Monthly cap</router-link>
+    </BaseCard>
+
+    <BaseCard padding="sm" class="section">
       <h2>Profile</h2>
       <form @submit.prevent="onProfileSubmit" class="profile-form">
         <BaseField label="Display name" v-slot="{ id }">
