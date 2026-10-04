@@ -13,6 +13,8 @@ import {
 import { computed, ref, watch } from 'vue';
 import AccountChips from '@/components/horizon/AccountChips.vue';
 import FxSnapshotPanel from '@/components/horizon/FxSnapshotPanel.vue';
+import { usePaymentTracking } from '@/composables/usePaymentTracking';
+import { usePaymentLinkSheet } from '@/composables/usePaymentLinkSheet';
 import ReconcilePanel from '@/components/horizon/ReconcilePanel.vue';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
@@ -45,6 +47,12 @@ const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = {
 };
 
 const space = useSpaceStore();
+const paymentTracking = usePaymentTracking();
+const tracked = computed(() => !!paymentTracking.context.value?.state);
+const trackingKnown = computed(
+  () => !!paymentTracking.context.value && !paymentTracking.error.value
+);
+const checkBalances = () => usePaymentLinkSheet().open({ balanceReview: true });
 const { accounts, loading, error, refresh, add, update, archive } = useAccounts();
 
 const spaceCurrency = computed<Currency>(() => (space.currentSpace?.currency ?? 'RSD') as Currency);
@@ -159,12 +167,18 @@ const toast = useToast();
 
 async function onSubmit(): Promise<void> {
   saveError.value = null;
+  if (!trackingKnown.value) {
+    saveError.value = 'Load payment tracking before changing account balances.';
+    return;
+  }
   const parsedName = accountNameSchema.safeParse(name.value);
   if (!parsedName.success) {
     saveError.value = firstIssueMessage(parsedName) ?? 'Enter a name.';
     return;
   }
-  const parsedBalance = signedAmountSchema.safeParse(balance.value);
+  const parsedBalance = signedAmountSchema.safeParse(
+    tracked.value && !editingId.value ? '0' : balance.value
+  );
   if (!parsedBalance.success) {
     saveError.value = firstIssueMessage(parsedBalance) ?? 'Enter a valid amount.';
     return;
@@ -179,7 +193,7 @@ async function onSubmit(): Promise<void> {
         {
           name: parsedName.data,
           currency: currency.value,
-          current_balance_minor: balanceMinor,
+          ...(tracked.value ? {} : { current_balance_minor: balanceMinor }),
           type: type.value,
           include_in_total: includeInTotal.value,
         },
@@ -202,6 +216,7 @@ async function onSubmit(): Promise<void> {
       toast.success('Account added');
     }
     resetForm();
+    if (tracked.value) checkBalances();
   } catch (err) {
     saveError.value = err instanceof Error ? err.message : "Couldn't save the account.";
     toast.error(saveError.value);
@@ -270,7 +285,7 @@ async function onArchive(accountId: string): Promise<void> {
             </div>
 
             <div class="grid">
-              <BaseField label="Current balance" v-slot="{ id }">
+              <BaseField v-if="!tracked" label="Current balance" v-slot="{ id }">
                 <BaseInput
                   :id="id"
                   v-model="balance"
@@ -361,7 +376,19 @@ async function onArchive(accountId: string): Promise<void> {
     </div>
 
     <aside class="page-side">
-      <ReconcilePanel :accounts="accounts" @saved="refresh" />
+      <p v-if="tracked">
+        These are last checked balances. Review balances to update estimated cash and included
+        movements.
+      </p>
+      <BaseButton
+        v-if="tracked"
+        variant="secondary"
+        :disabled="!trackingKnown"
+        @click="checkBalances"
+        >Check balances</BaseButton
+      >
+      <ReconcilePanel v-else-if="trackingKnown" :accounts="accounts" @saved="refresh" />
+      <p v-else role="status">{{ paymentTracking.error.value ?? 'Loading balance review…' }}</p>
       <FxSnapshotPanel
         :space-currency="spaceCurrency"
         :currencies="foreignCurrencies"

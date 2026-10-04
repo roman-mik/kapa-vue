@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch, onUnmounted } from 'vue';
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
-import { CURRENCY_EXPONENT, zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
+import { zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
 import { usePaymentLinkSheet } from '@/composables/usePaymentLinkSheet';
-import { usePaymentTracking, type PaymentContext } from '@/composables/usePaymentTracking';
+import {
+  usePaymentTracking,
+  type PaymentContext,
+  type CashDecision,
+} from '@/composables/usePaymentTracking';
 import { useSessionStore } from '@/stores/session';
 import { useSpaceStore } from '@/stores/space';
 import { formatMoney } from '@/lib/money';
 import { formatFullDate } from '@/lib/date';
+import BalanceReviewForm from '@/components/horizon/BalanceReviewForm.vue';
 import BaseSheet from '@/components/ui/BaseSheet.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
@@ -27,11 +32,7 @@ const error = ref<string | null>(null);
 const saved = ref(false);
 const requestId = ref(crypto.randomUUID());
 const refreshSaved = shallowRef<(() => Promise<void>) | null>(null);
-const checking = ref(false);
-const amounts = ref<Record<string, string>>({});
-const includedExpenses = ref<string[]>([]);
-const includedPayments = ref<string[]>([]);
-const checkedToday = ref(false);
+const checking = ref(sheet.balanceReview.value);
 const search = ref('');
 const origin = space.currentSpaceId;
 const originUser = useSessionStore().user?.id;
@@ -43,18 +44,6 @@ const isCurrent = () =>
   mounted && origin === space.currentSpaceId && originUser === useSessionStore().user?.id;
 const allowanceRequestId = ref(crypto.randomUUID());
 const timezone = space.currentSpace?.timezone ?? 'UTC';
-const cashAccounts = computed(
-  () => snapshot.value?.accounts.filter((a) => !a.archived && a.include_in_total) ?? []
-);
-const completedInCashAccounts = computed(
-  () =>
-    snapshot.value?.occurrences.filter(
-      (p) =>
-        p.state === 'completed' &&
-        p.actual &&
-        cashAccounts.value.some((a) => a.id === p.actual!.accountId)
-    ) ?? []
-);
 const selectedPayment = computed(() =>
   snapshot.value?.occurrences.find((p) => p.id === paymentId.value)
 );
@@ -153,11 +142,6 @@ const canLink = computed(
     !busy.value &&
     !saved.value
 );
-const spendToCheck = computed(() =>
-  eligibleExpenses.value.filter(
-    (e) => !snapshot.value?.coverage.some((c) => c.expenseId === e.id && c.occurrenceId)
-  )
-);
 function message(err: unknown) {
   return err && typeof err === 'object' && 'message' in err
     ? String(err.message)
@@ -168,14 +152,6 @@ function hydrate(data: PaymentContext) {
   if (!paymentId.value && expense.value?.id)
     paymentId.value =
       data.coverage.find((c) => c.expenseId === expense.value?.id)?.occurrenceId ?? '';
-  amounts.value = Object.fromEntries(
-    data.accounts.map((a) => [
-      a.id,
-      (a.current_balance_minor / 10 ** CURRENCY_EXPONENT[a.currency as Currency]).toFixed(
-        CURRENCY_EXPONENT[a.currency as Currency]
-      ),
-    ])
-  );
   if (!expense.value && expenseId.value)
     expense.value = data.expenses.find((e) => e.id === expenseId.value) ?? null;
 }
@@ -331,50 +307,12 @@ async function separateAllowance() {
     busy.value = false;
   }
 }
-async function checkBalances() {
-  if (!snapshot.value || !checkedToday.value || busy.value || saved.value) return;
+async function checkBalances(decision: CashDecision) {
+  if (!snapshot.value || busy.value || saved.value) return;
   busy.value = true;
   error.value = null;
   try {
-    const checks = cashAccounts.value.map((a) => {
-      const text = amounts.value[a.id]?.trim() ?? '';
-      const balanceMinor = Number(text) * 10 ** CURRENCY_EXPONENT[a.currency as Currency];
-      if (
-        !/^-?\d+(?:\.\d+)?$/.test(text) ||
-        !Number.isFinite(balanceMinor) ||
-        !Number.isSafeInteger(Math.round(balanceMinor)) ||
-        Math.abs(balanceMinor - Math.round(balanceMinor)) > 0.000001
-      )
-        throw new Error('Enter a valid checked balance for every account.');
-      return {
-        accountId: a.id,
-        currency: a.currency,
-        balanceMinor: Math.round(balanceMinor),
-        previousBalanceMinor: a.current_balance_minor,
-        observationId: snapshot.value!.observations.find((o) => o.accountId === a.id)?.id ?? null,
-        includedPaymentIds: snapshot
-          .value!.occurrences.filter(
-            (p) => p.actual?.accountId === a.id && includedPayments.value.includes(p.id)
-          )
-          .map((p) => p.id),
-      };
-    });
-    const result = await tracking.checkBalances({
-      checks,
-      expenses: spendToCheck.value
-        .filter((e) => includedExpenses.value.includes(e.id!))
-        .map((e) => ({
-          expenseId: e.id!,
-          expenseUpdatedAt: e.updated_at!,
-          revision:
-            snapshot.value!.coverage.find((c) => c.expenseId === e.id)?.revision ??
-            snapshot.value!.cutovers.find((c) => c.expenseId === e.id)?.revision ??
-            0,
-        })),
-      sourceRevision: snapshot.value.state?.revision ?? null,
-      cashRevision: snapshot.value.state?.cash_revision ?? null,
-      requestId: requestId.value,
-    });
+    const result = await tracking.checkBalances(decision);
     if (!isCurrent()) return;
     saved.value = true;
     refreshSaved.value = async () => {
@@ -413,65 +351,13 @@ async function checkBalances() {
       <BaseButton v-else-if="!snapshot" variant="secondary" :disabled="busy" @click="reload"
         >Reload details</BaseButton
       >
-      <form
+      <BalanceReviewForm
         v-else-if="checking || !snapshot.state"
-        class="flow-form"
-        @submit.prevent="checkBalances"
-      >
-        <p>
-          Check the money in every included account today. Future estimates will start from these
-          balances.
-        </p>
-        <label v-for="a in cashAccounts" :key="a.id" :for="`checked-${a.id}`"
-          >{{ a.name }} ({{ a.currency }})
-          <BaseInput
-            :id="`checked-${a.id}`"
-            v-model="amounts[a.id]"
-            inputmode="decimal"
-            required
-            :disabled="busy"
-          />
-        </label>
-        <p v-if="!cashAccounts.length">Add an included account before checking balances.</p>
-        <router-link
-          v-if="!cashAccounts.length"
-          :to="{ name: 'horizon-accounts' }"
-          @click="sheet.close"
-          >Add account</router-link
-        >
-        <fieldset v-if="spendToCheck.length">
-          <legend>Recorded expenses already included in these balances</legend>
-          <p>
-            Select only spending your bank balances already contain. Other spending will need
-            review.
-          </p>
-          <label v-for="e in spendToCheck" :key="e.id!" class="choice"
-            ><input v-model="includedExpenses" type="checkbox" :value="e.id" :disabled="busy" />{{
-              e.note || 'Expense'
-            }}
-            · {{ formatMoney(e.amount_minor ?? 0, e.currency as Currency) }} ·
-            {{
-              e.spent_at ? formatFullDate(zonedDateKey(new Date(e.spent_at), timezone)) : ''
-            }}</label
-          >
-        </fieldset>
-        <fieldset v-if="completedInCashAccounts.length">
-          <legend>Completed payments included in these balances</legend>
-          <label v-for="p in completedInCashAccounts" :key="p.id" class="choice"
-            ><input v-model="includedPayments" type="checkbox" :value="p.id" :disabled="busy" />{{
-              p.expected.label
-            }}
-            · {{ formatMoney(p.actual!.amountMinor, p.actual!.currency as Currency) }}</label
-          >
-        </fieldset>
-        <label class="choice"
-          ><input v-model="checkedToday" type="checkbox" :disabled="busy" />I checked these account
-          balances today</label
-        >
-        <BaseButton type="submit" :disabled="busy || !checkedToday || !cashAccounts.length">{{
-          snapshot.state ? 'Save checked balances' : 'Save balances and start tracking'
-        }}</BaseButton>
-      </form>
+        :context="snapshot"
+        :busy="busy"
+        @submit="checkBalances"
+        @close="sheet.close"
+      />
       <form v-else class="flow-form" @submit.prevent="link">
         <p>
           The Pocket expense stays in your history. Linking completes only the selected payment;

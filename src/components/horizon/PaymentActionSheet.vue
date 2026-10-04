@@ -254,7 +254,7 @@ function linkExpense() {
 }
 function reviewBalances() {
   sheet.close();
-  usePaymentLinkSheet().open();
+  usePaymentLinkSheet().open({ balanceReview: true });
 }
 function actionName(record: { command: unknown }) {
   const command = record.command as { action?: { kind?: string }; kind?: string };
