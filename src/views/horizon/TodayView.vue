@@ -74,9 +74,11 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
     <div class="page-main">
       <h1 tabindex="-1">Today</h1>
       <CashflowReviewNotice :issues="lifecycleIssues" />
-      <BaseButton variant="secondary" @click="paymentLink.open()"
-        >Review payments and balances</BaseButton
-      >
+      <div class="review-actions">
+        <BaseButton variant="secondary" @click="paymentLink.open()">
+          Review payments and balances
+        </BaseButton>
+      </div>
       <ProjectionCompletenessNotice
         :issues="conversionIssues"
         :currency="reportingCurrency"
@@ -194,6 +196,15 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
 </template>
 
 <style scoped>
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin-block: var(--kapa-space-4) var(--kapa-space-5);
+}
+.review-actions .btn {
+  min-height: 44px;
+}
+
 .payment-action {
   font: inherit;
   text-align: left;
@@ -377,6 +388,15 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
 </style>
 
 <style scoped>
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin-block: var(--kapa-space-4) var(--kapa-space-5);
+}
+.review-actions .btn {
+  min-height: 44px;
+}
+
 .payment-action {
   font: inherit;
   text-align: left;
