@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue';
+import { nextTick, onUnmounted, ref, watch } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -61,6 +61,11 @@ watch(
   },
   { immediate: true }
 );
+onUnmounted(() => {
+  void nextTick(() => {
+    if (previouslyFocused?.isConnected) previouslyFocused.focus();
+  });
+});
 </script>
 
 <template>

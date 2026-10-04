@@ -1,5 +1,6 @@
 import { computed } from 'vue';
 import { addDays, projectionForRange } from '@roman-mik/kapa-core/horizon';
+import { getPaymentTrackingState } from '@roman-mik/kapa-core/horizon/queries';
 import { zonedDateKey } from '@roman-mik/kapa-core/pocket';
 import { useSpaceQuery } from '@/composables/useSpaceQuery';
 import { useSpaceStore } from '@/stores/space';
@@ -18,10 +19,11 @@ export function useHorizonProjection(dayOffset: () => number) {
     resource: 'projection',
     staleTimeMs: 30_000,
     params: () => [range.value?.from, range.value?.to, range.value?.timeZone],
-    load: ({ spaceId, params }) => {
+    load: async ({ spaceId, params }) => {
       const [from, to, timeZone] = params as [string, string, string];
       return projectionForRange(supabase, spaceId, {
         now: new Date(),
+        lifecycle: !!(await getPaymentTrackingState(supabase, spaceId)),
         timeZone,
         range: { from, to },
       });

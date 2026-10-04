@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CashflowReviewNotice from '@/components/horizon/CashflowReviewNotice.vue';
 import { entryDateSchema } from '@/lib/horizon/entryValidation';
 // Task 11 — the amount-first creation sheet. Calls the four composables'
 // add() directly (no dependency on IncomeStreamForm/ObligationForm/
@@ -331,7 +332,13 @@ onUnmounted(() => clearTimeout(previewTimer));
 
 const effectText = computed(() => {
   const effect = dryRun.effect.value;
-  if (!effect || dryRun.loading.value || dryRun.error.value || dryRun.conversionIssues.value.length)
+  if (
+    !effect ||
+    dryRun.loading.value ||
+    dryRun.error.value ||
+    dryRun.conversionIssues.value.length ||
+    dryRun.lifecycleIssues.value.length
+  )
     return null;
   const deltaText =
     effect.todayDeltaMinor === 0
@@ -663,6 +670,7 @@ async function onSave(): Promise<void> {
           @retry="dryRun.loadBaseline"
           @inspect="handleClose"
         />
+        <CashflowReviewNotice :issues="dryRun.lifecycleIssues.value" @inspect="handleClose" />
         <p v-if="effectText" class="effect">{{ effectText }}</p>
       </div>
 

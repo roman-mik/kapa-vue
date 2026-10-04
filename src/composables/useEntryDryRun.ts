@@ -1,6 +1,8 @@
 import { buildProjection } from '@roman-mik/kapa-core/horizon';
 import { computed, ref, watch } from 'vue';
 import type { Currency, CurrencyBucket } from '@roman-mik/kapa-core/pocket';
+import { mutationVersion } from '@/lib/serverState/invalidation';
+import { useSessionStore } from '@/stores/session';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
 import {
@@ -91,11 +93,23 @@ export function useEntryDryRun() {
     }
   }
 
+  watch(
+    () => mutationVersion(useSessionStore().user?.id ?? '', space.currentSpaceId ?? ''),
+    () => {
+      if (ingredients.value) void loadBaseline();
+    }
+  );
+
   return {
     loading,
     error,
     ingredients,
     effect,
+    lifecycleIssues: computed(
+      () =>
+        effect.value?.lifecycleIssues ??
+        (ingredients.value ? (buildProjection(ingredients.value).value.lifecycleIssues ?? []) : [])
+    ),
     conversionIssues,
     reportingCurrency,
     loadBaseline,

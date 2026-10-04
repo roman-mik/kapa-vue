@@ -77,7 +77,12 @@ export function useHorizonToday() {
   }
   return {
     conversionIssues: computed(() => projection.data.value?.unconverted ?? []),
-    isPartial: computed(() => !!projection.data.value?.unconverted.length),
+    lifecycleIssues: computed(() => projection.data.value?.value.lifecycleIssues ?? []),
+    isPartial: computed(
+      () =>
+        !!projection.data.value?.unconverted.length ||
+        !!projection.data.value?.value.lifecycleIssues?.length
+    ),
     loading: computed(
       () =>
         projection.loading.value ||
@@ -104,6 +109,10 @@ export function useHorizonToday() {
     monthMin,
     trough,
     balanceToday,
+    lifecycleEnabled: computed(() => projection.data.value?.value.lifecycleIssues !== undefined),
+    estimatedCash: computed(
+      () => days.value[0]?.events?.[0]?.balanceBeforeMinor ?? balanceToday.value
+    ),
     monthEnd,
     nextEvents,
     warnings,

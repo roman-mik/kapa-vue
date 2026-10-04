@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import CashflowReviewNotice from '@/components/horizon/CashflowReviewNotice.vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import { usePaymentLinkSheet } from '@/composables/usePaymentLinkSheet';
+const paymentLink = usePaymentLinkSheet();
 import { useRouter } from 'vue-router';
 import { paymentReviewRoute } from '@/lib/horizon/paymentReview';
 const router = useRouter();
@@ -20,6 +24,7 @@ import { formatFullDate } from '@/lib/date';
 const { accounts, loading: accountsLoading, error: accountsError } = useAccounts();
 const {
   conversionIssues,
+  lifecycleIssues,
   isPartial,
   refresh,
   loading,
@@ -29,6 +34,8 @@ const {
   capMinor,
   trough,
   balanceToday,
+  lifecycleEnabled,
+  estimatedCash,
   monthEnd,
   nextEvents,
   warnings,
@@ -57,6 +64,10 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
   <main class="page page--with-rail">
     <div class="page-main">
       <h1 tabindex="-1">Today</h1>
+      <CashflowReviewNotice :issues="lifecycleIssues" />
+      <BaseButton variant="secondary" @click="paymentLink.open()"
+        >Review payments and balances</BaseButton
+      >
       <ProjectionCompletenessNotice
         :issues="conversionIssues"
         :currency="reportingCurrency"
@@ -88,8 +99,14 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
           </section>
 
           <div class="hero-secondary">
+            <section v-if="lifecycleEnabled" class="hero-stat">
+              <p class="hero-label">Estimated cash now{{ isPartial ? ' (needs review)' : '' }}</p>
+              <p class="hero-value">
+                {{ estimatedCash !== null ? formatMoney(estimatedCash, reportingCurrency) : '—' }}
+              </p>
+            </section>
             <section class="hero-stat">
-              <p class="hero-label">Balance today{{ isPartial ? ' (partial)' : '' }}</p>
+              <p class="hero-label">Projected end of today{{ isPartial ? ' (partial)' : '' }}</p>
               <p class="hero-value">
                 {{ balanceToday !== null ? formatMoney(balanceToday, reportingCurrency) : '—' }}
               </p>
@@ -114,7 +131,14 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
           <ul v-if="nextEvents.length" class="list">
             <li v-for="event in nextEvents" :key="`${event.date}-${event.sourceId}`" class="row">
               <div class="row-info">
-                <span class="row-name">{{ event.label }}</span>
+                <button
+                  v-if="event.occurrenceId && event.nativeAmountMinor < 0"
+                  type="button"
+                  class="payment-action"
+                  @click="paymentLink.open({ paymentId: event.occurrenceId })"
+                >
+                  {{ event.label }}</button
+                ><span v-else class="row-name">{{ event.label }}</span>
                 <span class="note"
                   >{{ formatFullDate(event.date) }} · {{ isPartial ? 'partial balance' : 'leaves' }}
                   {{ formatMoney(event.balanceAfterMinor, reportingCurrency) }}</span
@@ -141,7 +165,11 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
 
     <aside class="page-side">
       <BaseCard class="side-card">
-        <h2 class="side-heading">Accounts</h2>
+        <h2 class="side-heading">Account balances</h2>
+        <p v-if="lifecycleEnabled" class="note">
+          Last checked balances; estimated cash above also includes reviewed movements since those
+          checks.
+        </p>
         <p v-if="accountsLoading && !accounts.length" role="status">Loading accounts…</p>
         <p v-else-if="accountsError" role="alert">{{ accountsError }}</p>
         <AccountChips v-else-if="accounts.length" :accounts="accounts" />
@@ -160,6 +188,16 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
 </template>
 
 <style scoped>
+.payment-action {
+  font: inherit;
+  text-align: left;
+  color: var(--kapa-ink);
+  background: none;
+  border: 0;
+  min-height: 44px;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .error {
   color: var(--kapa-negative);
   margin: 0;
@@ -333,6 +371,16 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
 </style>
 
 <style scoped>
+.payment-action {
+  font: inherit;
+  text-align: left;
+  color: var(--kapa-ink);
+  background: none;
+  border: 0;
+  min-height: 44px;
+  text-decoration: underline;
+  cursor: pointer;
+}
 .account-action {
   display: inline-flex;
   align-items: center;

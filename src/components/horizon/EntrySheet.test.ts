@@ -91,6 +91,7 @@ describe('EntrySheet', () => {
       effect: dryRunEffect,
       loading: ref(false),
       error: ref(null),
+      lifecycleIssues: ref([]),
       conversionIssues: ref([]),
       reportingCurrency: ref('RSD'),
     });
@@ -125,6 +126,7 @@ describe('EntrySheet', () => {
       effect: dryRunEffect,
       loading: ref(false),
       error: ref(null),
+      lifecycleIssues: ref([]),
       conversionIssues: ref([{ currency: 'EUR', amountMinor: 1000 }]),
       reportingCurrency: ref('RSD'),
     });
@@ -133,6 +135,7 @@ describe('EntrySheet', () => {
       troughBefore: null,
       troughAfter: null,
       troughChanged: false,
+      lifecycleIssues: [],
       unconverted: [],
     };
     const wrapper = mountSheet({ open: true, defaultSide: 'out' });
@@ -154,6 +157,7 @@ describe('EntrySheet', () => {
       troughBefore: null,
       troughAfter: null,
       troughChanged: false,
+      lifecycleIssues: [],
       unconverted: [],
     };
     await nextTick();
@@ -169,6 +173,7 @@ describe('EntrySheet', () => {
       effect: dryRunEffect,
       loading: ref(false),
       error: previewError,
+      lifecycleIssues: ref([]),
       conversionIssues: ref([]),
       reportingCurrency: ref('RSD'),
     });

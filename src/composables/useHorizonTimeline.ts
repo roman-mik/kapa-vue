@@ -53,7 +53,12 @@ export function useHorizonTimeline() {
   }
   return {
     conversionIssues: computed(() => projection.data.value?.unconverted ?? []),
-    isPartial: computed(() => !!projection.data.value?.unconverted.length),
+    lifecycleIssues: computed(() => projection.data.value?.value.lifecycleIssues ?? []),
+    isPartial: computed(
+      () =>
+        !!projection.data.value?.unconverted.length ||
+        !!projection.data.value?.value.lifecycleIssues?.length
+    ),
     loading: computed(
       () => projection.loading.value || settings.loading.value || dismissals.loading.value
     ),

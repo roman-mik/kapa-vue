@@ -83,6 +83,12 @@ export class QueryCache {
     return undefined;
   }
 
+  errors(prefix: QueryKey): string[] {
+    return [...this.entries.values()]
+      .filter((e) => keyStartsWith(e.key, prefix))
+      .flatMap((e) => (e.error.value ? [e.error.value] : []));
+  }
+
   clear(): void {
     for (const entry of this.entries.values()) {
       entry.generation += 1;
