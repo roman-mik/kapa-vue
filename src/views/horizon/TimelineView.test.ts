@@ -104,7 +104,7 @@ describe('TimelineView', () => {
         ]),
       })
     );
-    const wrapper = mount(TimelineView);
+    const wrapper = mount(TimelineView, { global: { stubs: { PaymentList: true } } });
     expect(wrapper.text()).toContain('Forecast incomplete');
     expect(wrapper.find('.amount').text()).toContain('conversion unavailable');
     expect(wrapper.find('.leaf-balance').text()).toContain('Partial balance');
@@ -115,7 +115,7 @@ describe('TimelineView', () => {
     useHorizonTimeline.mockReturnValue(
       baseComposable({ loading: ref(true), days: ref([]), events: ref([]), metrics: ref(null) })
     );
-    const wrapper = mount(TimelineView);
+    const wrapper = mount(TimelineView, { global: { stubs: { PaymentList: true } } });
     expect(wrapper.findComponent(SkeletonBlock).exists()).toBe(true);
     expect(wrapper.find('h1').exists()).toBe(true);
   });
@@ -123,14 +123,14 @@ describe('TimelineView', () => {
   it('shows the error message when the fetch fails', () => {
     setDesktop(false);
     useHorizonTimeline.mockReturnValue(baseComposable({ error: ref('boom') }));
-    const wrapper = mount(TimelineView);
+    const wrapper = mount(TimelineView, { global: { stubs: { PaymentList: true } } });
     expect(wrapper.find('[role="alert"]').text()).toBe('boom');
   });
 
   it('renders one day-by-day month block with the month header summary and event rows', () => {
     setDesktop(false);
     useHorizonTimeline.mockReturnValue(baseComposable());
-    const wrapper = mount(TimelineView);
+    const wrapper = mount(TimelineView, { global: { stubs: { PaymentList: true } } });
 
     const month = wrapper.find('.month');
     expect(month.find('.month-name').text()).toBe(formatFullMonth('2026-09'));
@@ -144,21 +144,21 @@ describe('TimelineView', () => {
   it('shows the days-under badge on a month that dips below zero', () => {
     setDesktop(false);
     useHorizonTimeline.mockReturnValue(baseComposable());
-    const wrapper = mount(TimelineView);
+    const wrapper = mount(TimelineView, { global: { stubs: { PaymentList: true } } });
     expect(wrapper.find('.under-badge').text()).toContain('2');
   });
 
   it('marks the global trough day with a lowest-point tag', () => {
     setDesktop(false);
     useHorizonTimeline.mockReturnValue(baseComposable());
-    const wrapper = mount(TimelineView);
+    const wrapper = mount(TimelineView, { global: { stubs: { PaymentList: true } } });
     expect(wrapper.find('.row.trough .trough-tag').text()).toBe('lowest point');
   });
 
   it('drops the waterfall toggle on a phone viewport, keeping the balance line', () => {
     setDesktop(false);
     useHorizonTimeline.mockReturnValue(baseComposable());
-    const wrapper = mount(TimelineView);
+    const wrapper = mount(TimelineView, { global: { stubs: { PaymentList: true } } });
 
     expect(wrapper.findComponent(BalanceLineChart).exists()).toBe(true);
     expect(wrapper.findComponent(WaterfallChart).exists()).toBe(false);
@@ -168,7 +168,7 @@ describe('TimelineView', () => {
   it('shows the right-column month summary and the waterfall toggle on desktop', async () => {
     setDesktop(true);
     useHorizonTimeline.mockReturnValue(baseComposable());
-    const wrapper = mount(TimelineView);
+    const wrapper = mount(TimelineView, { global: { stubs: { PaymentList: true } } });
 
     // Waterfall toggle appears on desktop.
     expect(wrapper.find('.view-toggle').exists()).toBe(true);
@@ -199,7 +199,7 @@ describe('TimelineView', () => {
         dismiss,
       })
     );
-    const wrapper = mount(TimelineView);
+    const wrapper = mount(TimelineView, { global: { stubs: { PaymentList: true } } });
 
     const quiet = wrapper.findAll('button').find((b) => b.text() === "It's fine");
     await quiet!.trigger('click');

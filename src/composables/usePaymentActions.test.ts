@@ -129,3 +129,13 @@ it('saved refresh recovery retries reads without resubmitting the action', async
   expect(applyPaymentAction).toHaveBeenCalledTimes(1);
   expect(read).toHaveBeenCalledTimes(3);
 });
+
+it('history selects the highest revision when transaction timestamps tie', async () => {
+  listPaymentActions.mockResolvedValue([
+    { id: 'old', occurrence_id: 'salary', after_value: { revision: 3 } },
+    { id: 'latest', occurrence_id: 'salary', after_value: { revision: 4 } },
+  ]);
+  const actions = usePaymentActions(() => payment.id);
+  await actions.history.refresh();
+  expect(actions.latest.value?.id).toBe('latest');
+});

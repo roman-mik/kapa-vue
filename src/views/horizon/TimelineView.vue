@@ -1,4 +1,13 @@
 <script setup lang="ts">
+import PaymentList from '@/components/horizon/PaymentList.vue';
+import { usePaymentActionSheet } from '@/composables/usePaymentActionSheet';
+import type { NegativeDayWarning } from '@roman-mik/kapa-core/horizon';
+const paymentAction = usePaymentActionSheet();
+function reviewWarning(warning: NegativeDayWarning) {
+  if (warning.fix.kind === 'shiftPayment' && warning.fix.event.occurrenceId)
+    paymentAction.open(warning.fix.event.occurrenceId);
+  else void router.push(paymentReviewRoute(warning));
+}
 import CashflowReviewNotice from '@/components/horizon/CashflowReviewNotice.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { usePaymentLinkSheet } from '@/composables/usePaymentLinkSheet';
@@ -149,11 +158,7 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
           </div>
         </div>
 
-        <NegativeDayBanner
-          :warnings="warnings"
-          @dismiss="onDismiss"
-          @fix="router.push(paymentReviewRoute($event))"
-        />
+        <NegativeDayBanner :warnings="warnings" @dismiss="onDismiss" @fix="reviewWarning" />
 
         <BaseCard>
           <BalanceLineChart
@@ -307,6 +312,7 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
         </table>
       </BaseCard>
     </aside>
+    <PaymentList />
   </main>
 </template>
 

@@ -35,7 +35,7 @@ it('explains incomplete totals and unavailable event conversion', () => {
     daysUnderCount: ref(0),
     dismiss: vi.fn(),
   });
-  const wrapper = mount(TodayView);
+  const wrapper = mount(TodayView, { global: { stubs: { PaymentList: true } } });
   expect(wrapper.text()).toContain('Forecast incomplete');
   expect(wrapper.find('.hero').text()).toContain('(partial)');
   expect(wrapper.find('.amount').text()).toContain('conversion unavailable');
