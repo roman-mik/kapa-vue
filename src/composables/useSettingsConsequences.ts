@@ -1,3 +1,4 @@
+import { useHorizonClock } from './useHorizonClock';
 // Backs the two "what this does to your projection" sentences on the
 // Settings screen (task 14): same-day event order and forward spend mode.
 // Both run `buildProjection` twice — once for the current setting, once for
@@ -30,6 +31,7 @@ const HORIZON_DAYS = 90;
 
 export function useSettingsConsequences() {
   const space = useSpaceStore();
+  const clock = useHorizonClock();
   const loading = ref(false);
   let generation = 0;
   const eventOrderSentence = ref<string | null>(null);
@@ -125,7 +127,7 @@ export function useSettingsConsequences() {
     }
   }
 
-  watch(() => space.currentSpaceId, refresh, { immediate: true });
+  watch([() => space.currentSpaceId, clock.today], refresh, { immediate: true });
 
   watch(
     () => mutationVersion(useSessionStore().user?.id ?? '', space.currentSpaceId ?? ''),

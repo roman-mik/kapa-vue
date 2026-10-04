@@ -1,3 +1,4 @@
+import { useHorizonClock } from './useHorizonClock';
 import { computed } from 'vue';
 import { addDays, loadProjectionInput } from '@roman-mik/kapa-core/horizon';
 import {
@@ -45,6 +46,7 @@ export async function loadPaymentContext(spaceId: string, timezone: string) {
       : null,
   ]);
   return {
+    projectionInput: loaded?.input ?? null,
     allowance: loaded?.allowanceReview?.stored ?? null,
     state: loaded?.allowanceReview?.tracking ?? state,
     accounts,
@@ -61,11 +63,12 @@ export type LinkDecision = Parameters<typeof completeLinkExpense>[2];
 export type CashDecision = Parameters<typeof reviewCash>[2];
 export function usePaymentTracking() {
   const space = useSpaceStore();
+  const clock = useHorizonClock();
   const session = useSessionStore();
   const query = useSpaceQuery({
     resource: 'paymentTracking',
     staleTimeMs: 30_000,
-    params: () => [space.currentSpace?.timezone],
+    params: () => [space.currentSpace?.timezone, clock.today.value],
     load: ({ spaceId, params }) => loadPaymentContext(spaceId, params[0] as string),
   });
   async function refreshSaved(

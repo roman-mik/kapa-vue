@@ -1,4 +1,13 @@
 <script setup lang="ts">
+import PaymentList from '@/components/horizon/PaymentList.vue';
+import { usePaymentActionSheet } from '@/composables/usePaymentActionSheet';
+import type { NegativeDayWarning } from '@roman-mik/kapa-core/horizon';
+const paymentAction = usePaymentActionSheet();
+function reviewWarning(warning: NegativeDayWarning) {
+  if (warning.fix.kind === 'shiftPayment' && warning.fix.event.occurrenceId)
+    paymentAction.open(warning.fix.event.occurrenceId);
+  else void router.push(paymentReviewRoute(warning));
+}
 import CashflowReviewNotice from '@/components/horizon/CashflowReviewNotice.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import { usePaymentLinkSheet } from '@/composables/usePaymentLinkSheet';
@@ -65,9 +74,11 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
     <div class="page-main">
       <h1 tabindex="-1">Today</h1>
       <CashflowReviewNotice :issues="lifecycleIssues" />
-      <BaseButton variant="secondary" @click="paymentLink.open()"
-        >Review payments and balances</BaseButton
-      >
+      <div class="review-actions">
+        <BaseButton variant="secondary" @click="paymentLink.open()">
+          Review payments and balances
+        </BaseButton>
+      </div>
       <ProjectionCompletenessNotice
         :issues="conversionIssues"
         :currency="reportingCurrency"
@@ -120,11 +131,7 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
           </div>
         </div>
 
-        <NegativeDayBanner
-          :warnings="warnings"
-          @dismiss="onDismiss"
-          @fix="router.push(paymentReviewRoute($event))"
-        />
+        <NegativeDayBanner :warnings="warnings" @dismiss="onDismiss" @fix="reviewWarning" />
 
         <section class="section">
           <h2>Next up</h2>
@@ -132,10 +139,10 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
             <li v-for="event in nextEvents" :key="`${event.date}-${event.sourceId}`" class="row">
               <div class="row-info">
                 <button
-                  v-if="event.occurrenceId && event.nativeAmountMinor < 0"
+                  v-if="event.occurrenceId"
                   type="button"
                   class="payment-action"
-                  @click="paymentLink.open({ paymentId: event.occurrenceId })"
+                  @click="paymentAction.open(event.occurrenceId)"
                 >
                   {{ event.label }}</button
                 ><span v-else class="row-name">{{ event.label }}</span>
@@ -184,10 +191,20 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
         <CapAssumptionNote :cap-minor="capMinor" :currency="reportingCurrency" />
       </BaseCard>
     </aside>
+    <PaymentList />
   </main>
 </template>
 
 <style scoped>
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin-block: var(--kapa-space-4) var(--kapa-space-5);
+}
+.review-actions .btn {
+  min-height: 44px;
+}
+
 .payment-action {
   font: inherit;
   text-align: left;
@@ -371,6 +388,15 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
 </style>
 
 <style scoped>
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  margin-block: var(--kapa-space-4) var(--kapa-space-5);
+}
+.review-actions .btn {
+  min-height: 44px;
+}
+
 .payment-action {
   font: inherit;
   text-align: left;
