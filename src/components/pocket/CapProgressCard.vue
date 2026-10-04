@@ -43,7 +43,9 @@ const paceMarkerPct = computed(() => {
 });
 
 const eyebrow = computed(() =>
-  props.summary.home.kind === 'over' ? 'over your cap' : 'left this month'
+  props.summary.home.kind === 'over'
+    ? 'over your everyday cap'
+    : 'everyday allowance left this month'
 );
 
 const heroValue = computed(() =>
@@ -83,7 +85,7 @@ const heroValue = computed(() =>
 
     <div class="track-row">
       <span class="spent-line">
-        {{ formatMoney(summary.spent, summary.currency) }} spent of
+        {{ formatMoney(summary.spent, summary.currency) }} everyday spent of
         {{ formatMoney(capMinor, summary.currency) }}
       </span>
       <span v-if="showPace" class="pace-line">

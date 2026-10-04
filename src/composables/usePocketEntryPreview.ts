@@ -9,6 +9,7 @@ import { computed, type ComputedRef, type Ref } from 'vue';
 import type { PocketSummary } from '@/composables/usePocketHome';
 
 export interface EntryDraft {
+  countsTowardCap?: boolean;
   amountMinor: number;
   currency: Currency;
   /** Zoned date key (YYYY-MM-DD) the expense is dated as of. */
@@ -16,6 +17,7 @@ export interface EntryDraft {
 }
 
 export interface EntryPreviewExclusion {
+  countsTowardCap?: boolean;
   amountMinor: number;
   currency: Currency;
   date: string;
@@ -47,7 +49,11 @@ export function usePocketEntryPreview(
 
     let baseRemaining = home.remaining;
     const excluded = exclude?.value;
-    if (excluded) {
+    if (
+      excluded &&
+      excluded.countsTowardCap !== false &&
+      excluded.date.slice(0, 7) === home.month
+    ) {
       const originalContribution = convertToCurrency(
         excluded.amountMinor,
         excluded.currency,
@@ -59,13 +65,10 @@ export function usePocketEntryPreview(
       baseRemaining = home.remaining + originalContribution;
     }
 
-    const converted = convertToCurrency(
-      d.amountMinor,
-      d.currency,
-      home.currency,
-      d.date,
-      rates.value
-    );
+    const contributes = d.countsTowardCap !== false && d.date.slice(0, 7) === home.month;
+    const converted = contributes
+      ? convertToCurrency(d.amountMinor, d.currency, home.currency, d.date, rates.value)
+      : 0;
     if (converted === undefined) return null;
 
     const remainingAfterMinor = remainingAfter(baseRemaining, converted);

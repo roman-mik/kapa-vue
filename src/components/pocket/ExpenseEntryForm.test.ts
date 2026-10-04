@@ -6,6 +6,16 @@ import type { PocketSummary } from '@/composables/usePocketHome';
 import { useSpaceStore } from '@/stores/space';
 import ExpenseEntryForm from './ExpenseEntryForm.vue';
 
+const capMocks = vi.hoisted(() => ({ counts: vi.fn() }));
+vi.mock('@/composables/useCategoryCapRules', () => ({
+  useCategoryCapRules: () => ({
+    countsTowardCap: capMocks.counts,
+    loading: ref(false),
+    error: ref(null),
+    refresh: vi.fn(),
+  }),
+}));
+
 vi.mock('@/composables/useCategories', () => ({
   useCategories: () => ({
     categories: ref([{ id: 'cat-1', name: 'Groceries', color: null }]),
@@ -19,6 +29,8 @@ function baseSummary(overrides: Partial<PocketSummary> = {}): PocketSummary {
   return {
     month: '2026-09',
     currency: 'RSD',
+    totalSpent: 34_180_00,
+    totalUnconverted: [],
     spent: 34_180_00,
     remaining: 65_820_00,
     safeDaily: 3_657_00,
@@ -40,6 +52,7 @@ function baseSummary(overrides: Partial<PocketSummary> = {}): PocketSummary {
 describe('ExpenseEntryForm', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    capMocks.counts.mockImplementation((id) => id !== 'rent');
     const space = useSpaceStore();
     space.spaces = [
       {
@@ -160,7 +173,7 @@ describe('ExpenseEntryForm', () => {
       },
     });
     expect(wrapper.find('.hint').exists()).toBe(true);
-    expect(wrapper.find('.hint').text()).toContain('left after this');
+    expect(wrapper.find('.preview').text()).toContain('left after this');
     wrapper.unmount();
   });
 
@@ -183,4 +196,61 @@ describe('ExpenseEntryForm', () => {
     expect(wrapper.find('.amount-display').text()).toBe('0');
     wrapper.unmount();
   });
+});
+
+it('uses the category default, emits an override and restores the default for keep-adding', async () => {
+  setActivePinia(createPinia());
+  capMocks.counts.mockImplementation((id) => id !== 'rent');
+  const wrapper = mount(ExpenseEntryForm, {
+    props: {
+      mode: 'add',
+      summary: baseSummary(),
+      rates: [],
+      initialValues: {
+        amountMinor: 300,
+        currency: 'RSD',
+        categoryId: 'rent',
+        note: null,
+        date: '2026-09-01',
+      },
+    },
+  });
+  expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false);
+  expect(wrapper.find('.preview').text()).toContain('everyday allowance');
+  await wrapper.find('input[type="checkbox"]').setValue(true);
+  await wrapper.find('form').trigger('submit');
+  expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual(
+    expect.objectContaining({ countsTowardCap: true })
+  );
+  (wrapper.vm as unknown as { reset: (opts: { keepCategory: boolean }) => void }).reset({
+    keepCategory: true,
+  });
+  await wrapper.vm.$nextTick();
+  expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false);
+  wrapper.unmount();
+});
+it('preserves saved eligibility when an edited expense changes category', async () => {
+  setActivePinia(createPinia());
+  capMocks.counts.mockReturnValue(false);
+  const wrapper = mount(ExpenseEntryForm, {
+    props: {
+      mode: 'edit',
+      summary: baseSummary(),
+      rates: [],
+      initialValues: {
+        countsTowardCap: true,
+        amountMinor: 50,
+        currency: 'RSD',
+        categoryId: null,
+        note: null,
+        date: '2026-09-01',
+      },
+    },
+  });
+  expect((wrapper.find('input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true);
+  await wrapper.find('form').trigger('submit');
+  expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual(
+    expect.objectContaining({ countsTowardCap: true })
+  );
+  wrapper.unmount();
 });

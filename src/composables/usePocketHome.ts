@@ -1,5 +1,6 @@
 import type { CurrencyBucket, PocketHomeView } from '@roman-mik/kapa-core/pocket';
 import {
+  everydayExpenses,
   categoryBreakdown,
   completedDays,
   type Currency,
@@ -33,7 +34,10 @@ import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 export interface PocketSummary {
   month: string;
   currency: Currency;
+  /** Everyday spending; used by every cap-relative calculation. */
   spent: number;
+  totalSpent: number;
+  totalUnconverted: CurrencyBucket[];
   remaining: number;
   safeDaily: number;
   paceGap: number;
@@ -91,7 +95,9 @@ export function usePocketHome() {
     const elapsed = elapsedDays(D, dl);
     const completed = completedDays(D, dl);
 
-    const amounts = expenses.value.map(toExpenseAmount);
+    const allAmounts = expenses.value.map(toExpenseAmount);
+    const amounts = everydayExpenses(allAmounts);
+    const totalResult = spentTotal(allAmounts, timeZone, spaceCurrency, fxRates.rates.value);
     const spentResult = spentTotal(amounts, timeZone, spaceCurrency, fxRates.rates.value);
     const spent = spentResult.value;
 
@@ -120,6 +126,8 @@ export function usePocketHome() {
       month,
       currency: spaceCurrency,
       spent,
+      totalSpent: totalResult.value,
+      totalUnconverted: totalResult.unconverted,
       remaining: remainingValue,
       safeDaily: safeDaily(remainingValue, dl),
       paceGap: paceGap(evenPaceValue, spent),

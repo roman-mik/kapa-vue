@@ -21,7 +21,12 @@ describe('Pocket cap entry point', () => {
     home.mockReturnValue({
       summary: ref({
         home: { kind },
+        currency: 'RSD',
+        dailyTotals: [],
+        dailyCapReference: 0,
         spent: 100,
+        totalSpent: 100,
+        totalUnconverted: [],
         remaining: 900,
         todayExpenses: [],
         unconverted: [],

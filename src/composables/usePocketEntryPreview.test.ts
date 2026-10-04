@@ -12,6 +12,8 @@ function baseSummary(overrides: Partial<PocketSummary> = {}): PocketSummary {
   return {
     month: '2026-09',
     currency: 'RSD',
+    totalSpent: 34_180_00,
+    totalUnconverted: [],
     spent: 34_180_00,
     remaining: 65_820_00,
     safeDaily: 3_657_00,
@@ -97,7 +99,7 @@ describe('usePocketEntryPreview', () => {
     const exclude = ref<EntryPreviewExclusion | null>({
       amountMinor: 2_000_00,
       currency: 'RSD',
-      date: '2026-08-30',
+      date: '2026-09-01',
     });
     const preview = usePocketEntryPreview(draft, summary, rates, exclude);
     // remaining (65_820_00) + original (2_000_00) - new (3_000_00)
@@ -115,7 +117,7 @@ describe('usePocketEntryPreview', () => {
     const exclude = ref<EntryPreviewExclusion | null>({
       amountMinor: 1000,
       currency: 'EUR',
-      date: '2026-08-30',
+      date: '2026-09-01',
     });
     expect(usePocketEntryPreview(draft, summary, rates, exclude).value).toBeNull();
   });
@@ -131,4 +133,51 @@ describe('usePocketEntryPreview', () => {
     expect(preview.value).not.toBeNull();
     expect(preview.value!.remainingAfterMinor).toBeLessThan(65_820_00);
   });
+});
+
+it('does not charge outside-cap missing-FX spending to the allowance', () => {
+  const draft = ref<EntryDraft | null>({
+    amountMinor: 300,
+    currency: 'USD',
+    date: '2026-09-01',
+    countsTowardCap: false,
+  });
+  const summary = ref(baseSummary({ remaining: 350 }));
+  const preview = usePocketEntryPreview(draft, summary, ref([]));
+  expect(preview.value?.remainingAfterMinor).toBe(350);
+});
+it.each([
+  [false, true, 250],
+  [true, false, 650],
+  [false, false, 350],
+  [true, true, 550],
+])('replaces eligibility %s with %s without charging twice', (oldCounts, newCounts, expected) => {
+  const draft = ref<EntryDraft | null>({
+    amountMinor: 100,
+    currency: 'RSD',
+    date: '2026-09-01',
+    countsTowardCap: newCounts,
+  });
+  const original = ref<EntryPreviewExclusion | null>({
+    amountMinor: 300,
+    currency: 'RSD',
+    date: '2026-09-01',
+    countsTowardCap: oldCounts,
+  });
+  expect(
+    usePocketEntryPreview(draft, ref(baseSummary({ remaining: 350 })), ref([]), original).value
+      ?.remainingAfterMinor
+  ).toBe(expected);
+});
+it('does not restore a prior-month expense into this month allowance', () => {
+  const draft = ref<EntryDraft | null>({ amountMinor: 100, currency: 'RSD', date: '2026-09-01' });
+  const original = ref<EntryPreviewExclusion | null>({
+    amountMinor: 300,
+    currency: 'USD',
+    date: '2026-08-31',
+  });
+  expect(
+    usePocketEntryPreview(draft, ref(baseSummary({ remaining: 350 })), ref([]), original).value
+      ?.remainingAfterMinor
+  ).toBe(250);
 });

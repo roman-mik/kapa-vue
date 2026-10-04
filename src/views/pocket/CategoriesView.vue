@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { categoryBreakdown } from '@roman-mik/kapa-core/pocket';
+import { toExpenseAmount } from '@/lib/expenseAmount';
+import { useSpaceStore } from '@/stores/space';
 import type { Category } from '@roman-mik/kapa-core/core';
 import { SWATCH_SLOTS, type SwatchSlot } from '@roman-mik/kapa-core/theme';
 import { computed, ref, watch } from 'vue';
@@ -10,6 +13,7 @@ import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
 import CategoryShareBar from '@/components/pocket/CategoryShareBar.vue';
 import ExpenseRowMenu from '@/components/pocket/ExpenseRowMenu.vue';
 import type { RowMenuAction } from '@/components/pocket/expenseRowMenu';
+import { useCategoryCapRules } from '@/composables/useCategoryCapRules';
 import { useCategories } from '@/composables/useCategories';
 import { useExpenses } from '@/composables/useExpenses';
 import { usePocketHome } from '@/composables/usePocketHome';
@@ -23,7 +27,10 @@ import { categoryNameSchema, firstIssueMessage } from '@/lib/validation';
 const { categories, loading, error, add, rename, archive, restore, setColor } = useCategories({
   includeArchived: true,
 });
-const { summary } = usePocketHome();
+const capRules = useCategoryCapRules();
+const capRulesLoading = capRules.loading;
+const capRulesError = capRules.error;
+const { summary, rates } = usePocketHome();
 const { expenses } = useExpenses();
 const { isDesktop } = useViewport();
 const toast = useToast();
@@ -47,7 +54,21 @@ const capMinor = computed(() =>
   summary.value ? summary.value.spent + summary.value.remaining : 0
 );
 
+const allCategorySpending = computed(
+  () =>
+    categoryBreakdown(
+      expenses.value.map(toExpenseAmount),
+      useSpaceStore().currentSpace?.timezone ?? 'UTC',
+      currency.value,
+      rates.value
+    ).value
+);
+
 function categorySpent(categoryId: string): number {
+  return allCategorySpending.value.find((b) => b.categoryId === categoryId)?.spent ?? 0;
+}
+
+function categoryBudgetSpent(categoryId: string): number {
   return summary.value?.categoryBreakdown.find((b) => b.categoryId === categoryId)?.spent ?? 0;
 }
 
@@ -71,9 +92,13 @@ watch(
   { immediate: true }
 );
 
-watch(selectedCategory, (category) => {
-  if (category) renameValue.value = category.name;
-});
+watch(
+  selectedCategory,
+  (category) => {
+    if (category) renameValue.value = category.name;
+  },
+  { immediate: true }
+);
 
 function rowMenuActions(category: Category): RowMenuAction[] {
   if (category.archived) {
@@ -187,11 +212,33 @@ async function onRestore(id: string): Promise<void> {
     busyId.value = null;
   }
 }
+async function onCapDefault(id: string, event: Event): Promise<void> {
+  const control = event.target as HTMLInputElement;
+  const counts = control.checked;
+  busyId.value = id;
+  try {
+    await capRules.setDefault(id, counts);
+    toast.success('Default updated. Existing expenses stay unchanged.');
+  } catch (err) {
+    toast.error(err instanceof Error ? err.message : 'Could not update this default.');
+  } finally {
+    busyId.value = null;
+    control.checked = capRules.countsTowardCap(id);
+  }
+}
 </script>
 
 <template>
   <main class="page page--with-rail">
     <h1 class="full-row">Categories</h1>
+    <p class="full-row">
+      Set which categories count toward your everyday limit. Defaults apply to new expenses; you can
+      override each expense.
+    </p>
+    <p v-if="capRulesError" role="alert" class="error full-row">
+      Could not load everyday defaults.
+      <button type="button" @click="capRules.refresh()">Retry</button>
+    </p>
 
     <template v-if="loading && !categories.length">
       <div class="full-row">
@@ -209,7 +256,7 @@ async function onRestore(id: string): Promise<void> {
           <span role="columnheader">Category</span>
           <span role="columnheader">This month</span>
           <span role="columnheader">Expenses</span>
-          <span role="columnheader">Share</span>
+          <span role="columnheader">Everyday share</span>
           <span role="columnheader" aria-hidden="true" />
         </div>
 
@@ -285,13 +332,15 @@ async function onRestore(id: string): Promise<void> {
                 <div class="share-col">
                   <template v-if="!category.archived">
                     <CategoryShareBar
-                      :percent="categorySharePct(categorySpent(category.id), capMinor)"
+                      :percent="categorySharePct(categoryBudgetSpent(category.id), capMinor)"
                       :color="
                         category.color ? swatchCssVar(category.color as SwatchSlot) : undefined
                       "
                     />
                     <span class="share-pct">
-                      {{ Math.round(categorySharePct(categorySpent(category.id), capMinor)) }}%
+                      {{
+                        Math.round(categorySharePct(categoryBudgetSpent(category.id), capMinor))
+                      }}%
                     </span>
                   </template>
                 </div>
@@ -305,6 +354,16 @@ async function onRestore(id: string): Promise<void> {
                 />
               </div>
 
+              <label class="cap-default" @click.stop>
+                <input
+                  type="checkbox"
+                  :aria-label="`Counts toward everyday limit for ${category.name}`"
+                  :checked="capRules.countsTowardCap(category.id)"
+                  :disabled="capRulesLoading || !!capRulesError || busyId === category.id"
+                  @change="onCapDefault(category.id, $event)"
+                />
+                Counts toward everyday limit
+              </label>
               <div
                 v-if="!isDesktop && pickingColorId === category.id"
                 class="swatch-row"
@@ -414,6 +473,20 @@ async function onRestore(id: string): Promise<void> {
 </template>
 
 <style scoped>
+.cap-default {
+  display: flex;
+  align-items: center;
+  gap: var(--kapa-space-2);
+  min-height: 44px;
+  cursor: pointer;
+  margin-top: var(--kapa-space-2);
+}
+.cap-default input {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  accent-color: var(--kapa-accent-600);
+}
 .full-row {
   grid-column: 1 / -1;
 }

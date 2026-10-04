@@ -64,6 +64,7 @@ const initialValues = computed<ExpenseDraftPayload | undefined>(() => {
   const expense = original.value;
   if (!expense) return undefined;
   return {
+    countsTowardCap: expense.counts_toward_cap ?? true,
     amountMinor: expense.amount_minor ?? 0,
     currency: (expense.currency ?? 'RSD') as Currency,
     categoryId: expense.category_id,
@@ -76,6 +77,7 @@ const excludeFromPreview = computed<EntryPreviewExclusion | null>(() => {
   const expense = original.value;
   if (!expense) return null;
   return {
+    countsTowardCap: expense.counts_toward_cap ?? true,
     amountMinor: expense.amount_minor ?? 0,
     currency: (expense.currency ?? 'RSD') as Currency,
     date: dateKeyOf(expense),
@@ -93,6 +95,7 @@ async function onSubmit(payload: ExpenseDraftPayload): Promise<void> {
     const outcome = await update(
       expenseId.value,
       {
+        counts_toward_cap: payload.countsTowardCap,
         amount_minor: payload.amountMinor,
         currency: payload.currency,
         category_id: payload.categoryId,

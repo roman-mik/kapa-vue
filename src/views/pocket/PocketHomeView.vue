@@ -72,6 +72,7 @@ function onRowMenuConfirm(row: ExpenseView, id: string): void {
 function onDuplicate(row: ExpenseView): void {
   entrySheet.open({
     prefill: {
+      countsTowardCap: row.counts_toward_cap ?? true,
       amountMinor: row.amount_minor ?? 0,
       currency: (row.currency ?? 'RSD') as Currency,
       categoryId: row.category_id,
@@ -123,7 +124,7 @@ async function onDelete(row: ExpenseView): Promise<void> {
         </template>
 
         <BaseCard v-if="summary.home.kind !== 'no-cap'" padding="sm">
-          <h2>Daily spending</h2>
+          <h2>Everyday spending</h2>
           <DailySpendChart
             :days="summary.dailyTotals"
             :reference-line="summary.dailyCapReference"
@@ -133,11 +134,31 @@ async function onDelete(row: ExpenseView): Promise<void> {
       </div>
 
       <aside class="page-side">
+        <BaseCard padding="sm">
+          <h2>This month</h2>
+          <p>
+            Everyday spent
+            <strong class="money-amount">{{ formatMoney(summary.spent, summary.currency) }}</strong>
+          </p>
+          <p>
+            Total spent
+            <strong class="money-amount">{{
+              formatMoney(summary.totalSpent, summary.currency)
+            }}</strong>
+          </p>
+          <p class="hint">Total includes bills and spending outside your everyday limit.</p>
+          <UnconvertedNote
+            v-if="summary.totalUnconverted?.length"
+            :buckets="summary.totalUnconverted"
+            :currency="summary.currency"
+            context="in total spending"
+          />
+        </BaseCard>
         <BaseCard v-if="summary.unconverted.length" padding="sm">
           <UnconvertedNote
             :buckets="summary.unconverted"
             :currency="summary.currency"
-            context="above"
+            context="in everyday budget figures"
           />
         </BaseCard>
 
@@ -195,7 +216,7 @@ async function onDelete(row: ExpenseView): Promise<void> {
         </BaseCard>
 
         <BaseCard v-if="summary.categoryBreakdown.length" padding="sm">
-          <h2>By category</h2>
+          <h2>Everyday by category</h2>
           <ul class="breakdown">
             <li v-for="row in summary.categoryBreakdown" :key="row.categoryId ?? 'none'">
               <div class="breakdown-row-head">

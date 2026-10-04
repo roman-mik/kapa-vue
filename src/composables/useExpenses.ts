@@ -23,6 +23,7 @@ export interface NewExpense {
   categoryId: string | null;
   note: string | null;
   spentAt?: string;
+  countsTowardCap?: boolean;
 }
 
 // The current-month expense list for the current space — no arithmetic,
@@ -59,6 +60,9 @@ export function useExpenses() {
       currency: expense.currency,
       category_id: expense.categoryId,
       note: expense.note,
+      ...(expense.countsTowardCap !== undefined
+        ? { counts_toward_cap: expense.countsTowardCap }
+        : {}),
       ...(expense.spentAt ? { spent_at: expense.spentAt } : {}),
     });
     await invalidate();

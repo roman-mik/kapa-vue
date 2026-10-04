@@ -15,6 +15,15 @@ const { useExpenses, usePocketHome, useToast } = vi.hoisted(() => ({
 vi.mock('@/composables/useExpenses', () => ({ useExpenses }));
 vi.mock('@/composables/usePocketHome', () => ({ usePocketHome }));
 vi.mock('@/composables/useToast', () => ({ useToast }));
+vi.mock('@/composables/useCategoryCapRules', () => ({
+  useCategoryCapRules: () => ({
+    countsTowardCap: () => true,
+    loading: ref(false),
+    error: ref(null),
+    refresh: vi.fn(),
+  }),
+}));
+
 vi.mock('@/composables/useCategories', () => ({
   useCategories: () => ({
     categories: ref([]),
