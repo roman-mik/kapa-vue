@@ -2,6 +2,8 @@
 import { type Currency, type CurrencyBucket, type FxRate } from '@roman-mik/kapa-core/pocket';
 import { type ScheduleCalendar } from '@roman-mik/kapa-core/horizon';
 import { computed, ref } from 'vue';
+import PaymentReview from '@/components/horizon/PaymentReview.vue';
+import type { PaymentReviewTarget } from '@/lib/horizon/paymentReview';
 import PlannedSpendForm from '@/components/horizon/PlannedSpendForm.vue';
 import RowEditor, { type RowEditorEntry } from '@/components/horizon/RowEditor.vue';
 import UnconvertedNote from '@/components/pocket/UnconvertedNote.vue';
@@ -23,8 +25,12 @@ import { formatMoney, formatRate } from '@/lib/money';
 import { formatFullDate, formatFullMonth } from '@/lib/date';
 import { useSpaceStore } from '@/stores/space';
 
-const props = withDefaults(defineProps<{ isDesktop?: boolean }>(), { isDesktop: false });
+const props = withDefaults(
+  defineProps<{ isDesktop?: boolean; reviewTarget?: PaymentReviewTarget | null }>(),
+  { isDesktop: false }
+);
 
+const emit = defineEmits<{ reviewFinished: [] }>();
 const CADENCE_LABELS: Record<string, string> = {
   daily: 'Daily',
   weekly: 'Weekly',
@@ -49,6 +55,7 @@ const calendar = computed<ScheduleCalendar>(
 );
 
 const {
+  allEvents,
   monthOneOffs,
   convertibles: oneOffConvertibles,
   loading: oneOffsLoading,
@@ -116,15 +123,17 @@ const buckets = computed(() =>
         monthlyMinor: o.monthlyMinor,
         firstDueDate: o.occurrences[0]?.date ?? null,
       })),
-      oneOffs: monthOneOffs.value.map((e) => ({
-        id: e.id,
-        name: e.name,
-        category: e.category,
-        currency: e.currency,
-        amountMinor: e.amount_minor,
-        date: e.date,
-        direction: e.direction as 'in' | 'out',
-      })),
+      oneOffs: monthOneOffs.value
+        .filter((e) => e.direction === 'out')
+        .map((e) => ({
+          id: e.id,
+          name: e.name,
+          category: e.category,
+          currency: e.currency,
+          amountMinor: e.amount_minor,
+          date: e.date,
+          direction: e.direction as 'in' | 'out',
+        })),
       plannedSpend: plannedSpendWithMonth.value.map((item) => ({
         id: item.id,
         name: item.name,
@@ -337,6 +346,34 @@ function onPlannedCancelled(): void {
   editingPlannedId.value = null;
 }
 
+const reviewObligation = computed(() =>
+  props.reviewTarget?.kind === 'obligation'
+    ? obligationsWithMonth.value.find((o) => o.id === props.reviewTarget?.id)
+    : undefined
+);
+const reviewOneOff = computed(() =>
+  props.reviewTarget?.kind === 'oneOffOut'
+    ? allEvents.value.find((e) => e.id === props.reviewTarget?.id && e.direction === 'out')
+    : undefined
+);
+const reviewPlanned = computed(() =>
+  props.reviewTarget?.kind === 'plannedSpend'
+    ? plannedSpendWithMonth.value.find((p) => p.id === props.reviewTarget?.id)
+    : undefined
+);
+const reviewEntry = computed<RowEditorEntry | null>(() =>
+  reviewOneOff.value
+    ? { kind: 'oneOff', initial: reviewOneOff.value, update: updateOneOff, remove: removeOneOff }
+    : reviewObligation.value
+      ? {
+          kind: 'obligation',
+          initial: reviewObligation.value,
+          calendar: calendar.value,
+          update: updateObligation,
+          archive: archiveObligation,
+        }
+      : null
+);
 const loadingInitial = computed(() => loading.value && !obligationsWithMonth.value.length);
 
 function amountTone(row: MoneyOutRow): string {
@@ -399,6 +436,38 @@ function oneOffEntry(row: MoneyOutRow): RowEditorEntry | null {
 
       <p class="fx-note" v-if="fxNote">{{ fxNote }}</p>
 
+      <PaymentReview
+        v-if="reviewTarget"
+        :target="reviewTarget"
+        :loading="loading || oneOffsLoading || plannedSpendLoading"
+        :error="error || oneOffsError || plannedSpendError"
+        :found="!!(reviewEntry || reviewPlanned)"
+        :recurring="!!(reviewObligation || reviewPlanned)"
+        @close="emit('reviewFinished')"
+      >
+        <RowEditor
+          v-if="reviewEntry"
+          :entry="reviewEntry"
+          @saved="emit('reviewFinished')"
+          @archived="emit('reviewFinished')"
+          @removed="emit('reviewFinished')"
+          @cancelled="emit('reviewFinished')"
+        />
+        <PlannedSpendForm
+          v-else-if="reviewPlanned"
+          :accounts="accounts"
+          :categories="categories"
+          :space-currency="spaceCurrency"
+          :default-start-date="reviewPlanned.start_date"
+          :initial="reviewPlanned"
+          :save="addPlannedSpend"
+          :update="updatePlannedSpend"
+          :archive="archivePlannedSpend"
+          @saved="emit('reviewFinished')"
+          @archived="emit('reviewFinished')"
+          @cancelled="emit('reviewFinished')"
+        />
+      </PaymentReview>
       <div class="kind-filter" role="group" aria-label="Filter by kind">
         <button
           v-for="opt in KIND_OPTIONS"
@@ -534,6 +603,7 @@ function oneOffEntry(row: MoneyOutRow): RowEditorEntry | null {
               </span>
               <span class="row-total" :class="amountTone(row)">
                 <span class="native">{{ amountPrefix(row) }}{{ amountText(row) }}</span>
+                <span v-if="row.kind !== 'oneOff'" class="fx">Total in {{ monthLabel }}</span>
                 <span v-if="rowFxMeta(row)" class="fx">
                   {{ rowFxMeta(row)!.native }} @ {{ rowFxMeta(row)!.rate }}
                 </span>

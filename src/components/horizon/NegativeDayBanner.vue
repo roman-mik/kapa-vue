@@ -28,7 +28,7 @@ const reasonDrafts = ref<Record<string, string>>({});
 
 function fixLabel(warning: NegativeDayWarning): string {
   return warning.fix.kind === 'shiftPayment'
-    ? `Shift the ${warning.fix.event.label} payment`
+    ? `Review the ${warning.fix.event.label} payment`
     : `Hold back ${formatMoney(warning.fix.amountMinor, warning.currency as Currency)} before then`;
 }
 

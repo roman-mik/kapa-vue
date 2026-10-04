@@ -117,6 +117,7 @@ export function useOneOffEvents() {
   }
 
   return {
+    allEvents,
     monthOneOffs,
     convertibles,
     month,

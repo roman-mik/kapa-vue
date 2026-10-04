@@ -29,9 +29,11 @@ function onKeydown(event: KeyboardEvent): void {
     return;
   }
   if (event.key !== 'Tab' || !panel.value) return;
-  const focusable = panel.value.querySelectorAll<HTMLElement>(
-    'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
-  );
+  const focusable = Array.from(
+    panel.value.querySelectorAll<HTMLElement>(
+      'a[href], summary, button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((element) => element.tagName === 'SUMMARY' || !element.closest('details:not([open])'));
   if (focusable.length === 0) return;
   const first = focusable[0];
   const last = focusable[focusable.length - 1];

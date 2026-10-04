@@ -1,3 +1,5 @@
+import type { NewIncomeStream } from '@/composables/useIncomeStreams';
+import type { Currency } from '@roman-mik/kapa-core/pocket';
 import {
   coveredPeriod,
   formatMonthLabel,
@@ -163,4 +165,21 @@ function monthLabelFor(
   const rule = rules[0];
   const paymentDate = occ.originalDate ?? occ.date;
   return formatMonthLabel(coveredPeriod(paymentDate, rule));
+}
+
+export interface IncomeFormDraft {
+  kind: NewIncomeStream['kind'];
+  name: string;
+  accountId: string;
+  currency: Currency;
+  amount: string;
+  startDate: string;
+  hourlyRate: string;
+  hoursPerDay: string;
+  earningPeriod: 'monthly' | 'semiMonthly';
+  lagDays: string;
+  paymentRule: NewIncomeStream['paymentRule'];
+  payDay: string;
+  confidence: NewIncomeStream['confidence'];
+  taxable: boolean;
 }

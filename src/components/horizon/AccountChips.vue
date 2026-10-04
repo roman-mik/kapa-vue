@@ -11,10 +11,12 @@ defineProps<{
 <template>
   <ul class="chips">
     <li v-for="account in accounts" :key="account.id" class="chip">
-      <span class="name">{{ account.name }}</span>
-      <span class="balance">{{
-        formatMoney(account.current_balance_minor, account.currency as Currency)
-      }}</span>
+      <router-link :to="{ name: 'horizon-accounts' }" class="account-link">
+        <span class="name">{{ account.name }}</span>
+        <span class="balance">{{
+          formatMoney(account.current_balance_minor, account.currency as Currency)
+        }}</span>
+      </router-link>
     </li>
   </ul>
 </template>
@@ -47,5 +49,26 @@ defineProps<{
 
 .balance {
   color: var(--kapa-ink-muted);
+}
+</style>
+
+<style scoped>
+.account-link {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kapa-space-2);
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.chip {
+  max-width: 100%;
+  padding-block: 0;
+}
+.account-link:focus-visible {
+  outline: 2px solid var(--kapa-accent-700);
+  outline-offset: 3px;
 }
 </style>

@@ -204,6 +204,7 @@ function mockMoneyOutComposables(): void {
     archive: vi.fn().mockResolvedValue(undefined),
   });
   useOneOffEvents.mockReturnValue({
+    allEvents: ref([oneOffEvent]),
     monthOneOffs: ref([oneOffEvent]),
     convertibles: ref([]),
     loading: ref(false),
@@ -359,9 +360,71 @@ describe('MoneyInView', () => {
     expect(wrapper.text()).toContain('Tax refund');
   });
 
+  it('lists dated receipts once and filters them with one-off income', async () => {
+    const wrapper = mount(MoneyInView);
+    expect(wrapper.findAll('.row-main').filter((r) => r.text().includes('Gift'))).toHaveLength(1);
+    await wrapper
+      .findAll('.kind-filter .seg')
+      .find((b) => b.text() === 'Recurring')!
+      .trigger('click');
+    expect(wrapper.text()).not.toContain('Gift');
+    await wrapper
+      .findAll('.kind-filter .seg')
+      .find((b) => b.text() === 'One-off')!
+      .trigger('click');
+    expect(wrapper.text()).toContain('Gift');
+    expect(wrapper.text()).toContain('Tax refund');
+  });
+
+  it('edits and deletes a dated receipt in Money in', async () => {
+    const data = useOneOffEvents();
+    const wrapper = mount(MoneyInView);
+    await wrapper
+      .findAll('.row-main')
+      .find((r) => r.text().includes('Gift'))!
+      .trigger('click');
+    await wrapper
+      .findAll('button')
+      .find((b) => b.text() === 'Delete')!
+      .trigger('click');
+    await flushPromises();
+    expect(data.remove).toHaveBeenCalledWith('e1');
+    expect(wrapper.find('[data-testid="row-editor"]').exists()).toBe(false);
+  });
+
+  it('includes only In receipts in the monthly total', () => {
+    const data = useOneOffEvents();
+    data.monthOneOffs.value = [
+      oneOffEvent,
+      { ...oneOffEvent, id: 'out', direction: 'out', amount_minor: 9000 },
+    ] as never;
+    const wrapper = mount(MoneyInView);
+    expect(wrapper.find('.hero-amount').text()).toContain('5,000');
+    expect(wrapper.findAll('.row-main').filter((r) => r.text().includes('Gift'))).toHaveLength(1);
+  });
+
+  it('opens a future receipt from its warning independently of monthly filters', () => {
+    const data = useOneOffEvents();
+    data.allEvents.value = [{ ...oneOffEvent, date: '2026-12-10' }] as never;
+    data.monthOneOffs.value = [];
+    const wrapper = mount(MoneyInView, {
+      props: { reviewTarget: { kind: 'oneOffIn', id: 'e1', date: '2026-12-10' } },
+    });
+    expect(wrapper.find('.payment-review [data-testid="row-editor"]').exists()).toBe(true);
+    expect(wrapper.find('.payment-review input[type="date"]').element).toHaveProperty(
+      'value',
+      '2026-12-10'
+    );
+  });
+
   it('shows the FX note when a rate snapshot is loaded', () => {
     const wrapper = mount(MoneyInView);
-    expect(wrapper.find('.fx-note').text()).toContain('converted at rates as of');
+    expect(
+      wrapper
+        .findAll('.fx-note')
+        .map((note) => note.text())
+        .join(' ')
+    ).toContain('converted at rates as of');
   });
 
   it('expands the compact RowEditor for a fixed stream and saves', async () => {
@@ -429,10 +492,26 @@ describe('MoneyOutView', () => {
     expect(sheet.defaultSide.value).toBe('out');
   });
 
+  it('opens the recurring warning source and discloses edit scope', () => {
+    const wrapper = mount(MoneyOutView, {
+      props: { reviewTarget: { kind: 'obligation', id: 'o1', date: '2026-12-01' } },
+    });
+    expect(wrapper.find('.payment-review [data-testid="row-editor"]').exists()).toBe(true);
+    expect(wrapper.find('.payment-review').text()).toContain('future payments');
+  });
+
+  it('provides a fallback for deleted or unsupported warning sources', () => {
+    const wrapper = mount(MoneyOutView, {
+      props: { reviewTarget: { kind: 'obligation', id: 'deleted', date: '2026-12-01' } },
+    });
+    expect(wrapper.find('.payment-review').text()).toContain('Review the Money list below');
+    expect(wrapper.find('.payment-review [data-testid="row-editor"]').exists()).toBe(false);
+  });
+
   it('filters the merged list by kind', async () => {
     const wrapper = mount(MoneyOutView);
     expect(wrapper.text()).toContain('Rent');
-    expect(wrapper.text()).toContain('Gift');
+    expect(wrapper.text()).not.toContain('Gift');
     expect(wrapper.text()).toContain('Groceries');
 
     const plannedTab = wrapper.findAll('.kind-filter .seg').find((b) => b.text() === 'Planned');
@@ -459,6 +538,7 @@ describe('MoneyOutView', () => {
 
   it('deletes a one-off from the RowEditor', async () => {
     const composable = useOneOffEvents();
+    composable.monthOneOffs.value = [{ ...oneOffEvent, direction: 'out' }] as never;
     const wrapper = mount(MoneyOutView);
 
     const giftRow = wrapper.findAll('.row-main').find((r) => r.text().includes('Gift'));

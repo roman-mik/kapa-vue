@@ -59,7 +59,7 @@ describe('NegativeDayBanner', () => {
     });
     const text = wrapper.text();
     expect(text).toContain(formatFullDate('2026-09-02'));
-    expect(text).toContain('Shift the Rent payment');
+    expect(text).toContain('Review the Rent payment');
   });
 
   it('renders a hold-back suggestion when the fix has no shiftable event', () => {
@@ -133,7 +133,7 @@ describe('NegativeDayBanner', () => {
     const warning = shiftWarning('2026-09-02', 1000, 'Rent');
     const wrapper = mount(NegativeDayBanner, { props: { warnings: [warning] } });
 
-    const primary = wrapper.findAll('button').find((b) => b.text().includes('Shift the Rent'));
+    const primary = wrapper.findAll('button').find((b) => b.text().includes('Review the Rent'));
     expect(primary).toBeDefined();
     await primary!.trigger('click');
 

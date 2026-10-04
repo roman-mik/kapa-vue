@@ -65,6 +65,12 @@ describe('HorizonTabBar', () => {
     expect(sheet.defaultSide.value).toBe('out');
   });
 
+  it('defaults add to In when the Money page defaults to In', async () => {
+    const wrapper = await mountBar('horizon-money');
+    await wrapper.find('.tab.add').trigger('click');
+    expect(useEntrySheet().defaultSide.value).toBe('in');
+  });
+
   it('opens the entry sheet defaulting to "in" from /horizon/money?side=in', async () => {
     useEntrySheet().close();
     const router = makeRouter();

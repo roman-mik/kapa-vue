@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import MoneyInView from '@/views/horizon/MoneyInView.vue';
 import MoneyOutView from '@/views/horizon/MoneyOutView.vue';
+import type { PaymentReviewTarget } from '@/lib/horizon/paymentReview';
 import { useViewport } from '@/composables/useViewport';
 
 // One component serves all three money routes (redesign task 10):
@@ -32,6 +33,21 @@ const side = computed<Side>(() => {
   if (fixed) return fixed;
   return route.query.side === 'out' ? 'out' : 'in';
 });
+
+const reviewTarget = computed<PaymentReviewTarget | null>(() => {
+  const q = route.query;
+  return typeof q.reviewId === 'string' && typeof q.reviewKind === 'string'
+    ? {
+        id: q.reviewId,
+        kind: q.reviewKind,
+        date: typeof q.reviewDate === 'string' ? q.reviewDate : '',
+      }
+    : null;
+});
+function clearReview(): void {
+  const { reviewId: _id, reviewKind: _kind, reviewDate: _date, ...query } = route.query;
+  router.replace({ query });
+}
 
 function select(next: Side): void {
   if (next === side.value) return;
@@ -69,8 +85,18 @@ function select(next: Side): void {
     </button>
   </div>
 
-  <MoneyInView v-if="side === 'in'" :is-desktop="isDesktop" />
-  <MoneyOutView v-else :is-desktop="isDesktop" />
+  <MoneyInView
+    v-if="side === 'in'"
+    :is-desktop="isDesktop"
+    :review-target="reviewTarget"
+    @review-finished="clearReview"
+  />
+  <MoneyOutView
+    v-else
+    :is-desktop="isDesktop"
+    :review-target="reviewTarget"
+    @review-finished="clearReview"
+  />
 </template>
 
 <style scoped>

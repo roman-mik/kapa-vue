@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router';
+import { paymentReviewRoute } from '@/lib/horizon/paymentReview';
+const router = useRouter();
 import type { Currency } from '@roman-mik/kapa-core/pocket';
 import ProjectionCompletenessNotice from '@/components/horizon/ProjectionCompletenessNotice.vue';
 import { computed } from 'vue';
@@ -14,7 +17,7 @@ import { useHorizonToday } from '@/composables/useHorizonToday';
 import { formatMoney } from '@/lib/money';
 import { formatFullDate } from '@/lib/date';
 
-const { accounts } = useAccounts();
+const { accounts, loading: accountsLoading, error: accountsError } = useAccounts();
 const {
   conversionIssues,
   isPartial,
@@ -100,7 +103,11 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
           </div>
         </div>
 
-        <NegativeDayBanner :warnings="warnings" @dismiss="onDismiss" />
+        <NegativeDayBanner
+          :warnings="warnings"
+          @dismiss="onDismiss"
+          @fix="router.push(paymentReviewRoute($event))"
+        />
 
         <section class="section">
           <h2>Next up</h2>
@@ -135,8 +142,13 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
     <aside class="page-side">
       <BaseCard class="side-card">
         <h2 class="side-heading">Accounts</h2>
-        <AccountChips v-if="accounts.length" :accounts="accounts" />
-        <EmptyState v-else title="No accounts yet" message="Add an account to see it here." />
+        <p v-if="accountsLoading && !accounts.length" role="status">Loading accounts…</p>
+        <p v-else-if="accountsError" role="alert">{{ accountsError }}</p>
+        <AccountChips v-else-if="accounts.length" :accounts="accounts" />
+        <EmptyState v-else title="No accounts yet" message="Start with the money you have today." />
+        <router-link class="account-action" :to="{ name: 'horizon-accounts' }">{{
+          accounts.length || accountsLoading || accountsError ? 'Manage accounts' : 'Add account'
+        }}</router-link>
       </BaseCard>
 
       <BaseCard v-if="spendMode === 'cap'" class="side-card">
@@ -317,5 +329,15 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
   text-transform: uppercase;
   font-weight: 700;
   color: var(--kapa-ink-muted);
+}
+</style>
+
+<style scoped>
+.account-action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--kapa-accent-800);
+  font-weight: 600;
 }
 </style>

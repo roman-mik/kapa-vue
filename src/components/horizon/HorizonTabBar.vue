@@ -4,9 +4,8 @@ import { computed } from 'vue';
 import { useEntrySheet } from '@/composables/useEntrySheet';
 
 // Five tabs per HorizonTabs.dc.html: Today · Timeline · [ + ] · Money ·
-// Settings. Money is a single tab that also highlights on the two desktop
-// money routes; Accounts is deliberately absent from phone nav (reachable via
-// Today's account chips). The centre [ + ] is the circular add button,
+// Settings. Money also highlights on the two desktop money routes.
+// Accounts is reachable through Today's account links. The centre [ + ] is the circular add button,
 // opening the shared entry sheet mounted once in HorizonLayout.vue.
 const navTabs = [
   { key: 'today', label: 'Today', to: { name: 'horizon-today' } },
@@ -31,7 +30,7 @@ const entrySheet = useEntrySheet();
 // Default side: infer from ?side= on the phone Money route (for symmetry
 // with the desktop "Add" buttons' route-fixed default), otherwise 'out'.
 function openEntrySheet(): void {
-  const side = route.name === 'horizon-money' && route.query.side === 'in' ? 'in' : 'out';
+  const side = route.name === 'horizon-money' && route.query.side !== 'out' ? 'in' : 'out';
   entrySheet.open(side);
 }
 </script>
