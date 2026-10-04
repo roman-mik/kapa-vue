@@ -3,6 +3,7 @@ import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 
 export function toExpenseAmount(row: ExpenseView): ExpenseAmount {
   return {
+    countsTowardCap: row.counts_toward_cap ?? true,
     categoryId: row.category_id,
     amountMinor: row.amount_minor ?? 0,
     currency: (row.currency ?? 'RSD') as Currency,

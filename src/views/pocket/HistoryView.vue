@@ -160,6 +160,7 @@ function onRowMenuConfirm(row: ExpenseView, id: string): void {
 function onDuplicate(row: ExpenseView): void {
   entrySheet.open({
     prefill: {
+      countsTowardCap: row.counts_toward_cap ?? true,
       amountMinor: row.amount_minor ?? 0,
       currency: (row.currency ?? 'RSD') as Currency,
       categoryId: row.category_id,
@@ -171,6 +172,7 @@ function onDuplicate(row: ExpenseView): void {
 function toEntryDraft(row: ExpenseView): ExpenseDraftPayload {
   const timeZone = space.currentSpace?.timezone ?? 'UTC';
   return {
+    countsTowardCap: row.counts_toward_cap ?? true,
     amountMinor: row.amount_minor ?? 0,
     currency: (row.currency ?? 'RSD') as Currency,
     categoryId: row.category_id,
@@ -183,7 +185,12 @@ function toEntryDraft(row: ExpenseView): ExpenseDraftPayload {
 
 function toExcludeDraft(row: ExpenseView): EntryPreviewExclusion {
   const draft = toEntryDraft(row);
-  return { amountMinor: draft.amountMinor, currency: draft.currency, date: draft.date };
+  return {
+    countsTowardCap: draft.countsTowardCap,
+    amountMinor: draft.amountMinor,
+    currency: draft.currency,
+    date: draft.date,
+  };
 }
 
 async function onInlineEditSubmit(row: ExpenseView, payload: ExpenseDraftPayload): Promise<void> {
@@ -194,6 +201,7 @@ async function onInlineEditSubmit(row: ExpenseView, payload: ExpenseDraftPayload
     const outcome = await update(
       row.id!,
       {
+        counts_toward_cap: payload.countsTowardCap,
         amount_minor: payload.amountMinor,
         currency: payload.currency,
         category_id: payload.categoryId,

@@ -4,6 +4,7 @@ import { queryCache } from './queryCache';
 const dependents: Record<string, readonly string[]> = {
   accounts: ['projection'],
   cap: ['projection'],
+  categoryCapRules: ['projection'],
   pocketExpenses: ['projection'],
   incomeStreams: ['projection'],
   obligations: ['projection'],

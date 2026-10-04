@@ -55,6 +55,74 @@ describe('useExpenses', () => {
     space.currentSpaceId = 's1';
   });
 
+  it('keeps all records while budget, chart and category usage exclude outside-cap spending', async () => {
+    const now = new Date().toISOString();
+    listExpensesInRange.mockResolvedValue([
+      {
+        id: 'g',
+        category_id: 'groceries',
+        amount_minor: 50,
+        currency: 'RSD',
+        spent_at: now,
+        counts_toward_cap: true,
+      },
+      {
+        id: 'r',
+        category_id: 'rent',
+        amount_minor: 300,
+        currency: 'RSD',
+        spent_at: now,
+        counts_toward_cap: false,
+      },
+      { id: 'fx', amount_minor: 20, currency: 'USD', spent_at: now, counts_toward_cap: false },
+    ]);
+    const home = usePocketHome();
+    const history = useExpenses();
+    await flush();
+    expect(home.summary.value?.spent).toBe(50);
+    expect(home.summary.value?.totalSpent).toBe(350);
+    expect(home.summary.value?.remaining).toBe(9950);
+    expect(home.summary.value?.categoryBreakdown).toEqual([{ categoryId: 'groceries', spent: 50 }]);
+    expect(home.summary.value?.dailyTotals.filter((day) => day.amountMinor > 0)).toHaveLength(1);
+    expect(home.summary.value?.dailyTotals.find((day) => day.amountMinor > 0)?.amountMinor).toBe(
+      50
+    );
+    expect(home.summary.value?.unconverted).toEqual([]);
+    expect(home.summary.value?.totalUnconverted).toEqual([{ currency: 'USD', amountMinor: 20 }]);
+    expect(home.summary.value?.todayExpenses).toHaveLength(3);
+    expect(history.expenses.value).toHaveLength(3);
+    updateExpense.mockResolvedValue({ ok: true });
+    listExpensesInRange.mockResolvedValue([
+      {
+        id: 'r',
+        category_id: 'rent',
+        amount_minor: 300,
+        currency: 'RSD',
+        spent_at: now,
+        counts_toward_cap: true,
+      },
+    ]);
+    await history.update('r', { counts_toward_cap: true }, 'original-version');
+    expect(home.summary.value?.spent).toBe(300);
+    expect(home.summary.value?.totalSpent).toBe(300);
+  });
+
+  it('sends an explicit outside-cap override on create', async () => {
+    const expenses = useExpenses();
+    await flush();
+    await expenses.add({
+      amountMinor: 300,
+      currency: 'RSD',
+      categoryId: 'rent',
+      note: null,
+      countsTowardCap: false,
+    });
+    expect(addExpense).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ counts_toward_cap: false })
+    );
+  });
+
   it('fetches the current month for the current space on init', async () => {
     const { expenses } = useExpenses();
     await flush();

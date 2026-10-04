@@ -15,6 +15,7 @@ import type { SwatchSlot } from '@roman-mik/kapa-core/theme';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseField from '@/components/ui/BaseField.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
+import { useCategoryCapRules } from '@/composables/useCategoryCapRules';
 import { useCategories } from '@/composables/useCategories';
 import {
   usePocketEntryPreview,
@@ -29,6 +30,7 @@ import { expenseDateSchema, firstIssueMessage, positiveAmountSchema } from '@/li
 import { useSpaceStore } from '@/stores/space';
 
 export interface ExpenseDraftPayload {
+  countsTowardCap?: boolean;
   amountMinor: number;
   currency: Currency;
   categoryId: string | null;
@@ -56,6 +58,14 @@ const space = useSpaceStore();
 // only ever offers active ones.
 const { categories } = useCategories({ includeArchived: props.mode === 'edit' });
 
+const capRules = useCategoryCapRules();
+const capOverride = ref<boolean | null>(props.initialValues?.countsTowardCap ?? null);
+const countsTowardCap = computed(
+  () => capOverride.value ?? capRules.countsTowardCap(categoryId.value || null)
+);
+const capRulesLoading = capRules.loading;
+const capRulesError = capRules.error;
+
 const timeZone = space.currentSpace?.timezone ?? 'UTC';
 const todayKey = computed(() => zonedDateKey(new Date(), timeZone));
 
@@ -71,6 +81,9 @@ const currency = ref<Currency>(
   props.initialValues?.currency ?? ((space.currentSpace?.currency ?? 'RSD') as Currency)
 );
 const categoryId = ref<string>(props.initialValues?.categoryId ?? '');
+watch(categoryId, () => {
+  if (props.mode === 'add') capOverride.value = null;
+});
 const note = ref(props.initialValues?.note ?? '');
 const spentAtKey = ref(props.initialValues?.date ?? todayKey.value);
 const localError = ref<string | null>(null);
@@ -125,6 +138,7 @@ const draft = computed<EntryDraft | null>(() => {
   const value = Number(amount.value);
   if (!Number.isFinite(value) || value <= 0) return null;
   return {
+    countsTowardCap: countsTowardCap.value,
     amountMinor: Math.round(value * 10 ** exponent.value),
     currency: currency.value,
     date: spentAtKey.value || todayKey.value,
@@ -152,6 +166,7 @@ function buildPayload(): ExpenseDraftPayload | null {
     return null;
   }
   return {
+    countsTowardCap: countsTowardCap.value,
     amountMinor: Math.round(parsed.data * 10 ** exponent.value),
     currency: currency.value,
     categoryId: categoryId.value || null,
@@ -161,6 +176,7 @@ function buildPayload(): ExpenseDraftPayload | null {
 }
 
 function onSubmit(keepAdding: boolean): void {
+  if (props.submitting || capRulesLoading.value || capRulesError.value) return;
   const payload = buildPayload();
   if (!payload) return;
   emit('submit', payload, { keepAdding });
@@ -171,6 +187,7 @@ function reset(opts?: {
   keepCurrency?: boolean;
   keepDate?: boolean;
 }): void {
+  capOverride.value = null;
   amount.value = '';
   note.value = '';
   localError.value = null;
@@ -275,15 +292,36 @@ defineExpose({ reset });
       </button>
     </div>
 
-    <p v-if="preview" class="hint" :class="{ negative: preview.remainingAfterMinor < 0 }">
-      {{ formatMoney(preview.remainingAfterMinor, summary!.currency) }} left after this.
+    <label class="cap-scope">
+      <input
+        type="checkbox"
+        :checked="countsTowardCap"
+        :disabled="submitting || capRulesLoading || !!capRulesError"
+        @change="capOverride = ($event.target as HTMLInputElement).checked"
+      />
+      Counts toward everyday limit
+    </label>
+    <p class="hint">
+      {{
+        countsTowardCap
+          ? 'Uses your everyday allowance.'
+          : 'Recorded in total spending. Your everyday allowance stays unchanged.'
+      }}
+    </p>
+    <p v-if="capRulesError" role="alert" class="error">
+      Could not load category defaults.
+      <button type="button" @click="capRules.refresh()">Retry</button>
+    </p>
+    <p v-if="preview" class="hint preview" :class="{ negative: preview.remainingAfterMinor < 0 }">
+      {{ formatMoney(preview.remainingAfterMinor, summary!.currency) }} everyday allowance left
+      after this.
     </p>
 
     <p v-if="localError" role="alert" class="error">{{ localError }}</p>
     <p v-else-if="submitError" role="alert" class="error">{{ submitError }}</p>
 
     <div class="actions">
-      <BaseButton type="submit" block :disabled="submitting">
+      <BaseButton type="submit" block :disabled="submitting || capRulesLoading || !!capRulesError">
         {{ submitting ? 'Saving…' : 'Save' }}
       </BaseButton>
       <BaseButton
@@ -291,7 +329,7 @@ defineExpose({ reset });
         type="button"
         variant="secondary"
         block
-        :disabled="submitting"
+        :disabled="submitting || capRulesLoading || !!capRulesError"
         @click="onSubmit(true)"
       >
         Save · keep adding
@@ -301,6 +339,18 @@ defineExpose({ reset });
 </template>
 
 <style scoped>
+.cap-scope {
+  display: flex;
+  align-items: center;
+  gap: var(--kapa-space-2);
+  min-height: 44px;
+  cursor: pointer;
+}
+.cap-scope input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--kapa-accent-600);
+}
 .form {
   display: flex;
   flex-direction: column;

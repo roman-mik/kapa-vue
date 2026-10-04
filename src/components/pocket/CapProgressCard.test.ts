@@ -7,6 +7,8 @@ function baseSummary(overrides: Partial<PocketSummary> = {}): PocketSummary {
   return {
     month: '2026-09',
     currency: 'RSD',
+    totalSpent: 34_180_00,
+    totalUnconverted: [],
     spent: 34_180_00,
     remaining: 65_820_00,
     safeDaily: 3_657_00,
@@ -63,7 +65,7 @@ describe('CapProgressCard', () => {
         }),
       },
     });
-    expect(wrapper.text()).toContain('over your cap');
+    expect(wrapper.text()).toContain('over your everyday cap');
     expect(wrapper.find('.fill').classes()).toContain('state-over');
     // the visual fill clamps at 100% even though the true percentage is higher
     expect(wrapper.find('.fill').attributes('style')).toContain('width: 100%');

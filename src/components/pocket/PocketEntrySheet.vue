@@ -4,7 +4,7 @@
 // either from the /pocket/add route (AddExpenseView.vue, a thin opener) or
 // from a Duplicate row action (History/Home), which pre-fills a draft here
 // instead of writing immediately.
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { dateKeyStartUtc, zonedDateKey } from '@roman-mik/kapa-core/pocket';
 import BaseSheet from '@/components/ui/BaseSheet.vue';
 import ExpenseEntryForm, {
@@ -26,6 +26,11 @@ const submitting = ref(false);
 const submitError = ref<string | null>(null);
 const formRef = ref<InstanceType<typeof ExpenseEntryForm> | null>(null);
 
+watch(
+  () => space.currentSpaceId,
+  () => sheet.close()
+);
+
 const timeZone = computed(() => space.currentSpace?.timezone ?? 'UTC');
 const todayKey = computed(() => zonedDateKey(new Date(), timeZone.value));
 
@@ -41,6 +46,7 @@ async function onSubmit(
   submitting.value = true;
   try {
     await add({
+      countsTowardCap: payload.countsTowardCap,
       amountMinor: payload.amountMinor,
       currency: payload.currency,
       categoryId: payload.categoryId,
