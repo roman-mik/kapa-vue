@@ -45,6 +45,7 @@ export async function loadPaymentContext(spaceId: string, timezone: string) {
       : null,
   ]);
   return {
+    projectionInput: loaded?.input ?? null,
     allowance: loaded?.allowanceReview?.stored ?? null,
     state: loaded?.allowanceReview?.tracking ?? state,
     accounts,

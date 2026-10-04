@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import PaymentActionSheet from '@/components/horizon/PaymentActionSheet.vue';
+import { usePaymentActionSheet } from '@/composables/usePaymentActionSheet';
 import PaymentLinkSheet from '@/components/horizon/PaymentLinkSheet.vue';
 import { usePaymentLinkSheet } from '@/composables/usePaymentLinkSheet';
 import { useRoute } from 'vue-router';
@@ -9,6 +11,7 @@ import PocketEntrySheet from '@/components/pocket/PocketEntrySheet.vue';
 import ToastHost from '@/components/ui/ToastHost.vue';
 
 const route = useRoute();
+const paymentAction = usePaymentActionSheet();
 const paymentLink = usePaymentLinkSheet();
 </script>
 
@@ -20,6 +23,7 @@ const paymentLink = usePaymentLinkSheet();
   </main>
   <ToastHost />
   <PocketEntrySheet />
+  <PaymentActionSheet v-if="paymentAction.paymentId.value" />
   <PaymentLinkSheet v-if="paymentLink.isOpen.value" />
   <BottomTabBar v-if="route.meta.showHeader" />
 </template>

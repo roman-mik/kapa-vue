@@ -24,7 +24,14 @@ export function usePaymentActions(getPaymentId: () => string | null) {
     load: ({ spaceId, params }) =>
       params[0] ? listPaymentActions(supabase, spaceId, params[0] as string) : Promise.resolve([]),
   });
-  const latest = computed(() => history.data.value?.[0] ?? null);
+  const records = computed(() =>
+    [...(history.data.value ?? [])].sort(
+      (a, b) =>
+        Number((b.after_value as { revision?: number }).revision ?? 0) -
+        Number((a.after_value as { revision?: number }).revision ?? 0)
+    )
+  );
+  const latest = computed(() => records.value[0] ?? null);
   function capture(payment: TrackedOccurrence) {
     const userId = session.user?.id;
     const spaceId = space.currentSpaceId;
@@ -33,6 +40,14 @@ export function usePaymentActions(getPaymentId: () => string | null) {
       throw new Error('This payment is not available in this space. Reload before saving.');
     if (tracking.context.value.coverage.some((c) => c.occurrenceId === payment.id))
       throw new Error('Review the linked Pocket expense before changing this payment.');
+    const last = latest.value;
+    if (
+      (last?.command as { kind?: string } | undefined)?.kind === 'sourceRetire' &&
+      (last?.after_value as { revision?: number } | undefined)?.revision === payment.revision
+    )
+      throw new Error(
+        'This payment was retired by a schedule change. Review its recurring source instead.'
+      );
     return { userId, spaceId };
   }
   function savedRefresh(userId: string, spaceId: string) {
@@ -81,5 +96,5 @@ export function usePaymentActions(getPaymentId: () => string | null) {
     );
     return { payment: result, refresh: savedRefresh(userId, spaceId) };
   }
-  return { tracking, history, latest, apply, undo };
+  return { tracking, history, records, latest, apply, undo };
 }
