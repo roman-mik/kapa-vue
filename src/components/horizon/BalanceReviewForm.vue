@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useHorizonClock } from '@/composables/useHorizonClock';
 import { computed, ref, watch } from 'vue';
 import { CURRENCY_EXPONENT, zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
 import type { CashDecision, PaymentContext } from '@/composables/usePaymentTracking';
@@ -9,6 +10,8 @@ import { formatMoney } from '@/lib/money';
 import { formatFullDate } from '@/lib/date';
 const props = defineProps<{ context: PaymentContext; busy: boolean }>();
 const emit = defineEmits<{ submit: [decision: CashDecision]; close: [] }>();
+const clock = useHorizonClock();
+const staleDate = computed(() => props.context.today !== clock.today.value);
 const snapshot = computed(() => props.context);
 const timezone = useSpaceStore().currentSpace?.timezone ?? 'UTC';
 const amounts = ref<Record<string, string>>({});
@@ -58,7 +61,7 @@ watch(
   { immediate: true }
 );
 function submit() {
-  if (!checkedToday.value || props.busy || !cashAccounts.value.length) return;
+  if (!checkedToday.value || staleDate.value || props.busy || !cashAccounts.value.length) return;
   error.value = null;
   try {
     const checks = cashAccounts.value.map((a) => {
@@ -106,6 +109,7 @@ function submit() {
 }
 </script>
 <template>
+  <p v-if="staleDate" role="alert">The date changed. Reload balances before checking them.</p>
   <p v-if="error" role="alert">{{ error }}</p>
   <form class="flow-form" @submit.prevent="submit">
     <p>
@@ -155,9 +159,13 @@ function submit() {
       ><input v-model="checkedToday" type="checkbox" :disabled="busy" />I checked these account
       balances today</label
     >
-    <BaseButton type="submit" :disabled="busy || !checkedToday || !cashAccounts.length">{{
-      snapshot.state ? 'Save checked balances' : 'Save balances and start tracking'
-    }}</BaseButton>
+    <BaseButton
+      type="submit"
+      :disabled="busy || staleDate || !checkedToday || !cashAccounts.length"
+      >{{
+        snapshot.state ? 'Save checked balances' : 'Save balances and start tracking'
+      }}</BaseButton
+    >
   </form>
 </template>
 <style scoped>

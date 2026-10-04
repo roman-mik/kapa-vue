@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import { useHorizonClock } from '@/composables/useHorizonClock';
 import { computed, onUnmounted, ref, shallowRef, watch } from 'vue';
 import {
   buildProjection,
   transitionOccurrence,
   type OccurrenceAction,
-  type TrackedOccurrence,
 } from '@roman-mik/kapa-core/horizon';
 import { CURRENCY_EXPONENT, type Currency } from '@roman-mik/kapa-core/pocket';
 import { usePaymentActions } from '@/composables/usePaymentActions';
@@ -19,6 +19,8 @@ import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
 import { formatMoney } from '@/lib/money';
 import { formatFullDate } from '@/lib/date';
+const clock = useHorizonClock();
+const staleDate = computed(() => !!snapshot.value && snapshot.value.today !== clock.today.value);
 const sheet = usePaymentActionSheet();
 const selectedId = sheet.paymentId.value!;
 const space = useSpaceStore();
@@ -229,7 +231,7 @@ async function refreshOnly() {
   }
 }
 async function save() {
-  if (!payment.value || busy.value || saved.value || linked.value) return;
+  if (!payment.value || staleDate.value || busy.value || saved.value || linked.value) return;
   if (mode.value === 'undo' ? !undoAvailable.value : !candidate.value || !command.value) return;
   busy.value = true;
   error.value = null;
@@ -282,6 +284,9 @@ function actionName(record: { command: unknown }) {
     <h2 id="payment-action-title" tabindex="-1" data-autofocus>
       {{ payment?.expected.label ?? 'This payment' }}
     </h2>
+    <p v-if="staleDate && !saved" role="alert">
+      The date changed. Reload and review before saving this payment.
+    </p>
     <p v-if="error" role="alert">{{ error }}</p>
     <template v-if="saved"
       ><p role="status">Saved. Refresh your forecast without saving again.</p>
@@ -433,7 +438,9 @@ function actionName(record: { command: unknown }) {
         </p>
         <BaseButton
           type="submit"
-          :disabled="busy || linked || (mode === 'undo' ? !undoAvailable : !candidate)"
+          :disabled="
+            busy || staleDate || !!linked || (mode === 'undo' ? !undoAvailable : !candidate)
+          "
           >{{
             mode === 'cancel'
               ? 'Cancel this payment'

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useHorizonClock } from '@/composables/useHorizonClock';
 import { computed, ref, shallowRef, watch, onUnmounted } from 'vue';
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 import { zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
@@ -17,6 +18,8 @@ import BaseSheet from '@/components/ui/BaseSheet.vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseInput from '@/components/ui/BaseInput.vue';
 import BaseSelect from '@/components/ui/BaseSelect.vue';
+const clock = useHorizonClock();
+const staleDate = computed(() => !!snapshot.value && snapshot.value.today !== clock.today.value);
 const sheet = usePaymentLinkSheet();
 const space = useSpaceStore();
 // Instantiate remote reads only while the sheet is mounted by App.
@@ -124,7 +127,8 @@ const canAllocate = computed(
     !!inclusion.value &&
     !existingCoverage.value?.occurrenceId &&
     !busy.value &&
-    !saved.value
+    !saved.value &&
+    !staleDate.value
 );
 const canLink = computed(
   () =>
@@ -140,7 +144,8 @@ const canLink = computed(
     !otherLink.value &&
     !alreadyLinked.value &&
     !busy.value &&
-    !saved.value
+    !saved.value &&
+    !staleDate.value
 );
 function message(err: unknown) {
   return err && typeof err === 'object' && 'message' in err
@@ -287,7 +292,7 @@ async function allocate() {
   }
 }
 async function separateAllowance() {
-  if (!snapshot.value || busy.value || saved.value) return;
+  if (!snapshot.value || staleDate.value || busy.value || saved.value) return;
   busy.value = true;
   error.value = null;
   try {
@@ -308,7 +313,7 @@ async function separateAllowance() {
   }
 }
 async function checkBalances(decision: CashDecision) {
-  if (!snapshot.value || busy.value || saved.value) return;
+  if (!snapshot.value || staleDate.value || busy.value || saved.value) return;
   busy.value = true;
   error.value = null;
   try {
@@ -343,6 +348,9 @@ async function checkBalances(decision: CashDecision) {
         {{ checking || !snapshot?.state ? 'Check balances' : 'Link to a planned payment' }}
       </h2>
       <p v-if="!snapshot && tracking.loading.value" role="status">Loading payment details…</p>
+      <p v-if="staleDate && !saved" role="alert">
+        The date changed. Reload and review before saving.
+      </p>
       <p v-if="error || tracking.error.value" role="alert">{{ error ?? tracking.error.value }}</p>
       <template v-if="saved">
         <p role="status">Saved. Retry refresh to load your changes without saving again.</p>

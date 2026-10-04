@@ -1,3 +1,4 @@
+import { useHorizonClock } from './useHorizonClock';
 import { buildProjection } from '@roman-mik/kapa-core/horizon';
 import { computed, ref, watch } from 'vue';
 import type { Currency, CurrencyBucket } from '@roman-mik/kapa-core/pocket';
@@ -16,6 +17,7 @@ import { loadProjectionIngredients } from '@/lib/horizon/loadProjectionIngredien
 
 export function useEntryDryRun() {
   const space = useSpaceStore();
+  const clock = useHorizonClock();
   const ingredients = ref<DryRunIngredients | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -99,6 +101,10 @@ export function useEntryDryRun() {
       if (ingredients.value) void loadBaseline();
     }
   );
+
+  watch(clock.today, () => {
+    if (ingredients.value) void loadBaseline();
+  });
 
   return {
     loading,

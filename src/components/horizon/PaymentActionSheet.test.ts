@@ -212,3 +212,19 @@ it('a pending response cannot close a new review after unmount', async () => {
   expect(usePaymentActionSheet().paymentId.value).toBe('another');
   expect(refreshSaved).not.toHaveBeenCalled();
 });
+
+it('an open payment draft expires at zoned midnight without a write', async () => {
+  vi.useFakeTimers({ toFake: ['Date', 'setInterval', 'clearInterval'] });
+  vi.setSystemTime(new Date('2026-10-04T23:59:45Z'));
+  try {
+    await receipt();
+    vi.advanceTimersByTime(30_000);
+    await flushPromises();
+    expect(dom().text()).toContain('The date changed');
+    await dom().find('form').trigger('submit');
+    expect(apply).not.toHaveBeenCalled();
+  } finally {
+    wrapper.unmount();
+    vi.useRealTimers();
+  }
+});
