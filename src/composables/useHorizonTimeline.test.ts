@@ -25,6 +25,7 @@ vi.mock('@roman-mik/kapa-core/horizon/queries', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@roman-mik/kapa-core/horizon/queries')>();
   return {
     ...actual,
+    getPaymentTrackingState: vi.fn().mockResolvedValue(null),
     getSettings,
     listProjectionDismissals,
     dismissNegativeDay,

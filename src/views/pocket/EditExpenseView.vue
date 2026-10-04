@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import BaseButton from '@/components/ui/BaseButton.vue';
+import { usePaymentLinkSheet } from '@/composables/usePaymentLinkSheet';
+const paymentLink = usePaymentLinkSheet();
 // Thin deep-link wrapper: normal editing happens in-place on History's row
 // (see HistoryView.vue's expandedId state); this route exists only so
 // /pocket/edit/:id is bookmarkable/shareable on its own, rendering the same
@@ -137,6 +140,15 @@ function onClose(): void {
 
     <BaseSheet v-else :open="true" labelled-by="pocket-edit-title" @close="onClose">
       <h2 id="pocket-edit-title">Edit expense</h2>
+      <BaseButton
+        v-if="original"
+        variant="secondary"
+        @click="
+          paymentLink.open({ expense: original });
+          onClose();
+        "
+        >Link to a planned payment</BaseButton
+      >
       <ExpenseEntryForm
         :key="`${expenseId}-${original?.updated_at ?? ''}`"
         mode="edit"

@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import CashflowReviewNotice from '@/components/horizon/CashflowReviewNotice.vue';
+import BaseButton from '@/components/ui/BaseButton.vue';
+import { usePaymentLinkSheet } from '@/composables/usePaymentLinkSheet';
+const paymentLink = usePaymentLinkSheet();
 import { useRouter } from 'vue-router';
 import { paymentReviewRoute } from '@/lib/horizon/paymentReview';
 const router = useRouter();
@@ -9,7 +13,7 @@ import type { LedgerEvent } from '@roman-mik/kapa-core/horizon';
 import BalanceLineChart from '@/components/horizon/BalanceLineChart.vue';
 import NegativeDayBanner from '@/components/horizon/NegativeDayBanner.vue';
 import WaterfallChart from '@/components/horizon/WaterfallChart.vue';
-import BaseButton from '@/components/ui/BaseButton.vue';
+
 import BaseCard from '@/components/ui/BaseCard.vue';
 import BaseBadge from '@/components/ui/BaseBadge.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
@@ -28,6 +32,7 @@ import { timelineMonths } from '@/lib/horizon/timelineMonths';
 
 const {
   conversionIssues,
+  lifecycleIssues,
   isPartial,
   refresh,
   loading,
@@ -87,6 +92,10 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
   <main class="page page--with-rail">
     <div class="page-main">
       <h1 tabindex="-1">Timeline</h1>
+      <CashflowReviewNotice :issues="lifecycleIssues" />
+      <BaseButton variant="secondary" @click="paymentLink.open()"
+        >Review payments and balances</BaseButton
+      >
       <ProjectionCompletenessNotice
         :issues="conversionIssues"
         :currency="reportingCurrency"

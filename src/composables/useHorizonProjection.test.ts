@@ -1,6 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { ref } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vite-plus/test';
+import { getPaymentTrackingState } from '@roman-mik/kapa-core/horizon/queries';
 import { useHorizonProjection } from './useHorizonProjection';
 import { useSpaceStore } from '@/stores/space';
 import { useSessionStore } from '@/stores/session';
@@ -13,11 +14,17 @@ vi.mock('@roman-mik/kapa-core/horizon', async (original) => ({
   projectionForRange,
 }));
 
+vi.mock('@roman-mik/kapa-core/horizon/queries', async (original) => ({
+  ...(await original<typeof import('@roman-mik/kapa-core/horizon/queries')>()),
+  getPaymentTrackingState: vi.fn().mockResolvedValue(null),
+}));
+
 describe('shared Horizon projections', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     queryCache.clear();
     vi.clearAllMocks();
+    vi.mocked(getPaymentTrackingState).mockResolvedValue(null);
     useSessionStore().user = { id: 'u1' } as never;
     const space = useSpaceStore();
     space.spaces = [
@@ -25,6 +32,16 @@ describe('shared Horizon projections', () => {
     ];
     space.currentSpaceId = 's1';
     projectionForRange.mockResolvedValue({ value: { days: [], events: [] }, unconverted: [] });
+  });
+
+  it('enables durable cashflow only in spaces that started tracking', async () => {
+    vi.mocked(getPaymentTrackingState).mockResolvedValue({ space_id: 's1' } as never);
+    await useHorizonProjection(() => 90).refresh();
+    expect(projectionForRange).toHaveBeenCalledWith(
+      expect.anything(),
+      's1',
+      expect.objectContaining({ lifecycle: true })
+    );
   });
 
   it('shares equal ranges, isolates another range and reuses a fresh earlier range', async () => {

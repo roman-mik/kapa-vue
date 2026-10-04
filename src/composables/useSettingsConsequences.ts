@@ -14,6 +14,8 @@ import {
   type ProjectionInput,
 } from '@roman-mik/kapa-core/horizon';
 import type { EventOrder } from '@roman-mik/kapa-core/horizon/queries';
+import { mutationVersion } from '@/lib/serverState/invalidation';
+import { useSessionStore } from '@/stores/session';
 import { ref, watch } from 'vue';
 import { supabase } from '@/lib/supabase';
 import { useSpaceStore } from '@/stores/space';
@@ -29,10 +31,12 @@ const HORIZON_DAYS = 90;
 export function useSettingsConsequences() {
   const space = useSpaceStore();
   const loading = ref(false);
+  let generation = 0;
   const eventOrderSentence = ref<string | null>(null);
   const spendModeSentence = ref<string | null>(null);
 
   async function refresh(): Promise<void> {
+    const request = ++generation;
     const currentSpace = space.currentSpace;
     if (!currentSpace) {
       eventOrderSentence.value = null;
@@ -43,14 +47,23 @@ export function useSettingsConsequences() {
     eventOrderSentence.value = null;
     spendModeSentence.value = null;
     try {
-      const { input, settings } = await loadProjectionIngredients(
+      const { input, settings, unconverted } = await loadProjectionIngredients(
         supabase,
         currentSpace.id,
         currentSpace.timezone,
         HORIZON_DAYS
       );
       const currency = input.reportingCurrency;
-      const baselineDays = buildProjection(input).value.days;
+      if (request !== generation || currentSpace.id !== space.currentSpaceId) return;
+      const baselineResult = buildProjection(input);
+      const baseline = baselineResult.value;
+      if (
+        baseline.lifecycleIssues?.length ||
+        unconverted.length ||
+        baselineResult.unconverted.length
+      )
+        return;
+      const baselineDays = baseline.days;
 
       const currentOrder = input.eventOrder as EventOrder;
       const swappedOrder = swapIncomeObligation(currentOrder);
@@ -83,7 +96,18 @@ export function useSettingsConsequences() {
         ...input,
         pocketSpend: { ...input.pocketSpend, forward: altForward.value },
       };
-      const altDays = buildProjection(altInput).value.days;
+      if (request !== generation || currentSpace.id !== space.currentSpaceId) return;
+      const alternativeResult = buildProjection(altInput);
+      const alternative = alternativeResult.value;
+      if (
+        alternative.lifecycleIssues?.length ||
+        altForward.unconverted.length ||
+        alternativeResult.unconverted.length
+      ) {
+        eventOrderSentence.value = null;
+        return;
+      }
+      const altDays = alternative.days;
       const capDays = settings.spend_mode === 'cap' ? baselineDays : altDays;
       const runRateDays = settings.spend_mode === 'runRate' ? baselineDays : altDays;
       spendModeSentence.value = compareScenarios(
@@ -91,12 +115,22 @@ export function useSettingsConsequences() {
         { label: 'Run rate', days: runRateDays },
         currency
       );
+    } catch {
+      if (request === generation) {
+        eventOrderSentence.value = null;
+        spendModeSentence.value = null;
+      }
     } finally {
-      loading.value = false;
+      if (request === generation) loading.value = false;
     }
   }
 
   watch(() => space.currentSpaceId, refresh, { immediate: true });
+
+  watch(
+    () => mutationVersion(useSessionStore().user?.id ?? '', space.currentSpaceId ?? ''),
+    () => void refresh()
+  );
 
   return { loading, eventOrderSentence, spendModeSentence, refresh };
 }

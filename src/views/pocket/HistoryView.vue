@@ -9,6 +9,7 @@ import {
   zonedDateKey,
 } from '@roman-mik/kapa-core/pocket';
 import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
+import { usePaymentLinkSheet } from '@/composables/usePaymentLinkSheet';
 import { computed, ref, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
@@ -132,9 +133,11 @@ function attribution(userId: string | null): string {
   );
 }
 
+const paymentLink = usePaymentLinkSheet();
 const rowMenuActions: RowMenuAction[] = [
   { id: 'edit', label: 'Edit', kind: 'action' },
   { id: 'duplicate', label: 'Duplicate', kind: 'action' },
+  { id: 'link', label: 'Link to a planned payment', kind: 'action' },
   { id: 'delete', label: 'Delete', kind: 'confirm', confirmLabel: 'Really delete?' },
 ];
 
@@ -148,6 +151,8 @@ function onRowMenuSelect(row: ExpenseView, id: string): void {
   if (id === 'edit') {
     rowSubmitError.value = null;
     expandedId.value = expandedId.value === row.id ? null : (row.id ?? null);
+  } else if (id === 'link') {
+    paymentLink.open({ expense: row });
   } else if (id === 'duplicate') {
     onDuplicate(row);
   }

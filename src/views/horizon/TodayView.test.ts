@@ -9,6 +9,7 @@ it('explains incomplete totals and unavailable event conversion', () => {
   today.mockReturnValue({
     loading: ref(false),
     error: ref(null),
+    lifecycleIssues: ref([]),
     conversionIssues: ref([{ currency: 'EUR', amountMinor: 50000 }]),
     isPartial: ref(true),
     refresh: vi.fn(),

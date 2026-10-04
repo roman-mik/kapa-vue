@@ -24,6 +24,7 @@ function close(): void {
 function onSelect(action: RowMenuAction): void {
   if (action.disabled) return;
   close();
+  root.value?.querySelector<HTMLButtonElement>('.row-menu-trigger')?.focus();
   emit('select', action.id);
 }
 

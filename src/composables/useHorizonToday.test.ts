@@ -26,6 +26,7 @@ vi.mock('@roman-mik/kapa-core/horizon/queries', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@roman-mik/kapa-core/horizon/queries')>();
   return {
     ...actual,
+    getPaymentTrackingState: vi.fn().mockResolvedValue(null),
     getSettings,
     listProjectionDismissals,
     dismissNegativeDay,
@@ -188,5 +189,27 @@ describe('useHorizonToday', () => {
     });
     expect(projectionForRange).toHaveBeenCalledTimes(1);
     expect(warnings.value).toEqual([]);
+  });
+  it('distinguishes actual cash from projected today spending and qualifies unresolved movements', async () => {
+    projectionForRange.mockResolvedValue({
+      value: {
+        days: [
+          {
+            date: '2026-09-01',
+            balanceMinor: 600,
+            events: [fakeEvent({ balanceBeforeMinor: 650 })],
+          },
+        ],
+        events: [],
+        lifecycleIssues: ['Review Pocket expense grocery'],
+      },
+      unconverted: [],
+    });
+    const today = useHorizonToday();
+    await today.refresh();
+    expect(today.estimatedCash.value).toBe(650);
+    expect(today.balanceToday.value).toBe(600);
+    expect(today.isPartial.value).toBe(true);
+    expect(today.lifecycleEnabled.value).toBe(true);
   });
 });

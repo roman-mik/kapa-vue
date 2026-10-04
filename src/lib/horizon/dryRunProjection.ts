@@ -6,6 +6,7 @@
 
 import {
   buildProjection,
+  generateTrackedOccurrences,
   type IncomeStreamMathInput,
   type IncomeStreamProjectionInput,
   type ObligationProjectionInput,
@@ -32,6 +33,7 @@ export type DraftEntry =
 
 export interface DryRunEffect {
   unconverted: CurrencyBucket[];
+  lifecycleIssues: string[];
   /** with-draft balanceToday minus baseline balanceToday. */
   todayDeltaMinor: number;
   troughBefore: Trough | null;
@@ -172,7 +174,7 @@ function draftPlannedSpendInput(input: NewPlannedSpend): PlannedSpendProjectionI
 }
 
 /** Appends the draft to the matching array of an otherwise-real `ProjectionInput`. */
-export function spliceDraft(base: DryRunIngredients, draft: DraftEntry): ProjectionInput {
+function appendDraft(base: DryRunIngredients, draft: DraftEntry): ProjectionInput {
   switch (draft.kind) {
     case 'incomeStream':
       return {
@@ -191,6 +193,39 @@ export function spliceDraft(base: DryRunIngredients, draft: DraftEntry): Project
   }
 }
 
+/** Add only virtual draft occurrences; never regenerate or replace acted-on history. */
+export function spliceDraft(base: DryRunIngredients, draft: DraftEntry): ProjectionInput {
+  const next = appendDraft(base, draft);
+  if (!base.lifecycle) return next;
+  const expected = generateTrackedOccurrences(
+    {
+      incomeStreams: next.incomeStreams.filter((s) => s.id === DRAFT_ID),
+      obligations: next.obligations.filter((s) => s.id === DRAFT_ID),
+      oneOffEvents: next.oneOffEvents.filter((s) => s.id === DRAFT_ID),
+    },
+    base.calendar,
+    { from: base.todayKey, to: base.range.to },
+    base.todayKey
+  );
+  return {
+    ...next,
+    lifecycle: {
+      ...base.lifecycle,
+      occurrences: [
+        ...base.lifecycle.occurrences,
+        ...expected.map((e) => ({
+          id: e.key,
+          expected: e,
+          state: 'expected' as const,
+          revision: 0,
+          actual: null,
+          postponedDate: null,
+        })),
+      ],
+    },
+  };
+}
+
 /** Runs `buildProjection` on both inputs and diffs today's balance + the trough. */
 export function diffEffect(baseline: ProjectionInput, withDraft: ProjectionInput): DryRunEffect {
   const baselineResult = buildProjection(baseline);
@@ -206,6 +241,7 @@ export function diffEffect(baseline: ProjectionInput, withDraft: ProjectionInput
     troughBefore.minBalanceDate !== troughAfter.minBalanceDate;
   return {
     unconverted: draftResult.unconverted,
+    lifecycleIssues: draftResult.value.lifecycleIssues ?? [],
     todayDeltaMinor: (after[0]?.balanceMinor ?? 0) - (before[0]?.balanceMinor ?? 0),
     troughBefore,
     troughAfter,
