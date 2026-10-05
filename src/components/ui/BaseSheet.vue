@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { nextTick, onUnmounted, ref, watch } from 'vue';
+import { nextTick, onUnmounted, ref, watch, type CSSProperties } from 'vue';
 
 const props = withDefaults(
   defineProps<{
     open: boolean;
     labelledBy?: string;
     dismissible?: boolean;
+    panelStyle?: CSSProperties;
   }>(),
   { dismissible: true }
 );
@@ -74,6 +75,7 @@ onUnmounted(() => {
       <div
         ref="panel"
         class="sheet-panel"
+        :style="panelStyle"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="labelledBy"

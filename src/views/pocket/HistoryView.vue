@@ -12,6 +12,7 @@ import type { ExpenseView } from '@roman-mik/kapa-core/pocket/queries';
 import { usePaymentLinkSheet } from '@/composables/usePaymentLinkSheet';
 import { computed, ref, watch } from 'vue';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import CategoryFilterPicker from '@/components/pocket/CategoryFilterPicker.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import EmptyState from '@/components/ui/EmptyState.vue';
 import SkeletonBlock from '@/components/ui/SkeletonBlock.vue';
@@ -62,6 +63,7 @@ const rowError = ref<string | null>(null);
 // category id. The month breakdown bar below is intentionally unaffected by
 // this filter — it always reflects the whole month, per the plan.
 const categoryFilter = ref<string>('all');
+const breakdownOpen = ref(false);
 
 // A filter belonging to the previous space must not linger and silently empty
 // the list after a space switch.
@@ -69,6 +71,7 @@ watch(
   () => space.currentSpaceId,
   () => {
     categoryFilter.value = 'all';
+    breakdownOpen.value = false;
   }
 );
 
@@ -325,71 +328,59 @@ const dayGroups = computed<DayGroup[]>(() => {
   <main class="page">
     <h1>History</h1>
 
-    <div v-if="breakdown.length" class="breakdown">
-      <div
-        class="breakdown-bar"
-        role="img"
-        :aria-label="`Month breakdown: ${breakdown.map((b) => `${b.name} ${formatMoney(b.spent, summary!.currency)}`).join(', ')}`"
+    <div v-if="breakdown.length || summary?.unconverted.length" class="breakdown">
+      <button
+        type="button"
+        class="breakdown-toggle"
+        :aria-expanded="breakdownOpen"
+        aria-controls="history-month-breakdown"
+        @click="breakdownOpen = !breakdownOpen"
       >
-        <span
-          v-for="b in breakdown"
-          :key="b.categoryId ?? 'uncategorized'"
-          class="breakdown-segment"
-          :style="{ width: `${b.pct}%`, background: b.swatch }"
+        This month’s breakdown <span aria-hidden="true">{{ breakdownOpen ? '▴' : '▾' }}</span>
+      </button>
+      <div v-if="breakdownOpen" id="history-month-breakdown">
+        <p class="breakdown-scope">All categories · This month</p>
+        <div
+          class="breakdown-bar"
+          role="img"
+          :aria-label="`Month breakdown: ${breakdown.map((b) => `${b.name} ${formatMoney(b.spent, summary!.currency)}`).join(', ')}`"
+        >
+          <span
+            v-for="b in breakdown"
+            :key="b.categoryId ?? 'uncategorized'"
+            class="breakdown-segment"
+            :style="{ width: `${b.pct}%`, background: b.swatch }"
+          />
+        </div>
+        <ul class="breakdown-legend">
+          <li v-for="b in breakdown" :key="b.categoryId ?? 'uncategorized'">
+            <span class="dot" :style="{ background: b.swatch }" />
+            <span class="name">{{ b.name }}</span>
+            <span class="breakdown-amount">{{ formatMoney(b.spent, summary!.currency) }}</span>
+          </li>
+        </ul>
+        <UnconvertedNote
+          class="breakdown-note"
+          :buckets="summary!.unconverted"
+          :currency="summary!.currency"
+          context="in this breakdown"
         />
       </div>
-      <ul class="breakdown-legend">
-        <li v-for="b in breakdown" :key="b.categoryId ?? 'uncategorized'">
-          <span class="dot" :style="{ background: b.swatch }" />
-          <span class="name">{{ b.name }}</span>
-          <span class="breakdown-amount">{{ formatMoney(b.spent, summary!.currency) }}</span>
-        </li>
-      </ul>
-      <UnconvertedNote
-        class="breakdown-note"
-        :buckets="summary!.unconverted"
-        :currency="summary!.currency"
-        context="in this breakdown"
-      />
     </div>
 
-    <div class="chips" role="radiogroup" aria-label="Filter by category">
+    <div class="category-toolbar">
+      <CategoryFilterPicker
+        v-model="categoryFilter"
+        :categories="categories"
+        :space-id="space.currentSpaceId"
+      />
       <BaseButton
+        v-if="categoryFilter !== 'all'"
         type="button"
-        role="radio"
-        :aria-checked="categoryFilter === 'all'"
-        :variant="categoryFilter === 'all' ? 'primary' : 'secondary'"
+        variant="secondary"
         @click="categoryFilter = 'all'"
+        >Clear</BaseButton
       >
-        All
-      </BaseButton>
-      <BaseButton
-        type="button"
-        role="radio"
-        :aria-checked="categoryFilter === ''"
-        :variant="categoryFilter === '' ? 'primary' : 'secondary'"
-        @click="categoryFilter = ''"
-      >
-        Uncategorized
-      </BaseButton>
-      <BaseButton
-        v-for="c in categories"
-        :key="c.id"
-        type="button"
-        role="radio"
-        :aria-checked="categoryFilter === c.id"
-        :variant="categoryFilter === c.id ? 'primary' : 'secondary'"
-        @click="categoryFilter = c.id"
-      >
-        <span class="chip-inner">
-          <span
-            class="dot chip-dot"
-            :style="c.color ? { background: swatchCssVar(c.color as SwatchSlot) } : undefined"
-            :class="{ 'chip-dot--empty': !c.color }"
-          />
-          {{ c.name }}
-        </span>
-      </BaseButton>
     </div>
 
     <template v-if="loading && !rows.length">
@@ -402,7 +393,15 @@ const dayGroups = computed<DayGroup[]>(() => {
     <EmptyState
       v-else-if="!rows.length"
       :title="isEmptyBecauseFiltered ? 'No expenses match this category' : 'No expenses yet'"
-    />
+    >
+      <BaseButton
+        v-if="isEmptyBecauseFiltered"
+        type="button"
+        variant="secondary"
+        @click="categoryFilter = 'all'"
+        >Clear category filter</BaseButton
+      >
+    </EmptyState>
 
     <template v-else>
       <section v-for="group in dayGroups" :key="group.dateKey" class="day-group">
@@ -486,6 +485,27 @@ const dayGroups = computed<DayGroup[]>(() => {
   margin-bottom: var(--kapa-space-4);
 }
 
+.breakdown-toggle {
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--kapa-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.breakdown-toggle:focus-visible {
+  outline: 2px solid var(--kapa-accent);
+  outline-offset: 2px;
+}
+.breakdown-scope {
+  color: var(--kapa-ink-muted);
+  font-size: var(--kapa-text-caption-size);
+}
+.breakdown-legend .name {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
 .breakdown-bar {
   display: flex;
   width: 100%;
@@ -527,23 +547,13 @@ const dayGroups = computed<DayGroup[]>(() => {
   flex-shrink: 0;
 }
 
-.chip-inner {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kapa-space-1);
-}
-
-.chip-dot--empty {
-  border: 1px dashed currentColor;
-}
-
 .breakdown-amount {
   color: var(--kapa-ink-subtle);
 }
 
-.chips {
+.category-toolbar {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
   gap: var(--kapa-space-2);
   margin-bottom: var(--kapa-space-4);
 }
