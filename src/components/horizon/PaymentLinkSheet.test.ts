@@ -72,6 +72,9 @@ function context(): PaymentContext {
 let wrapper: ReturnType<typeof mount>;
 const dom = () => new DOMWrapper(document.body);
 beforeEach(() => {
+  // Keep the real clock aligned with these fixed-date payment fixtures.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-04T12:00:00Z'));
   setActivePinia(createPinia());
   vi.clearAllMocks();
   const space = useSpaceStore();
@@ -103,6 +106,7 @@ afterEach(() => {
   wrapper?.unmount();
   usePaymentLinkSheet().close();
   document.body.innerHTML = '';
+  vi.useRealTimers();
 });
 async function open(fromPayment = false) {
   usePaymentLinkSheet().open(

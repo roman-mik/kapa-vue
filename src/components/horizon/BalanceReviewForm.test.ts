@@ -1,9 +1,14 @@
 import { createPinia, setActivePinia } from 'pinia';
 import { mount } from '@vue/test-utils';
-import { beforeEach, expect, it } from 'vite-plus/test';
+import { afterEach, beforeEach, expect, it, vi } from 'vite-plus/test';
 import type { PaymentContext } from '@/composables/usePaymentTracking';
 import BalanceReviewForm from './BalanceReviewForm.vue';
-beforeEach(() => setActivePinia(createPinia()));
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-10-04T12:00:00Z'));
+  setActivePinia(createPinia());
+});
+afterEach(() => vi.useRealTimers());
 const context = () =>
   ({
     state: { revision: 4, cash_revision: 7 },
