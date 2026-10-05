@@ -137,3 +137,27 @@ describe('CategoryFilterPicker', () => {
     expect(wrapper.find('.category-options').exists()).toBe(false);
   });
 });
+
+it('keeps the phone sheet and options within the visible viewport after keyboard resize', async () => {
+  let resize: () => void = () => {};
+  const viewport = {
+    height: 800,
+    offsetTop: 0,
+    addEventListener: (event: string, listener: () => void) => {
+      if (event === 'resize') resize = listener;
+    },
+    removeEventListener: vi.fn(),
+  };
+  vi.stubGlobal('visualViewport', viewport);
+  setup(false);
+  await open();
+  viewport.height = 360;
+  resize();
+  await nextTick();
+  const panel = document.querySelector<HTMLElement>('.sheet-panel')!;
+  expect(panel.style.maxHeight).toBe('316.8px');
+  expect(panel.style.marginBottom).toBe(`${window.innerHeight - 360}px`);
+  expect(
+    parseFloat(document.querySelector<HTMLElement>('.category-options')!.style.maxHeight)
+  ).toBeCloseTo(116.8);
+});

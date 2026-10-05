@@ -12,13 +12,36 @@ const open = ref(false);
 const search = ref('');
 const media = window.matchMedia('(min-width: 760px)');
 const desktop = ref(media.matches);
-const selectedName = computed(() =>
-  props.modelValue === 'all'
-    ? 'All'
-    : props.modelValue === ''
-      ? 'Uncategorized'
-      : (props.categories.find((c) => c.id === props.modelValue)?.name ?? 'Unavailable category')
+const viewport = window.visualViewport;
+const viewportHeight = ref(viewport?.height ?? window.innerHeight);
+const keyboardInset = ref(0);
+function updateViewport() {
+  viewportHeight.value = viewport?.height ?? window.innerHeight;
+  keyboardInset.value = Math.max(
+    0,
+    window.innerHeight - viewportHeight.value - (viewport?.offsetTop ?? 0)
+  );
+}
+const sheetStyle = computed(() => ({
+  maxHeight: `${viewportHeight.value * 0.88}px`,
+  marginBottom: `${keyboardInset.value}px`,
+}));
+const optionsStyle = computed(() =>
+  desktop.value
+    ? undefined
+    : { maxHeight: `${Math.min(320, Math.max(44, viewportHeight.value * 0.88 - 200))}px` }
 );
+viewport?.addEventListener('resize', updateViewport);
+viewport?.addEventListener('scroll', updateViewport);
+updateViewport();
+const selectedName = computed(() => {
+  if (props.modelValue === 'all') return 'All';
+  if (props.modelValue === '') return 'Uncategorized';
+  return (
+    props.categories.find((category) => category.id === props.modelValue)?.name ??
+    'Unavailable category'
+  );
+});
 const options = computed(() => [
   { id: 'all', name: 'All categories', archived: false },
   ...('uncategorized'.includes(search.value.trim().toLocaleLowerCase())
@@ -29,8 +52,9 @@ const options = computed(() => [
     .sort((a, b) => a.name.localeCompare(b.name)),
 ]);
 async function close(restore = true) {
+  const wasOpen = open.value;
   open.value = false;
-  if (restore) {
+  if (restore && wasOpen) {
     await nextTick();
     trigger.value?.focus();
   }
@@ -59,16 +83,11 @@ function navigate(event: KeyboardEvent) {
   if (!buttons.length) return;
   event.preventDefault();
   const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-  const next =
-    event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? buttons.length - 1
-        : event.key === 'ArrowDown'
-          ? (index + 1) % buttons.length
-          : index < 0
-            ? buttons.length - 1
-            : (index - 1 + buttons.length) % buttons.length;
+  let next = 0;
+  if (event.key === 'End') next = buttons.length - 1;
+  else if (event.key === 'ArrowDown') next = (index + 1) % buttons.length;
+  else if (event.key === 'ArrowUp') next = (index - 1 + buttons.length) % buttons.length;
+  if (event.key === 'ArrowUp' && index < 0) next = buttons.length - 1;
   buttons[next]?.focus();
 }
 function focusOutside(event: FocusEvent) {
@@ -92,6 +111,8 @@ watch(
 );
 onUnmounted(() => {
   media.removeEventListener('change', breakpoint);
+  viewport?.removeEventListener('resize', updateViewport);
+  viewport?.removeEventListener('scroll', updateViewport);
   document.removeEventListener('pointerdown', outside);
   document.removeEventListener('focusin', focusOutside);
 });
@@ -116,6 +137,7 @@ onUnmounted(() => {
       :is="desktop ? 'div' : BaseSheet"
       v-if="open"
       :open="open"
+      :panel-style="desktop ? undefined : sheetStyle"
       :labelled-by="`${id}-title`"
       v-bind="desktop ? { class: 'category-popover' } : {}"
       @close="close()"
@@ -140,7 +162,13 @@ onUnmounted(() => {
           autocomplete="off"
           class="category-search"
         />
-        <div :id="`${id}-options`" class="category-options" role="group" aria-label="Categories">
+        <div
+          :id="`${id}-options`"
+          class="category-options"
+          :style="optionsStyle"
+          role="group"
+          aria-label="Categories"
+        >
           <button
             v-for="option in options"
             :key="option.id"
@@ -221,10 +249,21 @@ onUnmounted(() => {
   font-size: var(--kapa-text-body-size);
 }
 .picker-heading button {
+  background: transparent;
+  border: 0;
+  border-radius: var(--kapa-radius-sm);
+  color: var(--kapa-ink);
+  font: inherit;
+  cursor: pointer;
   min-width: 44px;
   min-height: 44px;
 }
 .category-search {
+  border: 1px solid var(--kapa-neutral-400);
+  border-radius: var(--kapa-radius-sm);
+  background: var(--kapa-surface);
+  color: var(--kapa-ink);
+  padding: var(--kapa-space-2);
   display: block;
   box-sizing: border-box;
   width: 100%;
