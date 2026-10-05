@@ -63,6 +63,7 @@ const rowError = ref<string | null>(null);
 // category id. The month breakdown bar below is intentionally unaffected by
 // this filter — it always reflects the whole month, per the plan.
 const categoryFilter = ref<string>('all');
+const breakdownOpen = ref(false);
 
 // A filter belonging to the previous space must not linger and silently empty
 // the list after a space switch.
@@ -70,6 +71,7 @@ watch(
   () => space.currentSpaceId,
   () => {
     categoryFilter.value = 'all';
+    breakdownOpen.value = false;
   }
 );
 
@@ -326,32 +328,44 @@ const dayGroups = computed<DayGroup[]>(() => {
   <main class="page">
     <h1>History</h1>
 
-    <div v-if="breakdown.length" class="breakdown">
-      <div
-        class="breakdown-bar"
-        role="img"
-        :aria-label="`Month breakdown: ${breakdown.map((b) => `${b.name} ${formatMoney(b.spent, summary!.currency)}`).join(', ')}`"
+    <div v-if="breakdown.length || summary?.unconverted.length" class="breakdown">
+      <button
+        type="button"
+        class="breakdown-toggle"
+        :aria-expanded="breakdownOpen"
+        aria-controls="history-month-breakdown"
+        @click="breakdownOpen = !breakdownOpen"
       >
-        <span
-          v-for="b in breakdown"
-          :key="b.categoryId ?? 'uncategorized'"
-          class="breakdown-segment"
-          :style="{ width: `${b.pct}%`, background: b.swatch }"
+        This month’s breakdown <span aria-hidden="true">{{ breakdownOpen ? '▴' : '▾' }}</span>
+      </button>
+      <div v-if="breakdownOpen" id="history-month-breakdown">
+        <p class="breakdown-scope">All categories · This month</p>
+        <div
+          class="breakdown-bar"
+          role="img"
+          :aria-label="`Month breakdown: ${breakdown.map((b) => `${b.name} ${formatMoney(b.spent, summary!.currency)}`).join(', ')}`"
+        >
+          <span
+            v-for="b in breakdown"
+            :key="b.categoryId ?? 'uncategorized'"
+            class="breakdown-segment"
+            :style="{ width: `${b.pct}%`, background: b.swatch }"
+          />
+        </div>
+        <ul class="breakdown-legend">
+          <li v-for="b in breakdown" :key="b.categoryId ?? 'uncategorized'">
+            <span class="dot" :style="{ background: b.swatch }" />
+            <span class="name">{{ b.name }}</span>
+            <span class="breakdown-amount">{{ formatMoney(b.spent, summary!.currency) }}</span>
+          </li>
+        </ul>
+        <UnconvertedNote
+          class="breakdown-note"
+          :buckets="summary!.unconverted"
+          :currency="summary!.currency"
+          context="in this breakdown"
         />
       </div>
-      <ul class="breakdown-legend">
-        <li v-for="b in breakdown" :key="b.categoryId ?? 'uncategorized'">
-          <span class="dot" :style="{ background: b.swatch }" />
-          <span class="name">{{ b.name }}</span>
-          <span class="breakdown-amount">{{ formatMoney(b.spent, summary!.currency) }}</span>
-        </li>
-      </ul>
-      <UnconvertedNote
-        class="breakdown-note"
-        :buckets="summary!.unconverted"
-        :currency="summary!.currency"
-        context="in this breakdown"
-      />
     </div>
 
     <div class="category-toolbar">
@@ -471,6 +485,27 @@ const dayGroups = computed<DayGroup[]>(() => {
   margin-bottom: var(--kapa-space-4);
 }
 
+.breakdown-toggle {
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--kapa-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.breakdown-toggle:focus-visible {
+  outline: 2px solid var(--kapa-accent);
+  outline-offset: 2px;
+}
+.breakdown-scope {
+  color: var(--kapa-ink-muted);
+  font-size: var(--kapa-text-caption-size);
+}
+.breakdown-legend .name {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
 .breakdown-bar {
   display: flex;
   width: 100%;

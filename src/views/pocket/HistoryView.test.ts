@@ -161,3 +161,36 @@ describe('History category filtering', () => {
     expect(mocks.remove).toHaveBeenCalledWith('groceries', 'version');
   });
 });
+
+describe('History monthly breakdown', () => {
+  it('starts collapsed with no total, expands all categories and FX notes even when filtered', async () => {
+    setup();
+    expect(wrapper.get('.breakdown-toggle').attributes('aria-expanded')).toBe('false');
+    expect(wrapper.find('.breakdown-legend').exists()).toBe(false);
+    expect(wrapper.find('.breakdown-amount').exists()).toBe(false);
+    await filter('food');
+    await wrapper.get('.breakdown-toggle').trigger('click');
+    expect(wrapper.get('.breakdown-toggle').attributes('aria-expanded')).toBe('true');
+    expect(wrapper.get('.breakdown-scope').text()).toBe('All categories · This month');
+    expect(wrapper.findAll('.breakdown-legend li')).toHaveLength(2);
+    expect(wrapper.get('.breakdown-note').text()).toContain('$10.00');
+    expect(wrapper.get('.breakdown-note').text()).toContain('in this breakdown');
+    await wrapper.get('.breakdown-toggle').trigger('click');
+    expect(wrapper.find('.breakdown-legend').exists()).toBe(false);
+  });
+  it('collapses again after switching space', async () => {
+    setup();
+    await wrapper.get('.breakdown-toggle').trigger('click');
+    space.currentSpaceId = 'two';
+    await wrapper.vm.$nextTick();
+    expect(wrapper.get('.breakdown-toggle').attributes('aria-expanded')).toBe('false');
+    expect(wrapper.find('.breakdown-legend').exists()).toBe(false);
+  });
+  it('retains the disclosure when all month spending lacks FX', async () => {
+    const home = mocks.home();
+    home.summary.value.categoryBreakdown = [];
+    setup();
+    await wrapper.get('.breakdown-toggle').trigger('click');
+    expect(wrapper.get('.breakdown-note').text()).toContain('$10.00');
+  });
+});
