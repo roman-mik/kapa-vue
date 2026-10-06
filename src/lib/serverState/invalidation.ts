@@ -8,6 +8,7 @@ export function mutationVersion(userId: string, spaceId: string): number {
 
 /** Reads affected by a successful write, including derived projections. */
 const dependents: Record<string, readonly string[]> = {
+  historyCoverage: ['projectionIngredients', 'projection'],
   paymentTracking: ['accounts', 'pocketExpenses', 'projection', 'paymentHistory'],
   accounts: ['projection', 'paymentTracking'],
   cap: ['projection', 'paymentTracking'],
@@ -28,6 +29,7 @@ export async function invalidateResources(
   resource: string
 ): Promise<void> {
   const resources = new Set([resource, ...(dependents[resource] ?? [])]);
+  if (resources.has('projection')) resources.add('projectionIngredients');
   await Promise.all([...resources].map((name) => queryCache.invalidate([userId, spaceId, name])));
   const key = JSON.stringify([userId, spaceId]);
   versions.set(key, (versions.get(key) ?? 0) + 1);

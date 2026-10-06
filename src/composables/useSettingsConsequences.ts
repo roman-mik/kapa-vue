@@ -8,12 +8,7 @@ import { useHorizonClock } from './useHorizonClock';
 // since spend mode isn't a `ProjectionInput` field — it's baked into
 // `pocketSpend.forward` before `buildProjection` ever runs.
 
-import {
-  buildProjection,
-  forwardSpendForRange,
-  runRateSpendForRange,
-  type ProjectionInput,
-} from '@roman-mik/kapa-core/horizon';
+import { buildProjection } from '@roman-mik/kapa-core/horizon';
 import type { EventOrder } from '@roman-mik/kapa-core/horizon/queries';
 import { mutationVersion } from '@/lib/serverState/invalidation';
 import { useSessionStore } from '@/stores/session';
@@ -60,6 +55,7 @@ export function useSettingsConsequences() {
       const baselineResult = buildProjection(input);
       const baseline = baselineResult.value;
       if (
+        baseline.assessment?.complete === false ||
         baseline.lifecycleIssues?.length ||
         unconverted.length ||
         baselineResult.unconverted.length
@@ -76,34 +72,21 @@ export function useSettingsConsequences() {
         currency
       );
 
-      const altForward =
-        settings.spend_mode === 'runRate'
-          ? await forwardSpendForRange(supabase, currentSpace.id, {
-              now: new Date(),
-              timeZone: currentSpace.timezone,
-              spaceCurrency: currency,
-              rates: input.rates,
-              from: input.todayKey,
-              to: input.range.to,
-            })
-          : await runRateSpendForRange(supabase, currentSpace.id, {
-              now: new Date(),
-              timeZone: currentSpace.timezone,
-              spaceCurrency: currency,
-              rates: input.rates,
-              from: input.todayKey,
-              to: input.range.to,
-            });
-      const altInput: ProjectionInput = {
-        ...input,
-        pocketSpend: { ...input.pocketSpend, forward: altForward.value },
-      };
+      const alternate = await loadProjectionIngredients(
+        supabase,
+        currentSpace.id,
+        currentSpace.timezone,
+        HORIZON_DAYS,
+        settings.spend_mode === 'runRate' ? 'cap' : 'runRate'
+      );
+      const altInput = alternate.input;
       if (request !== generation || currentSpace.id !== space.currentSpaceId) return;
       const alternativeResult = buildProjection(altInput);
       const alternative = alternativeResult.value;
       if (
+        alternative.assessment?.complete === false ||
         alternative.lifecycleIssues?.length ||
-        altForward.unconverted.length ||
+        alternate.unconverted.length ||
         alternativeResult.unconverted.length
       ) {
         eventOrderSentence.value = null;

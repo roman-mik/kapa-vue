@@ -107,6 +107,9 @@ export function useEntryDryRun() {
   });
 
   return {
+    assessment: computed(() =>
+      ingredients.value ? buildProjection(ingredients.value).value.assessment : undefined
+    ),
     loading,
     error,
     ingredients,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ForecastStatusNotice from '@/components/horizon/ForecastStatusNotice.vue';
 import CashflowReviewNotice from '@/components/horizon/CashflowReviewNotice.vue';
 import { entryDateSchema } from '@/lib/horizon/entryValidation';
 // Task 11 — the amount-first creation sheet. Calls the four composables'
@@ -337,7 +338,8 @@ const effectText = computed(() => {
     dryRun.loading.value ||
     dryRun.error.value ||
     dryRun.conversionIssues.value.length ||
-    dryRun.lifecycleIssues.value.length
+    dryRun.lifecycleIssues.value.length ||
+    dryRun.assessment.value?.complete === false
   )
     return null;
   const deltaText =
@@ -662,6 +664,12 @@ async function onSave(): Promise<void> {
         <SchedulePreview :items="billDates" />
       </div>
       <div class="preview-status">
+        <ForecastStatusNotice
+          :assessment="dryRun.assessment.value"
+          :loading="dryRun.loading.value"
+          :error="dryRun.error.value"
+          @inspect="handleClose"
+        />
         <ProjectionCompletenessNotice
           :issues="dryRun.conversionIssues.value"
           :currency="dryRun.reportingCurrency.value"

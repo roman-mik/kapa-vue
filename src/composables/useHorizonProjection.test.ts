@@ -11,7 +11,11 @@ import { invalidateResources } from '@/lib/serverState/invalidation';
 const { projectionForRange } = vi.hoisted(() => ({ projectionForRange: vi.fn() }));
 vi.mock('@roman-mik/kapa-core/horizon', async (original) => ({
   ...(await original<typeof import('@roman-mik/kapa-core/horizon')>()),
-  projectionForRange,
+  loadProjectionInput: async (...args: unknown[]) => ({
+    input: await projectionForRange(...args),
+    unconverted: [],
+  }),
+  buildProjection: (input: unknown) => input,
 }));
 
 vi.mock('@roman-mik/kapa-core/horizon/queries', async (original) => ({

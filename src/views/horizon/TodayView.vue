@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ForecastStatusNotice from '@/components/horizon/ForecastStatusNotice.vue';
 import PaymentList from '@/components/horizon/PaymentList.vue';
 import { usePaymentActionSheet } from '@/composables/usePaymentActionSheet';
 import type { NegativeDayWarning } from '@roman-mik/kapa-core/horizon';
@@ -32,6 +33,7 @@ import { formatFullDate } from '@/lib/date';
 
 const { accounts, loading: accountsLoading, error: accountsError } = useAccounts();
 const {
+  assessment,
   conversionIssues,
   lifecycleIssues,
   isPartial,
@@ -73,6 +75,7 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
   <main class="page page--with-rail">
     <div class="page-main">
       <h1 tabindex="-1">Today</h1>
+      <ForecastStatusNotice :assessment="assessment" :loading="loading" :error="error" />
       <CashflowReviewNotice :issues="lifecycleIssues" />
       <div class="review-actions">
         <BaseButton variant="secondary" @click="paymentLink.open()">
