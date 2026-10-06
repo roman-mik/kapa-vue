@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import HistoryCoverageEditor from '@/components/horizon/HistoryCoverageEditor.vue';
 import CapAssumptionNote from '@/components/horizon/CapAssumptionNote.vue';
 import EventOrderEditor from '@/components/horizon/EventOrderEditor.vue';
 import HolidayEditor from '@/components/horizon/HolidayEditor.vue';
@@ -65,6 +66,7 @@ const reportingCurrency = computed<Currency>(
     <p v-else-if="error" role="alert" class="error">{{ error }}</p>
 
     <template v-else-if="settings">
+      <BaseCard class="settings-card"><HistoryCoverageEditor /></BaseCard>
       <section class="section">
         <BaseCard class="settings-card">
           <h2>Same-day event order</h2>

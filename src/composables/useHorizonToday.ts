@@ -76,10 +76,14 @@ export function useHorizonToday() {
     await invalidate();
   }
   return {
+    assessment: computed(() => projection.data.value?.value.assessment),
     conversionIssues: computed(() => projection.data.value?.unconverted ?? []),
     lifecycleIssues: computed(() => projection.data.value?.value.lifecycleIssues ?? []),
     isPartial: computed(
       () =>
+        projection.loading.value ||
+        !!projection.error.value ||
+        projection.data.value?.value.assessment?.complete === false ||
         !!projection.data.value?.unconverted.length ||
         !!projection.data.value?.value.lifecycleIssues?.length
     ),

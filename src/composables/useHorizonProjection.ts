@@ -1,7 +1,8 @@
 import { useHorizonClock } from './useHorizonClock';
 import { computed } from 'vue';
-import { addDays, projectionForRange } from '@roman-mik/kapa-core/horizon';
-import { getPaymentTrackingState } from '@roman-mik/kapa-core/horizon/queries';
+import { addDays, buildProjection } from '@roman-mik/kapa-core/horizon';
+import { loadProjectionIngredients } from '@/lib/horizon/loadProjectionIngredients';
+import { daysBetween } from '@roman-mik/kapa-core/horizon';
 import { useSpaceQuery } from '@/composables/useSpaceQuery';
 import { useSpaceStore } from '@/stores/space';
 import { supabase } from '@/lib/supabase';
@@ -22,12 +23,14 @@ export function useHorizonProjection(dayOffset: () => number) {
     params: () => [range.value?.from, range.value?.to, range.value?.timeZone],
     load: async ({ spaceId, params }) => {
       const [from, to, timeZone] = params as [string, string, string];
-      return projectionForRange(supabase, spaceId, {
-        now: new Date(),
-        lifecycle: !!(await getPaymentTrackingState(supabase, spaceId)),
+      const loaded = await loadProjectionIngredients(
+        supabase,
+        spaceId,
         timeZone,
-        range: { from, to },
-      });
+        daysBetween(from, to)
+      );
+      const result = buildProjection(loaded.input);
+      return { ...result, unconverted: [...result.unconverted, ...loaded.unconverted] };
     },
   });
 }

@@ -1,3 +1,5 @@
+import { useSessionStore } from '@/stores/session';
+import { queryCache } from '@/lib/serverState/queryCache';
 import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, afterEach, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
@@ -39,6 +41,8 @@ const input: ProjectionInput = {
 };
 beforeEach(() => {
   setActivePinia(createPinia());
+  queryCache.clear();
+  useSessionStore().user = { id: 'user' } as never;
   vi.clearAllMocks();
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-10-04T10:00:00Z'));

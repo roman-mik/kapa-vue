@@ -1,3 +1,4 @@
+import { flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { useSpaceStore } from '@/stores/space';
@@ -18,7 +19,11 @@ vi.mock('@roman-mik/kapa-core/horizon', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@roman-mik/kapa-core/horizon')>();
   return {
     ...actual,
-    projectionForRange,
+    loadProjectionInput: async (...args: unknown[]) => ({
+      input: await projectionForRange(...args),
+      unconverted: [],
+    }),
+    buildProjection: (input: unknown) => input,
   };
 });
 
@@ -42,9 +47,7 @@ vi.mock('@roman-mik/kapa-core/pocket/queries', async (importOriginal) => {
 });
 
 function flush(): Promise<void> {
-  return Promise.resolve()
-    .then(() => Promise.resolve())
-    .then(() => Promise.resolve());
+  return flushPromises().then(() => undefined);
 }
 
 function fakeEvent(overrides: Record<string, unknown> = {}): Record<string, unknown> {

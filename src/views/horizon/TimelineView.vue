@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ForecastStatusNotice from '@/components/horizon/ForecastStatusNotice.vue';
 import PaymentList from '@/components/horizon/PaymentList.vue';
 import { usePaymentActionSheet } from '@/composables/usePaymentActionSheet';
 import type { NegativeDayWarning } from '@roman-mik/kapa-core/horizon';
@@ -40,6 +41,7 @@ import { globalTrough } from '@/lib/horizon/trough';
 import { timelineMonths } from '@/lib/horizon/timelineMonths';
 
 const {
+  assessment,
   conversionIssues,
   lifecycleIssues,
   isPartial,
@@ -101,6 +103,7 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
   <main class="page page--with-rail">
     <div class="page-main">
       <h1 tabindex="-1">Timeline</h1>
+      <ForecastStatusNotice :assessment="assessment" :loading="loading" :error="error" />
       <CashflowReviewNotice :issues="lifecycleIssues" />
       <BaseButton variant="secondary" @click="paymentLink.open()"
         >Review payments and balances</BaseButton

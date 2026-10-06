@@ -11,7 +11,15 @@ function result(): ProjectionIngredients {
     settings: {} as never,
     unconverted: [{ currency: 'USD', amountMinor: 500 }],
     input: {
-      accounts: [],
+      accounts: [
+        {
+          id: 'a1',
+          currency: 'RSD',
+          current_balance_minor: 0,
+          include_in_total: true,
+          archived: false,
+        },
+      ],
       incomeStreams: [],
       obligations: [],
       oneOffEvents: [],
