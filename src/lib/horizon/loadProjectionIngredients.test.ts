@@ -47,3 +47,17 @@ it('does not reuse another space or hide a refresh error behind cached ingredien
   await invalidateResources('u', 's', 'historyCoverage');
   await expect(loadProjectionIngredients(client, 's', 'UTC', 90)).rejects.toThrow('offline');
 });
+it('refreshes shared ingredients before rebuilding cached projections', async () => {
+  const client = {} as never;
+  const projection = queryCache.use({
+    key: ['u', 's', 'projection', 90],
+    staleTimeMs: 30_000,
+    load: () => loadProjectionIngredients(client, 's', 'UTC', 90),
+  });
+  const original = await projection.fetch();
+  const updated = { input: { horizonDays: 42 }, settings: {}, unconverted: [] };
+  load.mockResolvedValue(updated);
+  await invalidateResources('u', 's', 'cap');
+  expect(projection.data.value).toEqual(updated);
+  expect(projection.data.value).not.toBe(original);
+});

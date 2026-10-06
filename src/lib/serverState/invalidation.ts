@@ -30,6 +30,9 @@ export async function invalidateResources(
 ): Promise<void> {
   const resources = new Set([resource, ...(dependents[resource] ?? [])]);
   if (resources.has('projection')) resources.add('projectionIngredients');
+  // Derived loaders must not start while their shared ingredients are still fresh in cache.
+  if (resources.delete('projectionIngredients'))
+    await queryCache.invalidate([userId, spaceId, 'projectionIngredients']);
   await Promise.all([...resources].map((name) => queryCache.invalidate([userId, spaceId, name])));
   const key = JSON.stringify([userId, spaceId]);
   versions.set(key, (versions.get(key) ?? 0) + 1);
