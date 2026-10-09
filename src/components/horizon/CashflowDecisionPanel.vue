@@ -146,17 +146,25 @@ const excluded = computed(
         <p>
           Lowest cash:
           {{ formatMoney(decision.baselineSummary.value.selected.minimum.balanceMinor, currency) }}
-          → {{ formatMoney(result.summary.selected.minimum.balanceMinor, currency) }}.
+          →
+          {{
+            formatMoney(
+              decision.comparisonSummary.value?.selected.minimum.balanceMinor ?? 0,
+              currency
+            )
+          }}.
         </p>
         <p>
           Endpoint cash:
           {{ formatMoney(decision.baselineSummary.value.selected.endingCashMinor, currency) }} →
-          {{ formatMoney(result.summary.selected.endingCashMinor, currency) }}.
+          {{
+            formatMoney(decision.comparisonSummary.value?.selected.endingCashMinor ?? 0, currency)
+          }}.
         </p>
         <p>
           Next-income endpoint:
           {{ decision.baselineSummary.value.nextIncome.date ?? 'Unavailable' }} →
-          {{ result.summary.nextIncome.date ?? 'Unavailable' }}.
+          {{ decision.comparisonSummary.value?.nextIncome.date ?? 'Unavailable' }}.
         </p>
       </template>
       <details>

@@ -145,3 +145,44 @@ it('allocates only allowance remaining after existing payment coverage', () => {
   expect(buildProjection(next).value.days.at(-1)!.balanceMinor).toBe(110000);
   expect(base.lifecycle.allowanceCoverage?.mode).toBe('includesPayments');
 });
+
+it('moves one recurring bill without changing the next recurrence', () => {
+  const base = input();
+  base.range.to = '2026-11-30';
+  base.obligations = [
+    {
+      id: 'rent',
+      name: 'Rent',
+      currency: 'EUR',
+      accountId: 'a',
+      amountMinor: 30000,
+      schedules: [
+        {
+          id: 'monthly',
+          kind: 'dayOfMonth',
+          dayOfMonth: 15,
+          intervalDays: null,
+          nthWeekday: null,
+          weekday: null,
+          anchorDate: null,
+          slippagePolicy: 'nextBusinessDay',
+          coversPeriod: 'same',
+        },
+      ],
+    },
+  ];
+  const bill = cautiousCandidates(base).find(
+    (o) => o.expected.date === '2026-10-15' && o.expected.amountMinor < 0
+  )!;
+  const next = applyCashflowTrial(base, {
+    kind: 'billDate',
+    occurrenceKey: bill.expected.key,
+    fingerprint: occurrenceFingerprint(bill),
+    date: '2026-10-20',
+  });
+  expect(
+    buildProjection(next)
+      .value.events.filter((e) => e.amountMinor < 0)
+      .map((e) => e.date)
+  ).toEqual(['2026-10-20', '2026-11-16']);
+});

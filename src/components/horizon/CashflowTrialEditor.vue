@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import {
-  CURRENCIES,
-  CURRENCY_EXPONENT,
-  convertToCurrency,
-  type Currency,
-} from '@roman-mik/kapa-core/pocket';
+import { CURRENCIES, CURRENCY_EXPONENT, convertToCurrency } from '@roman-mik/kapa-core/pocket';
 import { occurrenceFingerprint } from '@roman-mik/kapa-core/horizon';
 import type { CashflowDecision } from '@/composables/useCashflowDecision';
 import BaseButton from '@/components/ui/BaseButton.vue';
@@ -140,9 +135,10 @@ function allocate() {
   localError.value = '';
 }
 function review() {
-  if (draft.value?.kind === 'billDate') {
-    const bill = bills.value.find((o) => o.expected.key === draft.value?.occurrenceKey);
-    if (bill) draft.value.fingerprint = occurrenceFingerprint(bill);
+  const current = draft.value;
+  if (current?.kind === 'billDate') {
+    const bill = bills.value.find((o) => o.expected.key === current.occurrenceKey);
+    if (bill) current.fingerprint = occurrenceFingerprint(bill);
   } else if (draft.value?.kind === 'purchase' && base.value) {
     draft.value.allocationCurrency = base.value.reportingCurrency;
     draft.value.allocations = draft.value.allocations.map((a) => ({
@@ -287,6 +283,9 @@ select {
   border-radius: var(--kapa-radius-sm);
 }
 button {
+  max-width: calc(100% - 8px);
+  white-space: normal;
+  overflow-wrap: anywhere;
   margin: var(--kapa-space-1);
   min-height: 44px;
 }
