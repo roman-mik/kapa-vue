@@ -30,6 +30,7 @@ function mockViewport(matches: boolean): void {
 // (which fetch real data via composables / need an active Pinia) so the
 // layout mounts without a real session, router wiring, or backend.
 const stubs = {
+  AppHeader: { template: '<header class="app-header-stub" />' },
   RouterLink: { template: '<a><slot /></a>' },
   RouterView: { template: '<div class="router-view-stub" />' },
   AppSwitcher: { template: '<div class="app-switcher-stub" />' },
@@ -50,6 +51,7 @@ describe('HorizonLayout mobile/desktop gate', () => {
     expect(wrapper.find('.shell').exists()).toBe(true);
     expect(wrapper.find('.rail-stub').exists()).toBe(true);
     expect(wrapper.find('.tabbar-stub').exists()).toBe(false);
+    expect(wrapper.find('.app-header-stub').exists()).toBe(false);
   });
 
   it('shows the router view and tab bar on a narrow viewport', () => {
@@ -60,6 +62,7 @@ describe('HorizonLayout mobile/desktop gate', () => {
     expect(wrapper.find('.shell').exists()).toBe(false);
     expect(wrapper.find('.router-view-stub').exists()).toBe(true);
     expect(wrapper.find('.tabbar-stub').exists()).toBe(true);
+    expect(wrapper.findAll('.app-header-stub')).toHaveLength(1);
     expect(wrapper.find('.rail-stub').exists()).toBe(false);
   });
 });

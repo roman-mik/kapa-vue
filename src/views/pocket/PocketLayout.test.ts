@@ -29,6 +29,7 @@ function mockViewport(matches: boolean): void {
 // primitives and both nav shells so the layout mounts without real
 // composables/backend data.
 const stubs = {
+  AppHeader: { template: '<header class="app-header-stub" />' },
   RouterLink: { template: '<a><slot /></a>' },
   RouterView: { template: '<div class="router-view-stub" />' },
   PocketRail: { template: '<div class="rail-stub" aria-label="Pocket" />' },
@@ -46,6 +47,7 @@ describe('PocketLayout mobile/desktop gate', () => {
     expect(wrapper.find('.shell').exists()).toBe(true);
     expect(wrapper.find('.rail-stub').exists()).toBe(true);
     expect(wrapper.find('.tabbar-stub').exists()).toBe(false);
+    expect(wrapper.find('.app-header-stub').exists()).toBe(false);
   });
 
   it('shows the router view and tab bar on a narrow viewport', () => {
@@ -55,6 +57,7 @@ describe('PocketLayout mobile/desktop gate', () => {
     expect(wrapper.find('.shell').exists()).toBe(false);
     expect(wrapper.find('.router-view-stub').exists()).toBe(true);
     expect(wrapper.find('.tabbar-stub').exists()).toBe(true);
+    expect(wrapper.findAll('.app-header-stub')).toHaveLength(1);
     expect(wrapper.find('.rail-stub').exists()).toBe(false);
   });
 });

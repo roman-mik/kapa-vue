@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppHeader from '@/components/layout/AppHeader.vue';
 import BottomTabBar from '@/components/layout/BottomTabBar.vue';
 import PocketRail from '@/components/pocket/PocketRail.vue';
 import { useViewport } from '@/composables/useViewport';
@@ -6,12 +7,8 @@ import { useViewport } from '@/composables/useViewport';
 // Mirrors HorizonLayout.vue: useViewport reacts to the lg breakpoint, so
 // crossing it live swaps the shell without a reload. Both branches render
 // <router-view> — a phone must reach every /pocket route, not just Home.
-// Unlike Horizon, the mobile branch reuses BottomTabBar.vue directly rather
-// than a Pocket-specific tab bar — its 5 tabs already are Pocket's routes,
-// so there's nothing to fork. /settings and the Pocket|Horizon AppSwitcher
-// it hosts stay outside this layout on purpose: dropping showHeader here
-// only affects this subtree's own 6 routes, not the shared /settings route,
-// so the switcher stays reachable via the rail/tab-bar's own Settings item.
+// Both apps expose the same app navigation in their mobile header.
+// Shared Settings retains its standalone header via route metadata.
 const { isDesktop } = useViewport();
 </script>
 
@@ -26,6 +23,7 @@ const { isDesktop } = useViewport();
   </template>
   <template v-else>
     <div class="phone-shell">
+      <AppHeader />
       <main class="content">
         <router-view />
       </main>

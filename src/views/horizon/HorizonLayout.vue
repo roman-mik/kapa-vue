@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppHeader from '@/components/layout/AppHeader.vue';
 import HorizonRail from '@/components/horizon/HorizonRail.vue';
 import HorizonTabBar from '@/components/horizon/HorizonTabBar.vue';
 import EntrySheet from '@/components/horizon/EntrySheet.vue';
@@ -29,6 +30,7 @@ const entrySheet = useEntrySheet();
   </template>
   <template v-else>
     <div class="phone-shell">
+      <AppHeader />
       <main class="content">
         <router-view />
       </main>
