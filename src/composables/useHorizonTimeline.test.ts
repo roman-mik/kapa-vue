@@ -117,7 +117,7 @@ describe('useHorizonTimeline', () => {
     expect(projectionForRange).toHaveBeenCalledWith(
       expect.anything(),
       'sp1',
-      expect.objectContaining({ range: { from: '2026-09-01', to: '2026-11-29' } })
+      expect.objectContaining({ range: { from: '2026-09-01', to: '2026-12-01' } })
     );
     expect(reportingCurrency.value).toBe('RSD');
     expect(days.value).toHaveLength(2);
@@ -147,7 +147,7 @@ describe('useHorizonTimeline', () => {
     expect(projectionForRange).toHaveBeenLastCalledWith(
       expect.anything(),
       'sp1',
-      expect.objectContaining({ range: { from: '2026-09-01', to: '2027-08-26' } })
+      expect.objectContaining({ range: { from: '2026-09-01', to: '2027-09-01' } })
     );
   });
 

@@ -5,9 +5,16 @@
 
 import type { ProjectionDay } from '@roman-mik/kapa-core/horizon';
 
-/** The number of days in `days` whose end-of-day balance is below zero. */
+/** Include within-day ordered cash, even when income restores a positive day end. */
+export function orderedDayMinimum(day: ProjectionDay): number {
+  return Math.min(
+    day.balanceMinor,
+    ...day.events.flatMap((e) => [e.balanceBeforeMinor, e.balanceAfterMinor])
+  );
+}
+/** Number of dates with a modeled zero breach. */
 export function daysUnder(days: ProjectionDay[]): number {
-  return days.filter((d) => d.balanceMinor < 0).length;
+  return days.filter((d) => orderedDayMinimum(d) < 0).length;
 }
 
 /** Days under zero grouped by 'YYYY-MM', ascending, for month headers. */
@@ -19,7 +26,7 @@ export interface DaysUnderMonth {
 export function daysUnderPerMonth(days: ProjectionDay[]): DaysUnderMonth[] {
   const counts = new Map<string, number>();
   for (const day of days) {
-    if (day.balanceMinor < 0) {
+    if (orderedDayMinimum(day) < 0) {
       const month = day.date.slice(0, 7);
       counts.set(month, (counts.get(month) ?? 0) + 1);
     }

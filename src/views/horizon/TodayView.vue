@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CashflowDecisionPanel from '@/components/horizon/CashflowDecisionPanel.vue';
 import ForecastStatusNotice from '@/components/horizon/ForecastStatusNotice.vue';
 import PaymentList from '@/components/horizon/PaymentList.vue';
 import { usePaymentActionSheet } from '@/composables/usePaymentActionSheet';
@@ -33,6 +34,7 @@ import { formatFullDate } from '@/lib/date';
 
 const { accounts, loading: accountsLoading, error: accountsError } = useAccounts();
 const {
+  decisions,
   assessment,
   conversionIssues,
   lifecycleIssues,
@@ -77,6 +79,7 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
       <h1 tabindex="-1">Today</h1>
       <ForecastStatusNotice :assessment="assessment" :loading="loading" :error="error" />
       <CashflowReviewNotice :issues="lifecycleIssues" />
+      <CashflowDecisionPanel v-if="decisions" :decision="decisions" />
       <div class="review-actions">
         <BaseButton variant="secondary" @click="paymentLink.open()">
           Review payments and balances
@@ -134,7 +137,12 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
           </div>
         </div>
 
-        <NegativeDayBanner :warnings="warnings" @dismiss="onDismiss" @fix="reviewWarning" />
+        <NegativeDayBanner
+          v-if="decisions?.store.mode !== 'cautious'"
+          :warnings="warnings"
+          @dismiss="onDismiss"
+          @fix="reviewWarning"
+        />
 
         <section class="section">
           <h2>Next up</h2>
@@ -142,7 +150,7 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
             <li v-for="event in nextEvents" :key="`${event.date}-${event.sourceId}`" class="row">
               <div class="row-info">
                 <button
-                  v-if="event.occurrenceId"
+                  v-if="event.occurrenceId && decisions?.store.mode !== 'cautious'"
                   type="button"
                   class="payment-action"
                   @click="paymentAction.open(event.occurrenceId)"
@@ -167,7 +175,7 @@ function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
           <EmptyState
             v-else
             title="Nothing scheduled"
-            message="No upcoming events in the next 90 days."
+            message="No upcoming events in the selected three-calendar-month forecast."
           />
         </section>
       </template>

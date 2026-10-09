@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CashflowDecisionPanel from '@/components/horizon/CashflowDecisionPanel.vue';
 import ForecastStatusNotice from '@/components/horizon/ForecastStatusNotice.vue';
 import PaymentList from '@/components/horizon/PaymentList.vue';
 import { usePaymentActionSheet } from '@/composables/usePaymentActionSheet';
@@ -41,6 +42,7 @@ import { globalTrough } from '@/lib/horizon/trough';
 import { timelineMonths } from '@/lib/horizon/timelineMonths';
 
 const {
+  decisions,
   assessment,
   conversionIssues,
   lifecycleIssues,
@@ -68,9 +70,23 @@ const initialLoading = computed(() => loading.value && days.value.length === 0);
 // One day-by-day list grouped by month; each month's header carries end
 // balance, low point and days-under (assembled in the pure helper, never in
 // the template).
-const months = computed(() => timelineMonths(metrics.value, daysUnderByMonth.value, events.value));
+const months = computed(() =>
+  timelineMonths(metrics.value, daysUnderByMonth.value, events.value).map((m) => {
+    const summary = decisions?.result.value?.summary.months.find((row) => row.month === m.month);
+    return {
+      ...m,
+      partial: summary?.partial ?? false,
+      rangeLabel: summary ? `${summary.from} through ${summary.to}` : '',
+    };
+  })
+);
 
-const troughDate = computed(() => globalTrough(days.value)?.minBalanceDate ?? null);
+const troughDate = computed(
+  () =>
+    decisions?.result.value?.summary.selected.minimum.date ??
+    globalTrough(days.value)?.minBalanceDate ??
+    null
+);
 
 function eventAmountTone(amountMinor: number): 'positive' | 'negative' {
   return amountMinor >= 0 ? 'positive' : 'negative';
@@ -105,6 +121,7 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
       <h1 tabindex="-1">Timeline</h1>
       <ForecastStatusNotice :assessment="assessment" :loading="loading" :error="error" />
       <CashflowReviewNotice :issues="lifecycleIssues" />
+      <CashflowDecisionPanel v-if="decisions" :decision="decisions" />
       <BaseButton variant="secondary" @click="paymentLink.open()"
         >Review payments and balances</BaseButton
       >
@@ -161,10 +178,17 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
           </div>
         </div>
 
-        <NegativeDayBanner :warnings="warnings" @dismiss="onDismiss" @fix="reviewWarning" />
+        <NegativeDayBanner
+          v-if="decisions?.store.mode !== 'cautious'"
+          :warnings="warnings"
+          @dismiss="onDismiss"
+          @fix="reviewWarning"
+        />
 
         <BaseCard>
           <BalanceLineChart
+            :minimum="decisions?.result.value?.summary.selected.minimum"
+            :reserve="decisions?.reserve.value"
             v-if="chartView === 'line'"
             :days="days"
             :events="chartEvents"
@@ -189,7 +213,10 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
             <div v-for="month in months" :key="month.month" class="month">
               <div class="month-header">
                 <div class="month-summary">
-                  <span class="month-name">{{ formatFullMonth(month.month) }}</span>
+                  <span class="month-name"
+                    >{{ formatFullMonth(month.month) }}{{ month.partial ? ' (partial)' : '' }}</span
+                  >
+                  <span v-if="month.rangeLabel" class="month-line">{{ month.rangeLabel }}</span>
                   <span class="month-line">
                     {{ isPartial ? 'partial end' : 'ends' }}
                     {{ formatMoney(month.endBalanceMinor, reportingCurrency) }} ·
@@ -298,7 +325,7 @@ function glyphShape(kind: LedgerEvent['kind']): GlyphShape {
           </thead>
           <tbody>
             <tr v-for="month in months" :key="month.month">
-              <td>{{ formatFullMonth(month.month) }}</td>
+              <td>{{ formatFullMonth(month.month) }}{{ month.partial ? ' (partial)' : '' }}</td>
               <td>{{ formatMoney(month.endBalanceMinor, reportingCurrency) }}</td>
               <td>
                 {{ formatMoney(month.minBalanceMinor, reportingCurrency) }}

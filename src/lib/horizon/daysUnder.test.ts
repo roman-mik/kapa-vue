@@ -66,3 +66,15 @@ describe('daysUnderPerMonth', () => {
     ]);
   });
 });
+it('counts an intraday deficit even if the date closes positive', () => {
+  const day = {
+    date: '2026-10-10',
+    balanceMinor: 90000,
+    events: [
+      { balanceBeforeMinor: 50000, balanceAfterMinor: -10000 },
+      { balanceBeforeMinor: -10000, balanceAfterMinor: 90000 },
+    ],
+  } as import('@roman-mik/kapa-core/horizon').ProjectionDay;
+  expect(daysUnder([day])).toBe(1);
+  expect(daysUnderPerMonth([day])).toEqual([{ month: '2026-10', daysUnder: 1 }]);
+});

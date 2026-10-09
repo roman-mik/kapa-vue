@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LedgerEvent, ProjectionDay } from '@roman-mik/kapa-core/horizon';
+import type { CashPoint, LedgerEvent, ProjectionDay } from '@roman-mik/kapa-core/horizon';
 import type { Currency } from '@roman-mik/kapa-core/pocket';
 import { computed } from 'vue';
 import EventGlyph from './EventGlyph.vue';
@@ -14,6 +14,8 @@ const props = defineProps<{
   events: LedgerEvent[];
   currency: Currency;
   partial?: boolean;
+  minimum?: CashPoint;
+  reserve?: number | null;
 }>();
 
 const PADDING = { top: 20, right: 24, bottom: 32, left: 56 };
@@ -27,7 +29,16 @@ const width = computed(() =>
 const chartWidth = computed(() => width.value - PADDING.left - PADDING.right);
 const chartHeight = CHART_HEIGHT - PADDING.top - PADDING.bottom;
 
-const domain = computed(() => balanceDomain(props.days.map((d) => d.balanceMinor)));
+const domain = computed(() =>
+  balanceDomain([
+    ...props.days.map((d) => d.balanceMinor),
+    ...props.events
+      .filter((e) => !e.unconvertible)
+      .flatMap((e) => [e.balanceBeforeMinor, e.balanceAfterMinor]),
+    ...(props.minimum ? [props.minimum.balanceMinor] : []),
+    ...(props.reserve == null ? [] : [props.reserve]),
+  ])
+);
 
 function scaleX(index: number): number {
   const n = props.days.length;
@@ -102,9 +113,14 @@ const dayIndexByDate = computed(() => {
 // same `globalTrough` the Today hero and the timeline list use, so the chart and
 // the list can never disagree about where the trough is. Null when there is no
 // trough to point at (fewer than 2 days or every day non-negative).
+const decisionTrough = computed(() =>
+  props.minimum
+    ? { minBalanceMinor: props.minimum.balanceMinor, minBalanceDate: props.minimum.date }
+    : globalTrough(props.days)
+);
 const hasTrough = computed(() => {
   if (props.days.length < 2) return false;
-  const trough = globalTrough(props.days);
+  const trough = decisionTrough.value;
   return trough !== null && trough.minBalanceMinor < 0;
 });
 
@@ -119,7 +135,7 @@ const troughCallout = computed<{
   label: string;
 } | null>(() => {
   if (!hasTrough.value) return null;
-  const trough = globalTrough(props.days)!;
+  const trough = decisionTrough.value!;
   const index = dayIndexByDate.value.get(trough.minBalanceDate);
   if (index === undefined) return null;
 
@@ -177,13 +193,18 @@ const summaryText = computed(() => {
   return (
     `Balance projection over ${props.days.length} days, from ` +
     `${formatMoney(first.balanceMinor, props.currency)} to ${formatMoney(last.balanceMinor, props.currency)}. ` +
-    `${negativeCount} day(s) go negative.`
+    `${negativeCount} day(s) end negative. Ordered movements may go negative within a day.`
   );
 });
 </script>
 
 <template>
   <div class="chart-scroll">
+    <p v-if="minimum && minimum.balanceMinor < 0" class="intraday-note">
+      {{ partial ? 'Known-only' : 'Ordered cash' }} minimum
+      {{ formatMoney(minimum.balanceMinor, currency) }} on {{ minimum.date }} · {{ minimum.cause }}.
+      The line shows day-end cash.
+    </p>
     <svg
       role="img"
       :aria-label="
@@ -213,6 +234,17 @@ const summaryText = computed(() => {
       />
       <text class="zero-label" :x="PADDING.left - 8" :y="zeroY" text-anchor="end">0</text>
 
+      <line
+        v-if="reserve != null"
+        :x1="PADDING.left"
+        :x2="PADDING.left + chartWidth"
+        :y1="scaleY(reserve)"
+        :y2="scaleY(reserve)"
+        stroke="currentColor"
+        stroke-dasharray="6 4"
+      >
+        <title>Reserve {{ formatMoney(reserve, currency) }}</title>
+      </line>
       <path
         v-for="(segment, i) in segments"
         :key="i"
