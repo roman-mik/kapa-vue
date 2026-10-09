@@ -95,6 +95,7 @@ function setDaily() {
     props.decision.store.draft = {
       ...props.decision.store.draft,
       dailySpend: {
+        currency: currency.value,
         amountMinor: minor(dailyAmount.value, currency.value),
         reason: dailyReason.value.trim(),
       },
@@ -213,7 +214,13 @@ function nativeCurrency(key: string): Currency {
       </ul>
       <p v-if="decision.store.draft.dailySpend">
         Expected forward spending: {{ expectedSpending }} →
-        {{ formatMoney(decision.store.draft.dailySpend.amountMinor, currency) }} each day.
+        {{
+          formatMoney(
+            decision.store.draft.dailySpend.amountMinor,
+            decision.store.draft.dailySpend.currency
+          )
+        }}
+        each day.
         {{ decision.store.draft.dailySpend.reason }}
       </p>
       <BaseButton

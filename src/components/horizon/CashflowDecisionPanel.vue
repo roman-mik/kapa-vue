@@ -73,9 +73,11 @@ const excluded = computed(
       <p v-else>
         Reserve:
         {{
-          decision.reserve.value === 0
-            ? 'Zero cash floor'
-            : formatMoney(decision.reserve.value ?? 0, currency)
+          decision.reserveUnset.value
+            ? 'No reserve set (zero cash floor)'
+            : decision.reserve.value === 0
+              ? 'Zero cash floor'
+              : formatMoney(decision.reserve.value ?? 0, currency)
         }}.
         <router-link :to="{ name: 'horizon-settings', hash: '#reserve' }">Edit reserve</router-link>
       </p>
@@ -95,6 +97,16 @@ const excluded = computed(
             <template v-if="decision.qualified.value"
               ><dt>Zero shortfall</dt>
               <dd>{{ formatMoney(w.value.zeroShortfallMinor, currency) }}</dd>
+              <dt>First below zero</dt>
+              <dd>{{ w.value.firstZeroBreach?.date ?? 'No breach in this window' }}</dd>
+              <dt>First below reserve</dt>
+              <dd>
+                {{
+                  w.value.reserveShortfallMinor === null
+                    ? 'Unavailable'
+                    : (w.value.firstReserveBreach?.date ?? 'No breach in this window')
+                }}
+              </dd>
               <dt>Reserve shortfall</dt>
               <dd>
                 {{

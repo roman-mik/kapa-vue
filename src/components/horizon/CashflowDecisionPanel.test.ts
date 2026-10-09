@@ -69,3 +69,23 @@ it('does not claim coverage while inputs are incomplete or refreshing', async ()
   expect(w.text()).toContain('Forecast updating or unavailable');
   expect(w.text()).not.toContain('included cash stays');
 });
+
+it('discloses an unset reserve as zero rather than a saved cash floor', async () => {
+  settings.value = {
+    reserve_minor: null,
+    reserve_currency: null,
+    reporting_currency: 'EUR',
+  } as never;
+  const base = input();
+  const decision = useCashflowDecision(
+    ref({ ...buildProjection(base), input: base }),
+    ref(false),
+    ref(null)
+  );
+  const w = mount(CashflowDecisionPanel, {
+    props: { decision },
+    global: { stubs: { RouterLink: true } },
+  });
+  expect(w.text()).toContain('No reserve set (zero cash floor)');
+  settings.value = { reserve_minor: 20000, reserve_currency: 'EUR', reporting_currency: 'EUR' };
+});
