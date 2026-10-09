@@ -3,6 +3,7 @@ import { useHorizonClock } from '@/composables/useHorizonClock';
 import { computed, onUnmounted, ref, shallowRef, watch } from 'vue';
 import {
   buildProjection,
+  occurrenceFingerprint,
   transitionOccurrence,
   type OccurrenceAction,
 } from '@roman-mik/kapa-core/horizon';
@@ -23,6 +24,7 @@ const clock = useHorizonClock();
 const staleDate = computed(() => !!snapshot.value && snapshot.value.today !== clock.today.value);
 const sheet = usePaymentActionSheet();
 const selectedId = sheet.paymentId.value!;
+const initialDateTrial = sheet.dateTrial.value;
 const space = useSpaceStore();
 const session = useSessionStore();
 const origin = space.currentSpaceId;
@@ -78,6 +80,15 @@ function hydrate(data: PaymentContext) {
   ).toFixed(exponent);
   date.value = p.actual?.date ?? data.today;
   inclusion.value = '';
+  if (initialDateTrial) {
+    if (occurrenceFingerprint(p) !== initialDateTrial.fingerprint) {
+      error.value =
+        'This bill changed since the trial. Review its latest details before changing the date.';
+    } else if (['expected', 'postponed'].includes(p.state)) {
+      mode.value = 'postpone';
+      date.value = initialDateTrial.date;
+    }
+  }
 }
 watch(
   actions.tracking.context,

@@ -9,6 +9,8 @@ import {
   type ProjectionResult,
 } from '@roman-mik/kapa-core/horizon';
 import type { Converted } from '@roman-mik/kapa-core/pocket';
+import { applyCashflowTrial } from '@/lib/horizon/purchaseTrial';
+import { useCashflowTrialStore } from '@/stores/cashflowTrial';
 import { useCautiousScenarioStore } from '@/stores/cautiousScenario';
 import { useSpaceStore } from '@/stores/space';
 import { useSessionStore } from '@/stores/session';
@@ -21,12 +23,16 @@ export function useCashflowDecision(
 ) {
   const settings = useHorizonSettingsResource();
   const store = useCautiousScenarioStore();
+  const trialStore = useCashflowTrialStore();
   const space = useSpaceStore();
   const session = useSessionStore();
   const accounts = useAccounts();
   watch(
     [() => session.user?.id, () => space.currentSpaceId],
-    ([user, id]) => store.bind(JSON.stringify([user, id])),
+    ([user, id]) => {
+      store.bind(JSON.stringify([user, id]));
+      trialStore.bind(JSON.stringify([user, id]));
+    },
     { immediate: true, flush: 'sync' }
   );
   const input = computed(() => data.value?.input);
@@ -38,11 +44,40 @@ export function useCashflowDecision(
   const reserve = computed(() =>
     reserveMismatch.value ? null : (settings.data.value?.reserve_minor ?? 0)
   );
+  const scenarioInput = computed(() => {
+    if (!input.value) return null;
+    try {
+      return store.mode === 'cautious'
+        ? applyCautiousScenario(input.value, store.draft)
+        : input.value;
+    } catch {
+      return null;
+    }
+  });
+  const trialCandidates = computed(() =>
+    scenarioInput.value
+      ? cautiousCandidates(scenarioInput.value).filter(
+          (o) =>
+            o.expected.amountMinor < 0 &&
+            (o.postponedDate ?? o.expected.date) <= scenarioInput.value!.range.to
+        )
+      : []
+  );
+  const comparisonSummary = computed(() => {
+    if (!scenarioInput.value || !data.value) return null;
+    const result = buildProjection(scenarioInput.value);
+    return computeDecisionSummary(
+      scenarioInput.value,
+      { ...result, unconverted: [...result.unconverted, ...data.value.unconverted] },
+      reserve.value
+    );
+  });
   const calculation = computed(() => {
     const base = input.value;
     if (!base || !data.value) return { value: null, error: '' };
     try {
-      const changed = store.mode === 'cautious' ? applyCautiousScenario(base, store.draft) : base;
+      const scenario = store.mode === 'cautious' ? applyCautiousScenario(base, store.draft) : base;
+      const changed = trialStore.draft ? applyCashflowTrial(scenario, trialStore.draft) : scenario;
       const result = changed === base ? data.value : buildProjection(changed);
       // Loader-level missing FX/history qualifications are shared, never erased by a trial.
       const combined = {
@@ -109,6 +144,10 @@ export function useCashflowDecision(
   }
   return {
     store,
+    trialStore,
+    scenarioInput,
+    trialCandidates,
+    comparisonSummary,
     input,
     candidates,
     ready,

@@ -4,6 +4,7 @@ import type { Currency } from '@roman-mik/kapa-core/pocket';
 import type { DecisionWindow } from '@roman-mik/kapa-core/horizon';
 import type { CashflowDecision } from '@/composables/useCashflowDecision';
 import CautiousEditor from './CautiousEditor.vue';
+import CashflowTrialEditor from './CashflowTrialEditor.vue';
 import BaseCard from '@/components/ui/BaseCard.vue';
 import { formatMoney } from '@/lib/money';
 const props = defineProps<{ decision: CashflowDecision }>();
@@ -51,6 +52,7 @@ const excluded = computed(
   <BaseCard class="decision-panel">
     <h2>Bill coverage and cashflow</h2>
     <CautiousEditor :decision="decision" />
+    <CashflowTrialEditor :decision="decision" />
     <p v-if="decision.error.value" role="alert">{{ decision.error.value }}</p>
     <p v-else-if="!decision.ready.value" role="status">
       Forecast updating or unavailable. Coverage cannot be assessed yet.
@@ -59,6 +61,15 @@ const excluded = computed(
       <p>
         {{ decision.store.mode === 'cautious' ? 'Cautious' : 'Expected' }} ·
         {{ result.summary.selected.from }} through {{ result.summary.selected.to }}, inclusive.
+      </p>
+      <p v-if="decision.trialStore.draft && decision.comparisonSummary.value">
+        Before trial → with trial: lowest cash
+        {{ formatMoney(decision.comparisonSummary.value.selected.minimum.balanceMinor, currency) }}
+        → {{ formatMoney(result.summary.selected.minimum.balanceMinor, currency) }}; endpoint
+        {{ formatMoney(decision.comparisonSummary.value.selected.endingCashMinor, currency) }} →
+        {{ formatMoney(result.summary.selected.endingCashMinor, currency) }}. Next-income endpoint
+        {{ decision.comparisonSummary.value.nextIncome.date ?? 'Unavailable' }} →
+        {{ result.summary.nextIncome.date ?? 'Unavailable' }}.
       </p>
       <p>
         Estimated cash before today’s scheduled movements:
@@ -135,17 +146,25 @@ const excluded = computed(
         <p>
           Lowest cash:
           {{ formatMoney(decision.baselineSummary.value.selected.minimum.balanceMinor, currency) }}
-          → {{ formatMoney(result.summary.selected.minimum.balanceMinor, currency) }}.
+          →
+          {{
+            formatMoney(
+              decision.comparisonSummary.value?.selected.minimum.balanceMinor ?? 0,
+              currency
+            )
+          }}.
         </p>
         <p>
           Endpoint cash:
           {{ formatMoney(decision.baselineSummary.value.selected.endingCashMinor, currency) }} →
-          {{ formatMoney(result.summary.selected.endingCashMinor, currency) }}.
+          {{
+            formatMoney(decision.comparisonSummary.value?.selected.endingCashMinor ?? 0, currency)
+          }}.
         </p>
         <p>
           Next-income endpoint:
           {{ decision.baselineSummary.value.nextIncome.date ?? 'Unavailable' }} →
-          {{ result.summary.nextIncome.date ?? 'Unavailable' }}.
+          {{ decision.comparisonSummary.value?.nextIncome.date ?? 'Unavailable' }}.
         </p>
       </template>
       <details>

@@ -35,7 +35,9 @@ const timeZone = computed(() => space.currentSpace?.timezone ?? 'UTC');
 const todayKey = computed(() => zonedDateKey(new Date(), timeZone.value));
 
 const initialValues = computed<ExpenseDraftPayload | undefined>(() =>
-  sheet.prefill.value ? { ...sheet.prefill.value, date: todayKey.value } : undefined
+  sheet.prefill.value
+    ? { ...sheet.prefill.value, date: sheet.prefill.value.date ?? todayKey.value }
+    : undefined
 );
 
 async function onSubmit(

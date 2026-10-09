@@ -6,6 +6,7 @@ import { ref } from 'vue';
 import type { Currency } from '@roman-mik/kapa-core/pocket';
 
 export interface DuplicatePrefill {
+  date?: string;
   countsTowardCap?: boolean;
   amountMinor: number;
   currency: Currency;

@@ -1,3 +1,4 @@
+import { dateKeyStartUtc } from '@roman-mik/kapa-core/pocket';
 import { mount } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { ref } from 'vue';
@@ -107,6 +108,35 @@ describe('PocketEntrySheet', () => {
 
     expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
     expect(document.body.querySelector('.amount-display')?.textContent).toBe('500');
+    wrapper.unmount();
+  });
+
+  it('records a trial prefill once with its exact selected date', async () => {
+    const wrapper = mountSheet();
+    usePocketEntrySheet().open({
+      prefill: {
+        amountMinor: 500,
+        currency: 'RSD',
+        categoryId: null,
+        note: 'Trial purchase',
+        date: '2026-10-10',
+        countsTowardCap: false,
+      },
+    });
+    await wrapper.vm.$nextTick();
+    document.body.querySelector<HTMLButtonElement>('.actions button')?.click();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    expect(add).toHaveBeenCalledTimes(1);
+    expect(add.mock.calls[0]![0]).toMatchObject({
+      amountMinor: 500,
+      countsTowardCap: false,
+      note: 'Trial purchase',
+    });
+    expect(add.mock.calls[0]![0].spentAt).toBe(
+      dateKeyStartUtc('2026-10-10', useSpaceStore().currentSpace!.timezone).toISOString()
+    );
+    expect(usePocketEntrySheet().isOpen.value).toBe(false);
     wrapper.unmount();
   });
 
