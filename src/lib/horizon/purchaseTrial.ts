@@ -1,3 +1,4 @@
+import { applyExplorationTrial, type ExplorationTrial } from './explorationTrial';
 import {
   applyCautiousScenario,
   buildProjection,
@@ -15,6 +16,7 @@ export interface AllowanceAllocation {
   availableMinor: number;
 }
 export type CashflowTrial =
+  | ExplorationTrial
   | {
       kind: 'purchase';
       name: string;
@@ -37,6 +39,7 @@ export function trialAllowance(base: ProjectionInput) {
 
 /** Transform forecast inputs only; this module has no persistence dependencies. */
 export function applyCashflowTrial(base: ProjectionInput, trial: CashflowTrial): ProjectionInput {
+  if (trial.kind === 'exploration') return applyExplorationTrial(base, trial);
   if (
     !entryDateSchema.safeParse(trial.date).success ||
     trial.date < base.todayKey ||

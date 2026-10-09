@@ -26,7 +26,7 @@ const persistedBill = computed(() => {
 });
 function record() {
   const d = draft.value;
-  if (!d || !props.decision.ready.value) return;
+  if (!d || d.kind === 'exploration' || !props.decision.ready.value) return;
   if (d.kind === 'purchase') {
     pocketSheet.open({
       prefill: {
@@ -56,11 +56,11 @@ const forward = computed(() => {
 });
 const amount = computed({
   get: () =>
-    draft.value?.kind === 'purchase' && draft.value.amountMinor > 0
+    draft.value && draft.value.kind !== 'billDate' && draft.value.amountMinor > 0
       ? String(draft.value.amountMinor / 10 ** CURRENCY_EXPONENT[draft.value.currency])
       : '',
   set: (text: string) => {
-    if (draft.value?.kind === 'purchase') {
+    if (draft.value && draft.value.kind !== 'billDate') {
       const exponent = CURRENCY_EXPONENT[draft.value.currency];
       draft.value.amountMinor =
         /^\d+(\.\d+)?$/.test(text) && (text.split('.')[1]?.length ?? 0) <= exponent
@@ -85,7 +85,7 @@ const converted = computed(() =>
       )
     : undefined
 );
-function start(kind: 'purchase' | 'billDate') {
+function start(kind: 'purchase' | 'billDate' | 'exploration') {
   const b = base.value;
   if (!b) return;
   localError.value = '';
@@ -99,6 +99,18 @@ function start(kind: 'purchase' | 'billDate') {
       date: b.todayKey,
       allocationCurrency: b.reportingCurrency,
       allocations: [],
+    };
+  else if (kind === 'exploration')
+    props.decision.trialStore.draft = {
+      kind,
+      purpose: 'spending',
+      savingTreatment: 'earmark',
+      cadence: 'once',
+      amountMinor: 0,
+      currency: b.reportingCurrency,
+      accountId: b.accounts.find((a) => a.include_in_total && !a.archived)?.id ?? '',
+      date: b.todayKey,
+      endDate: b.range.to,
     };
   else if (bills.value[0]) selectBill(bills.value[0].expected.key);
 }
@@ -157,16 +169,30 @@ function review() {
       <BaseButton variant="secondary" :disabled="!bills.length" @click="start('billDate')"
         >Compare a bill date</BaseButton
       >
+      <BaseButton variant="secondary" :disabled="!base" @click="start('exploration')"
+        >Explore spending or saving</BaseButton
+      >
     </template>
     <template v-else>
-      <h3>{{ draft.kind === 'purchase' ? 'Purchase trial' : 'Bill date trial' }}</h3>
+      <h3>
+        {{
+          draft.kind === 'purchase'
+            ? 'Purchase trial'
+            : draft.kind === 'billDate'
+              ? 'Bill date trial'
+              : 'Spending and saving trial'
+        }}
+      </h3>
       <p>
         Temporary comparison on the selected {{ decision.store.mode }} assumptions. Nothing is
         saved.
       </p>
-      <template v-if="draft.kind === 'purchase'">
-        <label>Name <input v-model="draft.name" /></label>
-        <label>Amount <input v-model="amount" inputmode="decimal" /></label>
+      <template v-if="draft.kind !== 'billDate'">
+        <label v-if="draft.kind === 'purchase'">Name <input v-model="draft.name" /></label>
+        <label
+          >{{ draft.kind === 'exploration' ? 'Amount per occurrence' : 'Amount' }}
+          <input v-model="amount" inputmode="decimal"
+        /></label>
         <label
           >Currency
           <select v-model="draft.currency">
@@ -200,6 +226,48 @@ function review() {
       <label
         >Date <input v-model="draft.date" type="date" :min="base?.todayKey" :max="base?.range.to"
       /></label>
+      <template v-if="draft.kind === 'exploration'">
+        <label
+          >Purpose
+          <select v-model="draft.purpose">
+            <option value="spending">Additional spending</option>
+            <option value="saving">Saving</option>
+          </select></label
+        >
+        <label
+          >Cadence
+          <select v-model="draft.cadence">
+            <option value="once">One time</option>
+            <option value="monthly">Monthly on this calendar day</option>
+          </select></label
+        >
+        <label
+          >End date
+          <input v-model="draft.endDate" type="date" :min="draft.date" :max="base?.range.to"
+        /></label>
+        <label v-if="draft.purpose === 'saving'"
+          >Saving treatment
+          <select v-model="draft.savingTreatment">
+            <option value="earmark">Reserve money in included accounts</option>
+            <option value="outside">Move outside spendable accounts</option>
+          </select></label
+        >
+        <p v-if="draft.purpose === 'saving' && draft.savingTreatment === 'earmark'">
+          Cash and cashflow totals stay unchanged. Each occurrence adds to the required reserve from
+          that date through the forecast end. This earmarks money; it does not move it between
+          accounts.
+        </p>
+        <p v-else-if="draft.purpose === 'saving'">
+          Each occurrence reduces included available cash as a savings transfer. Money-out totals
+          include the simulated transfer; it is not consumption.
+        </p>
+        <p v-else>This is additional spending, on top of the existing allowance and bills.</p>
+        <p>
+          Monthly dates clamp to the last day of short months and return to the original day
+          afterward. No business-day shift. This finite trial does not prove sustainable recurring
+          capacity or compute a maximum. No transfers or savings settings are saved.
+        </p>
+      </template>
       <template v-if="draft.kind === 'purchase' && base">
         <p>
           Allowance-covered {{ formatMoney(covered, base.reportingCurrency) }}; additional
@@ -247,6 +315,7 @@ function review() {
         in Horizon after recording.
       </p>
       <BaseButton
+        v-if="draft.kind !== 'exploration'"
         :disabled="!decision.ready.value || (draft.kind === 'billDate' && !persistedBill)"
         @click="record"
         >{{ draft.kind === 'purchase' ? 'Record in Pocket' : 'Review date change' }}</BaseButton

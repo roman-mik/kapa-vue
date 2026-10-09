@@ -106,3 +106,37 @@ it('shares a purchase trial, recomputes refreshed inputs, and clears on space sw
   await nextTick();
   expect(a.trialStore.draft).toBeNull();
 });
+
+it('recomputes dated savings on current assumptions, rejects excluded accounts and missing FX', () => {
+  const base = input();
+  const data = ref({ ...buildProjection(base), input: base });
+  const loading = ref(false);
+  const d = useCashflowDecision(data, loading, ref(null));
+  d.trialStore.draft = {
+    kind: 'exploration',
+    purpose: 'saving',
+    savingTreatment: 'earmark',
+    cadence: 'monthly',
+    amountMinor: 35000,
+    currency: 'EUR',
+    accountId: 'a',
+    date: '2026-10-10',
+    endDate: '2026-10-31',
+  };
+  expect(d.result.value?.summary.selected.reserveShortfallMinor).toBe(5000);
+  loading.value = true;
+  expect(d.qualified.value).toBe(false);
+  loading.value = false;
+  if (d.trialStore.draft.kind !== 'exploration') return;
+  d.trialStore.draft.currency = 'USD';
+  expect(d.error.value).toContain('FX');
+  expect(d.qualified.value).toBe(false);
+  d.trialStore.draft.currency = 'EUR';
+  const changed = {
+    ...base,
+    accounts: base.accounts.map((a) => ({ ...a, include_in_total: false })),
+  };
+  data.value = { ...buildProjection(changed), input: changed };
+  expect(d.error.value).toContain('included account');
+  expect(d.trialStore.draft).not.toBeNull();
+});
