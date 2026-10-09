@@ -50,6 +50,7 @@ async function save(clear = false) {
     error.value = 'Enter a nonnegative amount with the currency’s decimal places.';
     return;
   }
+  const invalidate = settings.invalidate;
   saving.value = true;
   error.value = '';
   try {
@@ -58,7 +59,7 @@ async function save(clear = false) {
       spaceId,
       clear ? null : { amountMinor: minor, currency: currency.value }
     );
-    await settings.invalidate();
+    await invalidate();
     if (space.currentSpaceId === spaceId) {
       dirty.value = false;
       if (clear) amount.value = '';
@@ -85,7 +86,8 @@ async function save(clear = false) {
     </p>
     <form @submit.prevent="save()">
       <label
-        >Reserve ({{ currency }}) <input v-model="amount" inputmode="decimal" @input="dirty = true"
+        >Reserve ({{ currency }})
+        <input v-model="amount" :disabled="saving" inputmode="decimal" @input="dirty = true"
       /></label>
       <p v-if="error" role="alert">{{ error }}</p>
       <BaseButton type="submit" :disabled="saving || settings.loading.value"

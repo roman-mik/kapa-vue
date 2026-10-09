@@ -85,7 +85,8 @@ export function useCashflowDecision(
       !error.value &&
       !settings.loading.value &&
       !settings.error.value &&
-      !!calculation.value.value
+      !!calculation.value.value &&
+      input.value?.reportingCurrency === settings.data.value?.reporting_currency
   );
   const qualified = computed(
     () => ready.value && calculation.value.value?.summary.complete === true
@@ -114,10 +115,16 @@ export function useCashflowDecision(
     qualified,
     reserve,
     reserveMismatch,
+    reserveUnset: computed(() => settings.data.value?.reserve_minor == null),
     staleChanges,
     reviewChange,
     error: computed(() => calculation.value.error || error.value || settings.error.value || ''),
     result: computed(() => calculation.value.value),
+    baselineSummary: computed(() =>
+      input.value && data.value
+        ? computeDecisionSummary(input.value, data.value, reserve.value)
+        : null
+    ),
     accountNames: computed(() => new Map(accounts.accounts.value.map((a) => [a.id, a.name]))),
     observations: computed(() => input.value?.lifecycle?.observations ?? []),
   };

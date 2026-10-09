@@ -17,6 +17,15 @@ const dailyReason = ref('');
 const candidate = computed(() =>
   props.decision.candidates.value.find((o) => o.expected.key === selected.value)
 );
+const expectedSpending = computed(() => {
+  const input = props.decision.input.value;
+  if (!input) return 'Unavailable';
+  const days = input.pocketSpend.forward.filter(
+    (day) => day.dateKey >= input.todayKey && day.dateKey <= input.range.to
+  );
+  const total = days.reduce((sum, day) => sum + day.amountMinor, 0);
+  return `${formatMoney(total, input.reportingCurrency)} across ${input.range.from}–${input.range.to} (${input.assessment?.provenance.spendMode ?? 'unknown'} assumption)`;
+});
 const currency = computed(() => props.decision.input.value?.reportingCurrency ?? 'RSD');
 watch(selected, () => {
   const o = candidate.value;
@@ -203,8 +212,7 @@ function nativeCurrency(key: string): Currency {
         </li>
       </ul>
       <p v-if="decision.store.draft.dailySpend">
-        Expected spending: current
-        {{ decision.input.value?.assessment?.provenance.spendMode }} assumption →
+        Expected forward spending: {{ expectedSpending }} →
         {{ formatMoney(decision.store.draft.dailySpend.amountMinor, currency) }} each day.
         {{ decision.store.draft.dailySpend.reason }}
       </p>

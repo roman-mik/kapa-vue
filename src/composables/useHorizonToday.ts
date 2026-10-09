@@ -1,3 +1,6 @@
+import { useCashflowDecision } from './useCashflowDecision';
+import { useHorizonClock } from './useHorizonClock';
+import { calendarMonthEndpoint, daysBetween } from '@roman-mik/kapa-core/horizon';
 import { computeMetrics, computeNegativeDayWarnings } from '@roman-mik/kapa-core/horizon';
 import { dismissNegativeDay } from '@roman-mik/kapa-core/horizon/queries';
 import { zonedDateKey, type Currency } from '@roman-mik/kapa-core/pocket';
@@ -7,7 +10,7 @@ import { useHorizonProjection } from '@/composables/useHorizonProjection';
 import { useHorizonSettingsResource } from '@/composables/useHorizonSettingsResource';
 import { useProjectionDismissals } from '@/composables/useProjectionDismissals';
 import { supabase } from '@/lib/supabase';
-import { daysUnder } from '@/lib/horizon/daysUnder';
+import { orderedDayMinimum, daysUnder } from '@/lib/horizon/daysUnder';
 import { globalTrough, type Trough } from '@/lib/horizon/trough';
 import { useSpaceStore } from '@/stores/space';
 
@@ -18,16 +21,36 @@ export interface MonthMin {
 
 export function useHorizonToday() {
   const space = useSpaceStore();
-  const projection = useHorizonProjection(() => 90);
+  const clock = useHorizonClock();
+  const projection = useHorizonProjection(() =>
+    daysBetween(clock.today.value, calendarMonthEndpoint(clock.today.value, 3))
+  );
   const settings = useHorizonSettingsResource();
+  const decisions = useCashflowDecision(projection.data, projection.loading, projection.error);
+  const effective = computed(() =>
+    decisions.store.mode === 'cautious' ? decisions.result.value?.projection : projection.data.value
+  );
   const dismissals = useProjectionDismissals();
   const cap = useCap();
   const reportingCurrency = computed(
     () => (settings.data.value?.reporting_currency ?? 'RSD') as Currency
   );
-  const metrics = computed(() =>
-    projection.data.value ? computeMetrics(projection.data.value.value.days) : null
-  );
+  const metrics = computed(() => {
+    if (!effective.value) return null;
+    const base = computeMetrics(effective.value.value.days);
+    const summary = decisions.result.value?.summary;
+    if (!summary) return base;
+    return {
+      ...base,
+      months: summary.months.map((m) => ({
+        month: m.month,
+        endBalanceMinor: m.endingCashMinor,
+        minBalanceMinor: m.minimum.balanceMinor,
+        minBalanceDate: m.minimum.date,
+        surplusMinor: m.netMovementMinor,
+      })),
+    };
+  });
   const monthMin = computed<MonthMin | null>(() => {
     const month = metrics.value?.months[0];
     return month
@@ -38,14 +61,12 @@ export function useHorizonToday() {
     const current = space.currentSpace;
     if (!current) return [];
     const today = zonedDateKey(new Date(), current.timezone);
-    return (
-      projection.data.value?.value.events.filter((event) => event.date >= today).slice(0, 3) ?? []
-    );
+    return effective.value?.value.events.filter((event) => event.date >= today).slice(0, 3) ?? [];
   });
   const warnings = computed(() => {
-    if (!projection.data.value || !dismissals.data.value) return [];
+    if (!effective.value || !dismissals.data.value) return [];
     return computeNegativeDayWarnings(
-      projection.data.value.value.days,
+      effective.value.value.days.map((day) => ({ ...day, balanceMinor: orderedDayMinimum(day) })),
       dismissals.data.value.map((d) => ({
         negativeDate: d.negative_date,
         shortfallMinor: d.shortfall_minor,
@@ -53,8 +74,13 @@ export function useHorizonToday() {
       reportingCurrency.value
     );
   });
-  const days = computed(() => projection.data.value?.value.days ?? []);
-  const trough = computed<Trough | null>(() => globalTrough(days.value));
+  const days = computed(() => effective.value?.value.days ?? []);
+  const trough = computed<Trough | null>(() => {
+    const minimum = decisions.result.value?.summary.selected.minimum;
+    return minimum
+      ? { minBalanceMinor: minimum.balanceMinor, minBalanceDate: minimum.date }
+      : globalTrough(days.value);
+  });
   const balanceToday = computed(() => days.value[0]?.balanceMinor ?? null);
   const monthEnd = computed(() => {
     const month = metrics.value?.months[0];
@@ -76,16 +102,18 @@ export function useHorizonToday() {
     await invalidate();
   }
   return {
-    assessment: computed(() => projection.data.value?.value.assessment),
-    conversionIssues: computed(() => projection.data.value?.unconverted ?? []),
-    lifecycleIssues: computed(() => projection.data.value?.value.lifecycleIssues ?? []),
+    decisions,
+    assessment: computed(() => effective.value?.value.assessment),
+    conversionIssues: computed(() => effective.value?.unconverted ?? []),
+    lifecycleIssues: computed(() => effective.value?.value.lifecycleIssues ?? []),
     isPartial: computed(
       () =>
         projection.loading.value ||
         !!projection.error.value ||
-        projection.data.value?.value.assessment?.complete === false ||
-        !!projection.data.value?.unconverted.length ||
-        !!projection.data.value?.value.lifecycleIssues?.length
+        !decisions.ready.value ||
+        effective.value?.value.assessment?.complete === false ||
+        !!effective.value?.unconverted.length ||
+        !!effective.value?.value.lifecycleIssues?.length
     ),
     loading: computed(
       () =>
@@ -113,9 +141,12 @@ export function useHorizonToday() {
     monthMin,
     trough,
     balanceToday,
-    lifecycleEnabled: computed(() => projection.data.value?.value.lifecycleIssues !== undefined),
+    lifecycleEnabled: computed(() => effective.value?.value.lifecycleIssues !== undefined),
     estimatedCash: computed(
-      () => days.value[0]?.events?.[0]?.balanceBeforeMinor ?? balanceToday.value
+      () =>
+        effective.value?.value.startingCashMinor ??
+        days.value[0]?.events?.[0]?.balanceBeforeMinor ??
+        balanceToday.value
     ),
     monthEnd,
     nextEvents,

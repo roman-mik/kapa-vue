@@ -38,7 +38,7 @@ describe('BalanceLineChart', () => {
     const svg = wrapper.find('svg');
     expect(svg.attributes('role')).toBe('img');
     expect(svg.attributes('aria-label')).toContain('3 days');
-    expect(svg.attributes('aria-label')).toContain('2 day(s) go negative');
+    expect(svg.attributes('aria-label')).toContain('2 day(s) end negative');
   });
 
   it('renders one marker per non-unconvertible event, tagged with its kind', () => {
@@ -107,4 +107,19 @@ describe('BalanceLineChart', () => {
     expect(callout.find('.trough-label').text()).toContain('low');
     expect(callout.text()).toContain('49');
   });
+});
+
+it('discloses an intraday deficit when every day closes positive', () => {
+  const wrapper = mount(BalanceLineChart, {
+    props: {
+      days: [{ date: '2026-10-10', balanceMinor: 90000, events: [] }],
+      events: [],
+      currency: 'EUR',
+      minimum: { date: '2026-10-10', balanceMinor: -10000, cause: 'Rent' },
+      reserve: 20000,
+    },
+  });
+  expect(wrapper.text()).toContain('Ordered cash minimum');
+  expect(wrapper.text()).toContain('Rent');
+  expect(wrapper.text()).toContain('The line shows day-end cash');
 });
