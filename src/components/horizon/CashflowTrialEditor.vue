@@ -9,6 +9,9 @@ import {
 import { occurrenceFingerprint } from '@roman-mik/kapa-core/horizon';
 import type { CashflowDecision } from '@/composables/useCashflowDecision';
 import BaseButton from '@/components/ui/BaseButton.vue';
+import { usePocketEntrySheet } from '@/composables/usePocketEntrySheet';
+import { usePaymentActionSheet } from '@/composables/usePaymentActionSheet';
+import { trialAllowance } from '@/lib/horizon/purchaseTrial';
 import { formatMoney } from '@/lib/money';
 const props = defineProps<{ decision: CashflowDecision }>();
 const draft = computed(() => props.decision.trialStore.draft);
@@ -16,10 +19,41 @@ const base = computed(() => props.decision.scenarioInput.value);
 const allowanceDate = ref('');
 const allowanceAmount = ref('');
 const localError = ref('');
+const pocketSheet = usePocketEntrySheet();
+const paymentSheet = usePaymentActionSheet();
+const persistedBill = computed(() => {
+  const d = draft.value;
+  return d?.kind === 'billDate'
+    ? props.decision.input.value?.lifecycle?.occurrences.find(
+        (o) => o.expected.key === d.occurrenceKey
+      )
+    : undefined;
+});
+function record() {
+  const d = draft.value;
+  if (!d || !props.decision.ready.value) return;
+  if (d.kind === 'purchase') {
+    pocketSheet.open({
+      prefill: {
+        amountMinor: d.amountMinor,
+        currency: d.currency,
+        date: d.date,
+        categoryId: null,
+        note: d.name.trim() || null,
+        countsTowardCap: covered.value > 0 && covered.value === converted.value,
+      },
+    });
+  } else {
+    const bill = persistedBill.value;
+    if (!bill) return;
+    paymentSheet.open(bill.id, { date: d.date, fingerprint: occurrenceFingerprint(bill) });
+  }
+  props.decision.trialStore.reset();
+}
 const bills = computed(() => props.decision.trialCandidates.value);
 const forward = computed(() => {
   const totals = new Map<string, number>();
-  for (const d of base.value?.pocketSpend.forward ?? []) {
+  for (const d of base.value ? trialAllowance(base.value) : []) {
     if (d.dateKey < base.value!.todayKey || d.dateKey > base.value!.range.to) continue;
     totals.set(d.dateKey, (totals.get(d.dateKey) ?? 0) + d.amountMinor);
   }
@@ -211,6 +245,16 @@ function review() {
         </details>
       </template>
       <p v-if="localError" role="alert">{{ localError }}</p>
+      <p v-if="draft.kind === 'purchase'">
+        Recording opens Pocket for final review. Allowance allocations stay temporary; choose
+        whether the whole expense counts toward your everyday limit there. Review its paying account
+        in Horizon after recording.
+      </p>
+      <BaseButton
+        :disabled="!decision.ready.value || (draft.kind === 'billDate' && !persistedBill)"
+        @click="record"
+        >{{ draft.kind === 'purchase' ? 'Record in Pocket' : 'Review date change' }}</BaseButton
+      >
       <BaseButton variant="secondary" @click="review">Review against latest inputs</BaseButton>
       <BaseButton variant="secondary" @click="decision.trialStore.reset()"
         >Dismiss trial</BaseButton

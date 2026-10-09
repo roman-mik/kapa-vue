@@ -113,3 +113,35 @@ it('moves only the selected bill and guards its fingerprint', () => {
   expect(base.oneOffEvents[0]!.date).toBe('2026-10-01');
   expect(() => applyCashflowTrial(base, { ...draft, fingerprint: 'old' })).toThrow('changed');
 });
+
+it('allocates only allowance remaining after existing payment coverage', () => {
+  const base = fixture();
+  const occurrences = cautiousCandidates(base);
+  const rent = occurrences.find((o) => o.expected.amountMinor < 0)!;
+  base.lifecycle = {
+    observations: [
+      { id: 'obs', accountId: 'a', date: base.todayKey, currency: 'EUR', balanceMinor: 50000 },
+    ],
+    occurrences,
+    issues: [],
+    allowanceCoverage: {
+      mode: 'includesPayments',
+      currency: 'EUR',
+      allocations: [
+        {
+          occurrenceId: rent.id,
+          occurrenceRevision: rent.revision,
+          date: '2026-10-20',
+          amountMinor: 30000,
+        },
+      ],
+    },
+  };
+  const draft = trial(base, true);
+  if (draft.kind !== 'purchase') return;
+  expect(() => applyCashflowTrial(base, draft)).toThrow('Allowance changed');
+  draft.allocations[0]!.availableMinor = 10000;
+  const next = applyCashflowTrial(base, draft);
+  expect(buildProjection(next).value.days.at(-1)!.balanceMinor).toBe(110000);
+  expect(base.lifecycle.allowanceCoverage?.mode).toBe('includesPayments');
+});

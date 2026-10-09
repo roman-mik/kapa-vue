@@ -1,5 +1,6 @@
 import {
   applyCautiousScenario,
+  buildProjection,
   cautiousCandidates,
   occurrenceFingerprint,
   type ProjectionInput,
@@ -25,6 +26,14 @@ export type CashflowTrial =
       allocations: AllowanceAllocation[];
     }
   | { kind: 'billDate'; occurrenceKey: string; fingerprint: string; date: string };
+
+/** Available allowance after existing payment allocations, never the unreduced raw cap. */
+export function trialAllowance(base: ProjectionInput) {
+  if (!base.lifecycle) return base.pocketSpend.forward;
+  return buildProjection(base)
+    .value.events.filter((e) => e.kind === 'pocketSpend' && e.date >= base.todayKey)
+    .map((e) => ({ dateKey: e.date, amountMinor: Math.max(0, -e.amountMinor) }));
+}
 
 /** Transform forecast inputs only; this module has no persistence dependencies. */
 export function applyCashflowTrial(base: ProjectionInput, trial: CashflowTrial): ProjectionInput {
@@ -61,6 +70,8 @@ export function applyCashflowTrial(base: ProjectionInput, trial: CashflowTrial):
     throw new Error('Choose an included account.');
   if (trial.allocations.length && trial.allocationCurrency !== base.reportingCurrency)
     throw new Error('Reporting currency changed. Review allowance allocations.');
+  const prior = buildProjection(base);
+  const availableForward = trialAllowance(base);
   const purchaseCost = convertToCurrency(
     trial.amountMinor,
     trial.currency,
@@ -70,7 +81,7 @@ export function applyCashflowTrial(base: ProjectionInput, trial: CashflowTrial):
   );
   const allocations = new Map<string, AllowanceAllocation>();
   for (const a of trial.allocations) {
-    const rows = base.pocketSpend.forward.filter((d) => d.dateKey === a.date);
+    const rows = availableForward.filter((d) => d.dateKey === a.date);
     const available = rows.reduce((sum, d) => sum + d.amountMinor, 0);
     if (
       allocations.has(a.date) ||
@@ -91,13 +102,25 @@ export function applyCashflowTrial(base: ProjectionInput, trial: CashflowTrial):
     throw new Error('Allowance allocation must not exceed the converted purchase cost.');
   // Consume each explicit date once, including inputs containing multiple rows on that date.
   const remaining = new Map([...allocations].map(([date, a]) => [date, a.amountMinor]));
-  const forward = base.pocketSpend.forward.map((d) => {
+  const forward = availableForward.map((d) => {
     const consumed = Math.min(d.amountMinor, remaining.get(d.dateKey) ?? 0);
     remaining.set(d.dateKey, (remaining.get(d.dateKey) ?? 0) - consumed);
     return { ...d, amountMinor: d.amountMinor - consumed };
   });
   return spliceDraft(
-    { ...base, pocketSpend: { ...base.pocketSpend, forward } },
+    {
+      ...base,
+      pocketSpend: { ...base.pocketSpend, forward },
+      ...(base.lifecycle
+        ? {
+            lifecycle: {
+              ...base.lifecycle,
+              allowanceCoverage: { mode: 'separate' as const },
+              issues: [...base.lifecycle.issues, ...(prior.value.lifecycleIssues ?? [])],
+            },
+          }
+        : {}),
+    },
     {
       kind: 'oneOff',
       value: {

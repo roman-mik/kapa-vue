@@ -1,3 +1,4 @@
+import { occurrenceFingerprint } from '@roman-mik/kapa-core/horizon';
 import { createPinia, setActivePinia } from 'pinia';
 import { mount, DOMWrapper, flushPromises } from '@vue/test-utils';
 import { computed, ref, shallowRef } from 'vue';
@@ -231,4 +232,25 @@ it('an open payment draft expires at zoned midnight without a write', async () =
     wrapper.unmount();
     vi.useRealTimers();
   }
+});
+
+it('prefills a trial date and submits one guarded occurrence change', async () => {
+  const payment = context.value!.occurrences[0]!;
+  usePaymentActionSheet().open('salary', {
+    date: '2026-10-20',
+    fingerprint: occurrenceFingerprint(payment),
+  });
+  await open();
+  expect(dom().get('#postponed-date').element).toHaveProperty('value', '2026-10-20');
+  await dom().find('form').trigger('submit');
+  await flushPromises();
+  expect(apply).toHaveBeenCalledTimes(1);
+  expect(apply.mock.calls[0]![1]).toEqual({ kind: 'postpone', date: '2026-10-20' });
+});
+it('does not silently apply a date trial after its source changes', async () => {
+  usePaymentActionSheet().open('salary', { date: '2026-10-20', fingerprint: 'stale' });
+  await open();
+  expect(dom().text()).toContain('changed since the trial');
+  expect(dom().find('#postponed-date').exists()).toBe(false);
+  expect(apply).not.toHaveBeenCalled();
 });

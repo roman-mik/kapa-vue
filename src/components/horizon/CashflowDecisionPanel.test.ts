@@ -1,3 +1,4 @@
+import { usePocketEntrySheet } from '@/composables/usePocketEntrySheet';
 import { mount, flushPromises } from '@vue/test-utils';
 import { createPinia, setActivePinia } from 'pinia';
 import { ref } from 'vue';
@@ -122,4 +123,39 @@ it('previews and dismisses a purchase without writes, displaying both windows', 
   expect(decision.result.value?.summary.selected.endingCashMinor).toBe(150000);
   expect(fetch).not.toHaveBeenCalled();
   vi.unstubAllGlobals();
+});
+
+it('hands a purchase to Pocket and removes the virtual movement before any save', async () => {
+  const base = input();
+  const decision = useCashflowDecision(
+    ref({ ...buildProjection(base), input: base }),
+    ref(false),
+    ref(null)
+  );
+  decision.trialStore.draft = {
+    kind: 'purchase',
+    name: 'Laptop',
+    amountMinor: 10000,
+    date: '2026-10-10',
+    currency: 'EUR',
+    accountId: 'a',
+    allocationCurrency: 'EUR',
+    allocations: [],
+  };
+  const w = mount(CashflowDecisionPanel, {
+    props: { decision },
+    global: { stubs: { RouterLink: true } },
+  });
+  await w
+    .findAll('button')
+    .find((b) => b.text() === 'Record in Pocket')!
+    .trigger('click');
+  expect(usePocketEntrySheet().prefill.value).toMatchObject({
+    amountMinor: 10000,
+    date: '2026-10-10',
+    note: 'Laptop',
+  });
+  expect(decision.trialStore.draft).toBeNull();
+  expect(decision.result.value?.summary.selected.endingCashMinor).toBe(150000);
+  usePocketEntrySheet().close();
 });
