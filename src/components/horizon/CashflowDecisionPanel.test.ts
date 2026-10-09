@@ -159,3 +159,41 @@ it('hands a purchase to Pocket and removes the virtual movement before any save'
   expect(decision.result.value?.summary.selected.endingCashMinor).toBe(150000);
   usePocketEntrySheet().close();
 });
+
+it('explores savings in place and outside cash without executing a transfer', async () => {
+  const fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
+  const base = input();
+  const decision = useCashflowDecision(
+    ref({ ...buildProjection(base), input: base }),
+    ref(false),
+    ref(null)
+  );
+  const w = mount(CashflowDecisionPanel, {
+    props: { decision },
+    global: { stubs: { RouterLink: true } },
+  });
+  await w
+    .findAll('button')
+    .find((b) => b.text() === 'Explore spending or saving')!
+    .trigger('click');
+  const trial = w.find('.trial-editor');
+  await trial.findAll('select')[2]!.setValue('saving');
+  await trial.findAll('input')[0]!.setValue('350');
+  await trial.find('input[type="date"]').setValue('2026-10-10');
+  expect(decision.result.value?.summary.selected.endingCashMinor).toBe(150000);
+  expect(decision.result.value?.summary.selected.reserveShortfallMinor).toBe(5000);
+  expect(w.text()).toContain('Cash and cashflow totals stay unchanged');
+  expect(w.text()).toContain('Base reserve before dated savings');
+  expect(trial.findAll('button').some((b) => b.text() === 'Record in Pocket')).toBe(false);
+  await trial.findAll('select')[4]!.setValue('outside');
+  expect(decision.result.value?.summary.selected.endingCashMinor).toBe(115000);
+  expect(w.text()).toContain('it is not consumption');
+  await trial
+    .findAll('button')
+    .find((b) => b.text() === 'Dismiss trial')!
+    .trigger('click');
+  expect(decision.trialStore.draft).toBeNull();
+  expect(fetch).not.toHaveBeenCalled();
+  vi.unstubAllGlobals();
+});

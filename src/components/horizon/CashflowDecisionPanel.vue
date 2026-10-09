@@ -82,7 +82,13 @@ const excluded = computed(
         >.
       </p>
       <p v-else>
-        Reserve:
+        {{
+          decision.trialStore.draft?.kind === 'exploration' &&
+          decision.trialStore.draft.purpose === 'saving' &&
+          decision.trialStore.draft.savingTreatment === 'earmark'
+            ? 'Base reserve before dated savings:'
+            : 'Reserve:'
+        }}
         {{
           decision.reserveUnset.value
             ? 'No reserve set (zero cash floor)'

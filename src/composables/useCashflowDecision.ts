@@ -1,3 +1,4 @@
+import { assessExplorationReserve } from '@/lib/horizon/explorationTrial';
 import { computed, watch, type Ref } from 'vue';
 import {
   applyCautiousScenario,
@@ -84,11 +85,22 @@ export function useCashflowDecision(
         ...result,
         unconverted: [...result.unconverted, ...(changed === base ? [] : data.value.unconverted)],
       };
+      const basicSummary = computeDecisionSummary(changed, combined, reserve.value);
+      const summary =
+        trialStore.draft?.kind === 'exploration'
+          ? assessExplorationReserve(
+              changed,
+              combined.value,
+              basicSummary,
+              reserve.value,
+              trialStore.draft
+            )
+          : basicSummary;
       return {
         value: {
           input: changed,
           projection: combined,
-          summary: computeDecisionSummary(changed, combined, reserve.value),
+          summary,
         },
         error: '',
       };
