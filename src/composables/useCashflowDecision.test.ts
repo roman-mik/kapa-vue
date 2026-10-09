@@ -76,3 +76,33 @@ it('loading, errors and currency mismatch cannot give affirmative reserve covera
   expect(d.reserveMismatch.value).toBe(true);
   expect(d.result.value?.summary.selected.reserveShortfallMinor).toBeNull();
 });
+
+it('shares a purchase trial, recomputes refreshed inputs, and clears on space switch', async () => {
+  const base = input();
+  base.pocketSpend.forward = [{ dateKey: '2026-10-20', amountMinor: 40000 }];
+  const data = ref({ ...buildProjection(base), input: base });
+  const a = useCashflowDecision(data, ref(false), ref(null));
+  const b = useCashflowDecision(data, ref(false), ref(null));
+  a.trialStore.draft = {
+    kind: 'purchase',
+    name: 'Laptop',
+    date: '2026-10-10',
+    amountMinor: 10000,
+    currency: 'EUR',
+    accountId: 'a',
+    allocationCurrency: 'EUR',
+    allocations: [{ date: '2026-10-20', amountMinor: 10000, availableMinor: 40000 }],
+  };
+  expect(b.result.value?.summary.selected.endingCashMinor).toBe(110000);
+  const changed = {
+    ...base,
+    pocketSpend: { actuals: [], forward: [{ dateKey: '2026-10-20', amountMinor: 30000 }] },
+  };
+  data.value = { ...buildProjection(changed), input: changed };
+  expect(a.qualified.value).toBe(false);
+  expect(a.error.value).toContain('Allowance changed');
+  expect(a.trialStore.draft).not.toBeNull();
+  useSpaceStore().currentSpaceId = 's2';
+  await nextTick();
+  expect(a.trialStore.draft).toBeNull();
+});

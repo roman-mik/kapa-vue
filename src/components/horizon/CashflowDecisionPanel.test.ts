@@ -89,3 +89,37 @@ it('discloses an unset reserve as zero rather than a saved cash floor', async ()
   expect(w.text()).toContain('No reserve set (zero cash floor)');
   settings.value = { reserve_minor: 20000, reserve_currency: 'EUR', reporting_currency: 'EUR' };
 });
+
+it('previews and dismisses a purchase without writes, displaying both windows', async () => {
+  const fetch = vi.fn();
+  vi.stubGlobal('fetch', fetch);
+  const base = input();
+  const decision = useCashflowDecision(
+    ref({ ...buildProjection(base), input: base }),
+    ref(false),
+    ref(null)
+  );
+  const w = mount(CashflowDecisionPanel, {
+    props: { decision },
+    global: { stubs: { RouterLink: true } },
+  });
+  await w
+    .findAll('button')
+    .find((b) => b.text() === 'Test a purchase')!
+    .trigger('click');
+  const fields = w.find('.trial-editor').findAll('input');
+  await fields[0]!.setValue('Laptop');
+  await fields[1]!.setValue('100');
+  await fields[2]!.setValue('2026-10-10');
+  expect(w.text()).toContain('Before trial → with trial');
+  expect(w.text()).toContain('Through next income');
+  expect(decision.result.value?.summary.selected.endingCashMinor).toBe(140000);
+  await w
+    .findAll('button')
+    .find((b) => b.text() === 'Dismiss trial')!
+    .trigger('click');
+  expect(decision.trialStore.draft).toBeNull();
+  expect(decision.result.value?.summary.selected.endingCashMinor).toBe(150000);
+  expect(fetch).not.toHaveBeenCalled();
+  vi.unstubAllGlobals();
+});
