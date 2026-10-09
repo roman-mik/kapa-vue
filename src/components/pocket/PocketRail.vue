@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSwitcher from '@/components/layout/AppSwitcher.vue';
 import type { Currency } from '@roman-mik/kapa-core/pocket';
 import { computed } from 'vue';
 import { usePocketEntrySheet } from '@/composables/usePocketEntrySheet';
@@ -69,6 +70,8 @@ const initials = computed(() => {
       <span class="title">Pocket</span>
       <span class="subtitle"> {{ spaceName }} · {{ spaceCurrency }} household </span>
     </div>
+
+    <AppSwitcher />
 
     <button type="button" class="add-btn" @click="entrySheet.open()">
       <span class="add-icon">+</span>Add expense

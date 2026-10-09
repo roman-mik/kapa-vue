@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSwitcher from '@/components/layout/AppSwitcher.vue';
 import type { Currency } from '@roman-mik/kapa-core/pocket';
 import { computed } from 'vue';
 import { useAccounts } from '@/composables/useAccounts';
@@ -72,6 +73,8 @@ const fx = computed(() => {
       <span class="title">Horizon</span>
       <span class="subtitle"> {{ spaceName }} · {{ spaceCurrency }} household </span>
     </div>
+
+    <AppSwitcher />
 
     <div class="links">
       <router-link

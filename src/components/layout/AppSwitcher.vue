@@ -12,29 +12,28 @@ const isPocket = computed(() => !isHorizon.value);
 </script>
 
 <template>
-  <div class="switcher" role="tablist" aria-label="App">
+  <nav class="switcher" aria-label="Apps">
     <router-link
-      :to="{ name: 'home' }"
-      role="tab"
-      :aria-selected="isPocket"
+      :to="isPocket ? route.fullPath : { name: 'home' }"
+      :aria-current="isPocket ? 'true' : undefined"
       :class="['tab', { active: isPocket }]"
     >
       Pocket
     </router-link>
     <router-link
-      :to="{ name: 'horizon-today' }"
-      role="tab"
-      :aria-selected="isHorizon"
+      :to="isHorizon ? route.fullPath : { name: 'horizon-today' }"
+      :aria-current="isHorizon ? 'true' : undefined"
       :class="['tab', { active: isHorizon }]"
     >
       Horizon
     </router-link>
-  </div>
+  </nav>
 </template>
 
 <style scoped>
 .switcher {
-  display: inline-flex;
+  display: flex;
+  min-width: 0;
   align-items: center;
   gap: 2px;
   padding: 2px;
@@ -44,6 +43,12 @@ const isPocket = computed(() => !isHorizon.value);
 }
 
 .tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 44px;
+  box-sizing: border-box;
   padding: var(--kapa-space-1) var(--kapa-space-3);
   border-radius: calc(var(--kapa-radius-md) - 2px);
   color: var(--kapa-ink-subtle);
@@ -55,7 +60,18 @@ const isPocket = computed(() => !isHorizon.value);
     background-color var(--kapa-motion-fast) var(--kapa-motion-ease);
 }
 
+.tab:focus-visible {
+  outline: 2px solid var(--kapa-ink);
+  outline-offset: 2px;
+}
+
+.tab:hover:not(.active) {
+  background: var(--kapa-neutral-100);
+  color: var(--kapa-ink);
+}
+
 .tab.active {
+  font-weight: 700;
   background: var(--kapa-accent);
   color: var(--kapa-white);
 }
