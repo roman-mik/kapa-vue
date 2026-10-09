@@ -38,6 +38,7 @@ const monthLabel = computed(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--kapa-space-3);
+  flex-wrap: wrap;
   padding: calc(var(--kapa-space-3) + env(safe-area-inset-top, 0px)) var(--kapa-space-4)
     var(--kapa-space-3);
   border-bottom: 1px solid var(--kapa-neutral-400);
@@ -45,12 +46,15 @@ const monthLabel = computed(() => {
 }
 
 .identity {
+  flex: 1 1 140px;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
 .space {
+  overflow-wrap: anywhere;
   font-weight: 600;
   color: var(--kapa-ink);
 }
@@ -58,5 +62,15 @@ const monthLabel = computed(() => {
 .month {
   font-size: var(--kapa-text-caption-size);
   color: var(--kapa-ink-muted);
+}
+
+.app-header :deep(.switcher) {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 380px) {
+  .app-header :deep(.switcher) {
+    width: 100%;
+  }
 }
 </style>
