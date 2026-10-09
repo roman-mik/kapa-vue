@@ -10,6 +10,31 @@ function deferred<T>() {
 }
 
 describe('QueryCache', () => {
+  it.each([
+    [new Error('Network unavailable'), 'Network unavailable'],
+    [
+      { code: '42501', message: 'Permission denied for forecast' },
+      'Permission denied for forecast',
+    ],
+    [{ message: '' }, 'Could not load data.'],
+    [{ message: 42 }, 'Could not load data.'],
+    [null, 'Could not load data.'],
+  ])(
+    'preserves useful remote errors and falls back for unknown failures (%j)',
+    async (error, message) => {
+      const query = new QueryCache().use({
+        key: ['u1', 's1', 'projection'],
+        staleTimeMs: 1_000,
+        load: async () => {
+          throw error;
+        },
+      });
+      await query.fetch();
+      expect(query.error.value).toBe(message);
+      expect(query.loading.value).toBe(false);
+    }
+  );
+
   it('updates loading while a request is pending and after it settles', async () => {
     const cache = new QueryCache();
     const response = deferred<number>();

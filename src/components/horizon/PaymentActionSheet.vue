@@ -73,11 +73,14 @@ function hydrate(data: PaymentContext) {
   const p = payment.value;
   if (!p) return;
   accountId.value = p.actual?.accountId ?? p.expected.accountId;
+  const amountCurrency = p.actual?.currency ?? p.expected.currency;
   const exponent = CURRENCY_EXPONENT[(p.actual?.currency ?? p.expected.currency) as Currency];
-  amount.value = (
-    Math.abs(p.actual?.amountMinor ?? p.expected.amountMinor) /
-    10 ** exponent
-  ).toFixed(exponent);
+  amount.value =
+    amountCurrency === account.value?.currency
+      ? (Math.abs(p.actual?.amountMinor ?? p.expected.amountMinor) / 10 ** exponent).toFixed(
+          exponent
+        )
+      : '';
   date.value = p.actual?.date ?? data.today;
   inclusion.value = '';
   if (initialDateTrial) {

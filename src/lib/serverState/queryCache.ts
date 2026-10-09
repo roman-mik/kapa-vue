@@ -35,7 +35,15 @@ function serialiseKey(key: QueryKey): string {
 }
 
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Could not load data.';
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof error.message === 'string' &&
+    error.message.trim()
+  )
+    return error.message;
+  return 'Could not load data.';
 }
 
 function keyStartsWith(key: QueryKey, prefix: QueryKey): boolean {
