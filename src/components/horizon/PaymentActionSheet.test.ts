@@ -119,6 +119,27 @@ it('records an early receipt with actual facts and original observation', async 
   );
   expect(usePaymentActionSheet().paymentId.value).toBeNull();
 });
+it('requires a native account amount for a foreign-currency expected receipt', async () => {
+  context.value!.occurrences[0].expected.currency = 'EUR';
+  context.value!.occurrences[0].expected.amountMinor = 100_000;
+  await open();
+  await click('Mark received');
+  expect(dom().find<HTMLInputElement>('#actual-amount').element.value).toBe('');
+  await dom().find('input[value="excluded"]').setValue();
+  await dom().find('form').trigger('submit');
+  await flushPromises();
+  expect(apply).not.toHaveBeenCalled();
+  await dom().find('#actual-amount').setValue('117000');
+  await dom().find('form').trigger('submit');
+  await flushPromises();
+  expect(apply).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({
+      actual: expect.objectContaining({ currency: 'RSD', amountMinor: 117000 }),
+    }),
+    expect.any(String)
+  );
+});
 it('postpones only the selected occurrence', async () => {
   await open();
   await click('Change date');
