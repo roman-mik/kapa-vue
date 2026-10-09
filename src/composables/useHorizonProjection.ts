@@ -30,7 +30,11 @@ export function useHorizonProjection(dayOffset: () => number) {
         daysBetween(from, to)
       );
       const result = buildProjection(loaded.input);
-      return { ...result, unconverted: [...result.unconverted, ...loaded.unconverted] };
+      return {
+        ...result,
+        input: loaded.input,
+        unconverted: [...result.unconverted, ...loaded.unconverted],
+      };
     },
   });
 }
